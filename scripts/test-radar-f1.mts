@@ -16,8 +16,10 @@
 import { config } from "dotenv";
 import { collectRDStation } from "@/lib/collectors/rdstation";
 import { analyze } from "@/lib/analyst";
+import { buildBriefing } from "@/lib/briefing";
 import { MOOVEFY } from "@/lib/clients/moovefy";
-import type { RawEvent } from "@/lib/types";
+import { sendToFormare, isDoorLive } from "@/lib/formare-door";
+import type { IntelligenceItem, RawEvent } from "@/lib/types";
 
 config({ path: ".env.local" });
 
@@ -52,6 +54,8 @@ async function rodarLoopF1(): Promise<Criterio[]> {
   const criterios: Criterio[] = [];
   // coletado uma vez no critério 1 e REUSADO no critério 3 (sem coletar duas vezes).
   let eventos: RawEvent[] = [];
+  // gerado no critério 3 e REUSADO no critério 4 (briefing/feed sobre os mesmos itens).
+  let itens: IntelligenceItem[] = [];
 
   // 1) Coletar >=1 movimento real do concorrente.
   //    Usa o cache do Firecrawl -> reexecuções no mesmo dia custam 0 créditos.
@@ -87,7 +91,7 @@ async function rodarLoopF1(): Promise<Criterio[]> {
 
   // 3) Analista gera item bem-formado, ancorado no Brain, a partir dos eventos já coletados.
   try {
-    const itens = await analyze(eventos, MOOVEFY.clientName, MOOVEFY.brainContext);
+    itens = await analyze(eventos, MOOVEFY.clientName, MOOVEFY.brainContext);
     const bons = itens.filter(
       (it) =>
         it.sinal.trim().length > 0 &&
@@ -110,9 +114,38 @@ async function rodarLoopF1(): Promise<Criterio[]> {
     });
   }
 
-  // 4-5) ainda pendentes — próximos passos do F1.
-  criterios.push({ nome: "Item aparece no briefing + feed", feito: false, detalhe: "não implementado ainda" });
-  criterios.push({ nome: "Botão dispara uma demanda no Formare", feito: false, detalhe: "não implementado ainda" });
+  // 4) O item aparece no briefing (top por score) — reusa os itens do critério 3.
+  //    O feed é o superconjunto (todos os itens); se há briefing, há feed.
+  const noBriefing = buildBriefing(itens).length;
+  criterios.push({
+    nome: "Item aparece no briefing + feed",
+    feito: noBriefing >= 1,
+    detalhe: noBriefing >= 1
+      ? `${noBriefing} no briefing do dia (de ${itens.length} no feed)`
+      : "nenhum item chegou ao briefing",
+  });
+
+  // 5) O botão "Gerar no Formare" dispara o envio pela porta estreita.
+  //    MODO SEGURO (dry-run): registra o bilhete localmente e NÃO toca no Formare
+  //    até o Rafael aprovar e instalar a porta. Live e dry-run usam o MESMO código.
+  try {
+    const envio = await sendToFormare(itens, { workspaceName: MOOVEFY.clientName });
+    criterios.push({
+      nome: "Botão dispara uma demanda no Formare",
+      feito: envio.ok,
+      detalhe: envio.ok
+        ? envio.mode === "dry-run"
+          ? `modo seguro (dry-run): bilhete de ${envio.payload.items.length} item(ns) gerado — porta real pendente do seu OK`
+          : `enviado ao Formare (${envio.inserted} inserido(s))`
+        : `falhou: ${envio.error}`,
+    });
+  } catch (err) {
+    criterios.push({
+      nome: "Botão dispara uma demanda no Formare",
+      feito: false,
+      detalhe: `envio falhou: ${(err as Error).message}`,
+    });
+  }
 
   return criterios;
 }
@@ -127,7 +160,10 @@ async function main(): Promise<void> {
   }
   console.log();
   if (tudoVerde) {
-    console.log("F1 VERDE ✅ — o loop mínimo funciona ponta-a-ponta.");
+    console.log("F1 COMPLETO ✅ — o loop mínimo funciona ponta-a-ponta.");
+    if (!isDoorLive()) {
+      console.log("(Entrega ao Formare em MODO SEGURO / dry-run — a porta estreita real aguarda o OK do Rafael.)");
+    }
     process.exit(0);
   }
   console.log("F1 ainda NÃO completo (esperado nesta fase). Vermelho honesto até o loop existir.");

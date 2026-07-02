@@ -1,13 +1,12 @@
 /**
- * BRIEFING DO DIA — a tela-ritual do Radar.
+ * FEED — todos os itens de inteligência do dia, em lista compacta.
  *
- * Server component: roda o loop (com cache diário, então visitas repetidas são
- * baratas) e mostra os itens de maior impacto para o cliente do F1 (Moovefy).
- * Cada item é um CARD: selo de impacto, o sinal (título), "por que importa",
- * "ação recomendada", a fonte (link) e o botão "Gerar no Formare".
+ * Mesma origem do briefing (o loop com cache diário), mas sem cortar por
+ * impacto: aqui está tudo. Cada linha mostra o selo, o sinal, a categoria, a
+ * fonte (link) e o botão "Gerar no Formare".
  */
 
-import { buildBriefing } from "@/lib/briefing";
+import { buildFeed, categoryOf } from "@/lib/briefing";
 import { MOOVEFY } from "@/lib/clients/moovefy";
 import { formatDateTimePtBR } from "@/lib/format";
 import { runRadarLoop } from "@/lib/loop";
@@ -15,11 +14,11 @@ import type { IntelligenceItem } from "@/lib/types";
 
 import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { RodarAgora } from "@/components/rodar-agora";
-import { FonteLink, ScoreBadge } from "@/components/score-badge";
+import { CategoryChip, FonteLink, ScoreBadge } from "@/components/score-badge";
 
 export const dynamic = "force-dynamic";
 
-export default async function BriefingPage() {
+export default async function FeedPage() {
   let items: IntelligenceItem[] = [];
   let ranAt = "";
   let error: string | null = null;
@@ -32,20 +31,20 @@ export default async function BriefingPage() {
     error = err instanceof Error ? err.message : "Não foi possível rodar o Radar.";
   }
 
-  const briefing = buildBriefing(items);
+  const feed = buildFeed(items);
 
   return (
     <section className="mx-auto max-w-3xl px-5 py-8 sm:px-6 sm:py-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-widest text-stone-400">
-            Briefing do dia
+            Feed
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
-            Radar — Briefing do dia
+            Todos os movimentos
           </h1>
           <p className="mt-1.5 text-sm text-stone-500">
-            Cliente{" "}
+            {feed.length} {feed.length === 1 ? "item" : "itens"} · cliente{" "}
             <span className="font-medium text-stone-700">{MOOVEFY.clientName}</span>
             {ranAt ? <> · atualizado em {formatDateTimePtBR(ranAt)}</> : null}
           </p>
@@ -56,56 +55,44 @@ export default async function BriefingPage() {
       <div className="mt-8">
         {error ? (
           <ErrorState message={error} />
-        ) : briefing.length === 0 ? (
+        ) : feed.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="space-y-4">
-            {briefing.map((item) => (
-              <BriefingCard key={item.id} item={item} />
+          <ul className="divide-y divide-stone-200 overflow-hidden rounded-2xl border border-stone-200 bg-white">
+            {feed.map((item) => (
+              <FeedRow key={item.id} item={item} />
             ))}
-          </div>
+          </ul>
         )}
       </div>
     </section>
   );
 }
 
-function BriefingCard({ item }: { item: IntelligenceItem }) {
+function FeedRow({ item }: { item: IntelligenceItem }) {
+  const category = categoryOf(item);
   return (
-    <article
-      data-testid="intel-item"
-      className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6"
+    <li
+      data-testid="feed-item"
+      className="flex items-start gap-3 px-4 py-4 sm:gap-4 sm:px-5"
     >
-      <div className="flex items-start gap-4">
-        <ScoreBadge score={item.score} />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold leading-snug tracking-tight text-stone-900">
-            {item.sinal}
-          </h2>
-          <FonteLink fonte={item.fonte} className="mt-1 max-w-full text-sm" />
+      <ScoreBadge score={item.score} size="sm" />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h2 className="font-medium leading-snug text-stone-900">{item.sinal}</h2>
+          {category ? <CategoryChip category={category} /> : null}
         </div>
+        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-stone-600">
+          {item.porQueImporta}
+        </p>
+        <FonteLink fonte={item.fonte} className="mt-1.5 max-w-full text-xs" />
       </div>
 
-      <div className="mt-5 space-y-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-            Por que importa
-          </p>
-          <p className="mt-1 leading-relaxed text-stone-700">{item.porQueImporta}</p>
-        </div>
-
-        <div className="rounded-xl border-l-2 border-emerald-400 bg-emerald-50/60 py-3 pl-4 pr-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            Ação recomendada
-          </p>
-          <p className="mt-1 leading-relaxed text-stone-800">{item.acao}</p>
-        </div>
-      </div>
-
-      <div className="mt-5 flex items-center justify-end border-t border-stone-100 pt-4">
+      <div className="flex-none pt-0.5">
         <GerarNoFormareButton itemId={item.id} />
       </div>
-    </article>
+    </li>
   );
 }
 
