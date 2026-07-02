@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "smoke": "tsx scripts/test-radar-f1.mts"
+    "smoke": "tsx scripts/test-radar-f1.mts",
+    "collect": "tsx scripts/collect.mts"
   },
   "dependencies": {
     "next": "16.2.7",
@@ -19,6 +20,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "tailwindcss": "^4",
     "tsx": "^4.22.5",
     "typescript": "^5"

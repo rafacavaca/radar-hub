@@ -13,6 +13,11 @@
  * checagem real. Quando os 5 critérios ficarem verdes, o F1 está provado.
  */
 
+import { config } from "dotenv";
+import { collectRDStation } from "@/lib/collectors/rdstation";
+
+config({ path: ".env.local" });
+
 const CLIENTE = "Moovefy";
 const CONCORRENTE = "RD Station";
 
@@ -41,14 +46,35 @@ export function itemValido(item: Partial<ItemDeInteligencia> | null | undefined)
 type Criterio = { nome: string; feito: boolean; detalhe?: string };
 
 async function rodarLoopF1(): Promise<Criterio[]> {
-  // TODO(F1): substituir cada `feito: false` pela checagem real conforme o loop for construído.
-  return [
-    { nome: `Coletar >=1 movimento real de ${CONCORRENTE}`, feito: false, detalhe: "coletor ainda não implementado" },
-    { nome: `Ler o Brain de ${CLIENTE} (via porta estreita de leitura)`, feito: false, detalhe: "leitura do Brain ainda não implementada" },
-    { nome: "Analista gera >=1 item bem-formado {sinal, por que importa (ancorado), ação, fonte, score}", feito: false, detalhe: "analista ainda não implementado" },
-    { nome: "Item aparece no briefing + feed", feito: false, detalhe: "entrega ainda não implementada" },
-    { nome: "Botão dispara uma demanda no Formare", feito: false, detalhe: "ponte com o Formare ainda não implementada" },
-  ];
+  const criterios: Criterio[] = [];
+
+  // 1) Coletar >=1 movimento real do concorrente.
+  //    Usa o cache do Firecrawl -> reexecuções no mesmo dia custam 0 créditos.
+  try {
+    const eventos = await collectRDStation({ limit: 5 });
+    const comTitulo = eventos.filter((e) => e.title?.trim()).length;
+    criterios.push({
+      nome: `Coletar >=1 movimento real de ${CONCORRENTE}`,
+      feito: comTitulo >= 1,
+      detalhe: eventos.length
+        ? `${eventos.length} coletado(s); ex.: "${eventos[0].title.slice(0, 60)}"`
+        : "nenhum evento coletado",
+    });
+  } catch (err) {
+    criterios.push({
+      nome: `Coletar >=1 movimento real de ${CONCORRENTE}`,
+      feito: false,
+      detalhe: `coleta falhou: ${(err as Error).message}`,
+    });
+  }
+
+  // 2-5) ainda pendentes — próximos passos do F1.
+  criterios.push({ nome: `Ler o Brain de ${CLIENTE} (via porta estreita de leitura)`, feito: false, detalhe: "não implementado ainda" });
+  criterios.push({ nome: "Analista gera item {sinal, por que importa (ancorado), ação, fonte, score}", feito: false, detalhe: "não implementado ainda" });
+  criterios.push({ nome: "Item aparece no briefing + feed", feito: false, detalhe: "não implementado ainda" });
+  criterios.push({ nome: "Botão dispara uma demanda no Formare", feito: false, detalhe: "não implementado ainda" });
+
+  return criterios;
 }
 
 async function main(): Promise<void> {

@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# radar collectors cache (respostas do Firecrawl — não versionar)
+/.cache/
+
+# permitir o exemplo (sem segredos)
+!.env.example
