@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/", label: "Briefing" },
   { href: "/feed", label: "Feed" },
+  { href: "/vigiar", label: "Vigiar" },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
