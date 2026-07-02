@@ -15,6 +15,9 @@
 
 import { config } from "dotenv";
 import { collectRDStation } from "@/lib/collectors/rdstation";
+import { analyze } from "@/lib/analyst";
+import { MOOVEFY } from "@/lib/clients/moovefy";
+import type { RawEvent } from "@/lib/types";
 
 config({ path: ".env.local" });
 
@@ -47,11 +50,13 @@ type Criterio = { nome: string; feito: boolean; detalhe?: string };
 
 async function rodarLoopF1(): Promise<Criterio[]> {
   const criterios: Criterio[] = [];
+  // coletado uma vez no critério 1 e REUSADO no critério 3 (sem coletar duas vezes).
+  let eventos: RawEvent[] = [];
 
   // 1) Coletar >=1 movimento real do concorrente.
   //    Usa o cache do Firecrawl -> reexecuções no mesmo dia custam 0 créditos.
   try {
-    const eventos = await collectRDStation({ limit: 5 });
+    eventos = await collectRDStation({ limit: 5 });
     const comTitulo = eventos.filter((e) => e.title?.trim()).length;
     criterios.push({
       nome: `Coletar >=1 movimento real de ${CONCORRENTE}`,
@@ -68,9 +73,44 @@ async function rodarLoopF1(): Promise<Criterio[]> {
     });
   }
 
-  // 2-5) ainda pendentes — próximos passos do F1.
-  criterios.push({ nome: `Ler o Brain de ${CLIENTE} (via porta estreita de leitura)`, feito: false, detalhe: "não implementado ainda" });
-  criterios.push({ nome: "Analista gera item {sinal, por que importa (ancorado), ação, fonte, score}", feito: false, detalhe: "não implementado ainda" });
+  // 2) Ler o Brain do cliente. Por ora é a FIXTURE de teste (substituto provisório
+  //    do Brain real do Formare, até a "porta estreita" de leitura existir).
+  const temBrain =
+    typeof MOOVEFY.brainContext === "string" && MOOVEFY.brainContext.trim().length > 0;
+  criterios.push({
+    nome: `Ler o Brain de ${CLIENTE} (via porta estreita de leitura)`,
+    feito: temBrain,
+    detalhe: temBrain
+      ? `fixture de teste (${MOOVEFY.brainContext.length} chars) — substituto provisório do Brain real`
+      : "brainContext vazio",
+  });
+
+  // 3) Analista gera item bem-formado, ancorado no Brain, a partir dos eventos já coletados.
+  try {
+    const itens = await analyze(eventos, MOOVEFY.clientName, MOOVEFY.brainContext);
+    const bons = itens.filter(
+      (it) =>
+        it.sinal.trim().length > 0 &&
+        it.porQueImporta.trim().length > 0 &&
+        it.acao.trim().length > 0 &&
+        typeof it.score === "number",
+    );
+    criterios.push({
+      nome: "Analista gera item {sinal, por que importa (ancorado), ação, fonte, score}",
+      feito: bons.length >= 1,
+      detalhe: bons.length
+        ? `${bons.length} item(ns); ex.: "${bons[0].sinal.slice(0, 70)}" (score ${bons[0].score})`
+        : "nenhum item bem-formado gerado",
+    });
+  } catch (err) {
+    criterios.push({
+      nome: "Analista gera item {sinal, por que importa (ancorado), ação, fonte, score}",
+      feito: false,
+      detalhe: `análise falhou: ${(err as Error).message}`,
+    });
+  }
+
+  // 4-5) ainda pendentes — próximos passos do F1.
   criterios.push({ nome: "Item aparece no briefing + feed", feito: false, detalhe: "não implementado ainda" });
   criterios.push({ nome: "Botão dispara uma demanda no Formare", feito: false, detalhe: "não implementado ainda" });
 
