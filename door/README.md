@@ -10,7 +10,8 @@ credencial do banco — o `.env` NUNCA entra neste repo).
 |---|---|---|
 | `GET /health` | vivo? + escrita on/off | aberto (sem segredo) |
 | `GET /brain?workspace=Nome&limit=60` | **LEITURA**: só conhecimento `is_confirmed=true` e `authority IN (canonical, reference)` do workspace, conteúdo truncado (1500 chars/nó, máx 200 nós) | exige `Authorization: Bearer <segredo>` |
-| `POST /intake` | **ESCRITA**: insere bilhetes SEMPRE como pendente+rascunho (`is_confirmed=false`, `authority='draft'`, `origin=radar` — literais no SQL) | exige segredo **E** `DOOR_WRITE_ENABLED=true` (hoje: **DESLIGADA**, pedido do Rafael 02/jul) |
+| `POST /intake` | **ESCRITA (Brain)**: insere bilhetes SEMPRE como pendente+rascunho (`is_confirmed=false`, `authority='draft'`, `origin=radar` — literais no SQL) | exige segredo **E** `DOOR_WRITE_ENABLED=true` (hoje: **DESLIGADA**, pedido do Rafael 02/jul) |
+| `POST /task` | **AÇÃO (F4)**: 1 item de inteligência vira 1 CARD do Formare em `stage='ideias'` + `tags=['radar']` (forçados no servidor; INSERT-only) | idem — segredo **E** `DOOR_WRITE_ENABLED=true` |
 
 Garantias: o Radar nunca tem a credencial do banco; rascunhos/pendentes nunca
 saem pela leitura; a escrita nunca toca nó existente (INSERT-only); escuta só

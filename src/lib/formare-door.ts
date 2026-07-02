@@ -60,6 +60,109 @@ function toPayload(items: IntelligenceItem[], workspaceName: string): DoorPayloa
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// F4 — AÇÃO NO FORMARE: 1 item de inteligência vira 1 CARD (pedido de trabalho)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Onde o Formare vive (pra montar o link "Ver no Formare" do card criado). */
+const FORMARE_APP_URL = process.env.FORMARE_APP_URL || "https://os.formare.tech";
+/** Base da porta estreita. Deriva da URL do /brain se não houver override. */
+function doorBaseUrl(): string | null {
+  if (process.env.RADAR_DOOR_BASE_URL) return process.env.RADAR_DOOR_BASE_URL;
+  const brain = process.env.RADAR_BRAIN_URL;
+  if (brain) return brain.replace(/\/brain\/?$/, "");
+  return null;
+}
+function doorSecret(): string | null {
+  return process.env.RADAR_DOOR_SECRET || process.env.RADAR_BRAIN_SECRET || null;
+}
+
+/** Link direto pro card dentro do Formare. */
+export function buildCardUrl(workspaceId: string, cardId: string): string {
+  return `${FORMARE_APP_URL}/workspaces/${workspaceId}/cards/${cardId}`;
+}
+
+export type SendTaskResult =
+  | { mode: "live"; ok: true; cardId: string; cardUrl: string }
+  | { mode: "dry-run"; ok: true; savedTo: string; reason: string }
+  | { mode: "live" | "dry-run"; ok: false; error: string };
+
+/** Grava o pedido na caixa de saída local (o dry-run do /task). */
+function saveTaskToOutbox(payload: unknown): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const hash = createHash("sha1").update(JSON.stringify(payload)).digest("hex").slice(0, 8);
+  mkdirSync(OUTBOX_DIR, { recursive: true });
+  const savedTo = join(OUTBOX_DIR, `task-${stamp}-${hash}.json`);
+  writeFileSync(
+    savedTo,
+    JSON.stringify({ kind: "task", mode: "dry-run", ranAt: new Date().toISOString(), payload }, null, 2),
+    "utf8",
+  );
+  return savedTo;
+}
+
+/**
+ * "Gerar no Formare" formalizado (F4): envia UM item pra virar CARD ('ideias',
+ * tag radar — forçados pela porta). A PORTA decide se a escrita está ligada:
+ * 403 = escrita desligada -> registramos na caixa de saída e dizemos isso.
+ */
+export async function sendTaskToFormare(item: IntelligenceItem): Promise<SendTaskResult> {
+  const base = doorBaseUrl();
+  const secret = doorSecret();
+  const payload = {
+    workspaceName: item.clientName,
+    item: {
+      sinal: item.sinal,
+      porQueImporta: item.porQueImporta,
+      acao: item.acao,
+      fonte: item.fonte,
+      score: item.score,
+      concorrente: item.concorrente,
+    },
+  };
+
+  // Porta nem configurada -> caixa de saída (nunca perde o pedido).
+  if (!base || !secret) {
+    const savedTo = saveTaskToOutbox(payload);
+    return { mode: "dry-run", ok: true, savedTo, reason: "porta não configurada" };
+  }
+
+  try {
+    const res = await fetch(`${base}/task`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(LIVE_TIMEOUT_MS),
+    });
+
+    // 403 = escrita DESLIGADA por decisão do Rafael -> modo seguro, sem erro.
+    if (res.status === 403) {
+      const savedTo = saveTaskToOutbox(payload);
+      return { mode: "dry-run", ok: true, savedTo, reason: "porta de escrita desligada" };
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { mode: "live", ok: false, error: `porta ${res.status}: ${text.slice(0, 200)}` };
+    }
+
+    const data = (await res.json()) as {
+      data?: { cardId?: string; workspaceId?: string };
+      error?: string;
+    };
+    if (data.error || !data.data?.cardId || !data.data.workspaceId) {
+      return { mode: "live", ok: false, error: data.error ?? "resposta sem cardId" };
+    }
+    return {
+      mode: "live",
+      ok: true,
+      cardId: data.data.cardId,
+      cardUrl: buildCardUrl(data.data.workspaceId, data.data.cardId),
+    };
+  } catch (err) {
+    return { mode: "live", ok: false, error: (err as Error).message };
+  }
+}
+
 /**
  * Envia itens de inteligência ao Formare pela porta estreita.
  * Sem RADAR_INTAKE_URL/SECRET -> DRY-RUN (registra local, não envia nada).

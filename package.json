@@ -10,6 +10,7 @@
     "smoke": "tsx scripts/test-radar-f1.mts",
     "smoke:f2": "tsx scripts/test-radar-f2.mts",
     "smoke:f3": "tsx scripts/test-radar-f3.mts",
+    "smoke:f4": "tsx scripts/test-radar-f4.mts",
     "collect": "tsx scripts/collect.mts",
     "analyze": "tsx scripts/analyze.mts"
   },

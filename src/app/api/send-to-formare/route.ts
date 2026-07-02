@@ -1,17 +1,17 @@
 /**
- * POST /api/send-to-formare — a "porta estreita" (Radar -> Brain do Formare).
+ * POST /api/send-to-formare — "Gerar no Formare" formalizado (F4).
  *
- * MODO SEGURO (dry-run) por padrão: enquanto RADAR_INTAKE_URL/SECRET não estão
- * definidos, NÃO envia nada ao Formare — registra o bilhete numa caixa de saída
- * local (.cache/outbox/). Quando o Rafael instalar e aprovar a porta, o MESMO
- * código passa a enviar de verdade. Ver docs/narrow-door/README.md.
+ * O item de inteligência vira um PEDIDO DE TRABALHO no Formare: um card em
+ * 'ideias', tag 'radar' (valores forçados pela porta estreita). Quando a porta
+ * de escrita está DESLIGADA (decisão do Rafael), a porta devolve 403 e o pedido
+ * fica registrado na caixa de saída local — nada toca o Formare.
  *
- * body { itemId }  ->  200 { data: SendResult }  (ou 4xx/5xx)
+ * body { itemId }  ->  200 { data: SendTaskResult }  (ou 4xx/5xx)
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { sendToFormare } from "@/lib/formare-door";
+import { sendTaskToFormare } from "@/lib/formare-door";
 import { runRadarLoop } from "@/lib/loop";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +33,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "item não encontrado" }, { status: 404 });
     }
 
-    // Envia pela porta estreita. Sem porta configurada -> dry-run (seguro).
-    const result = await sendToFormare([item], { workspaceName: item.clientName });
+    // Vira card pela porta estreita. Escrita desligada -> dry-run (403 vira
+    // caixa de saída, ok:true) — o botão mostra o estado honesto.
+    const result = await sendTaskToFormare(item);
     return NextResponse.json({ data: result }, { status: result.ok ? 200 : 502 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "falha no envio";

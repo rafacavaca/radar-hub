@@ -1,6 +1,6 @@
 /**
- * radar-door — a "porta estreita" (Radar <-> Brain do Formare) como SERVIÇO
- * ISOLADO no VPS. v2: além da escrita (F1), agora tem LEITURA (F3).
+ * radar-door — a "porta estreita" (Radar <-> Formare) como SERVIÇO ISOLADO no
+ * VPS. v2: LEITURA do Brain (F3). v3: AÇÃO — insight vira card 'ideias' (F4).
  *
  * FONTE DA VERDADE deste arquivo: repo radar-hub, pasta door/ (versionado).
  * Cópia implantada: /root/radar-door/door.mjs (rodando via systemd).
@@ -94,6 +94,83 @@ async function handleBrainRead(req, res, url) {
   }
 }
 
+/**
+ * POST /task — "Ação no Formare" (F4): transforma UM item de inteligência do
+ * Radar num CARD do Formare, no estágio inicial 'ideias' (a caixa de entrada
+ * de trabalho), carimbado com a tag 'radar'. Gated por DOOR_WRITE_ENABLED.
+ *
+ * FORÇADO NO SERVIDOR (o chamador não pode sobrescrever):
+ *   stage='ideias' (nunca pula etapas do fluxo) + tags=['radar'] (rastreável,
+ *   descartável em lote). INSERT-only — nunca toca card existente.
+ */
+async function handleTask(req, res) {
+  if (!WRITE_ENABLED) {
+    return json(res, 403, {
+      error: "porta de escrita DESLIGADA (DOOR_WRITE_ENABLED != true)",
+    });
+  }
+
+  let raw = "";
+  for await (const chunk of req) raw += chunk;
+  let body;
+  try {
+    body = JSON.parse(raw || "{}");
+  } catch {
+    return json(res, 400, { error: "invalid json" });
+  }
+
+  const workspaceName = typeof body.workspaceName === "string" ? body.workspaceName.trim() : "";
+  const item = body.item && typeof body.item === "object" ? body.item : null;
+  const sinal = String(item?.sinal ?? "").trim();
+  const porque = String(item?.porQueImporta ?? "").trim();
+  const acao = String(item?.acao ?? "").trim();
+  if (!workspaceName || !sinal || !porque || !acao) {
+    return json(res, 400, {
+      error: "workspaceName + item{sinal, porQueImporta, acao} obrigatorios",
+    });
+  }
+
+  const fonte = item?.fonte && typeof item.fonte === "object" ? item.fonte : {};
+  const concorrente = String(item?.concorrente ?? "").trim();
+  const score = Number.isFinite(item?.score) ? Math.round(item.score) : null;
+
+  const title = `[Radar] ${sinal}`.slice(0, 200);
+  const description =
+    `**Movimento do concorrente${concorrente ? ` (${concorrente})` : ""}:** ${sinal}\n\n` +
+    `**Por que importa para ${workspaceName}:** ${porque}\n\n` +
+    `**Ação recomendada:** ${acao}\n\n` +
+    `**Fonte:** [${fonte.titulo ?? "link"}](${fonte.url ?? ""})\n` +
+    (score !== null ? `**Score de impacto (Radar):** ${score}/100\n` : "") +
+    `\n— pedido criado pelo Radar em ${new Date().toISOString()}`;
+
+  const client = await pool.connect();
+  try {
+    const ws = await client.query("select id from workspaces where name = $1 limit 1", [
+      workspaceName,
+    ]);
+    if (ws.rowCount === 0) {
+      return json(res, 404, { error: `cliente nao encontrado: ${workspaceName}` });
+    }
+    const workspaceId = ws.rows[0].id;
+
+    // VALORES DE SEGURANÇA LITERAIS — stage inicial + tag radar. INSERT-only.
+    const r = await client.query(
+      `insert into cards (workspace_id, title, description, stage, tags)
+       values ($1, $2, $3, 'ideias', array['radar'])
+       returning id`,
+      [workspaceId, title, description],
+    );
+
+    return json(res, 200, {
+      data: { cardId: r.rows[0].id, workspaceId, workspace: workspaceName },
+    });
+  } catch (e) {
+    return json(res, 500, { error: String(e?.message ?? e) });
+  } finally {
+    client.release();
+  }
+}
+
 /** POST /intake — escrita pendente/rascunho (gated por DOOR_WRITE_ENABLED). */
 async function handleIntake(req, res) {
   if (!WRITE_ENABLED) {
@@ -179,6 +256,9 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && url.pathname === "/brain") {
     return handleBrainRead(req, res, url);
+  }
+  if (req.method === "POST" && url.pathname === "/task") {
+    return handleTask(req, res);
   }
   if (req.method === "POST" && url.pathname === "/intake") {
     return handleIntake(req, res);
