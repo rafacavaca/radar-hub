@@ -19,15 +19,26 @@ import { FonteLink, ScoreBadge } from "@/components/score-badge";
 
 export const dynamic = "force-dynamic";
 
+/** Texto honesto sobre a origem do contexto do analista (Brain real ou fallback). */
+function brainNote(result: { brainSources?: { clientName: string; mode: string; nodeCount?: number }[] }): string | null {
+  const source = result.brainSources?.find((s) => s.clientName === MOOVEFY.clientName);
+  if (!source) return null;
+  if (source.mode === "live") return `Brain ao vivo (${source.nodeCount} fatos confirmados)`;
+  if (source.mode === "fixture") return "Brain indisponível — usando resumo local";
+  return "sem base de conhecimento do cliente";
+}
+
 export default async function BriefingPage() {
   let items: IntelligenceItem[] = [];
   let ranAt = "";
   let error: string | null = null;
+  let brain: string | null = null;
 
   try {
     const result = await runRadarLoop();
     items = result.items;
     ranAt = result.ranAt;
+    brain = brainNote(result);
   } catch (err) {
     error = err instanceof Error ? err.message : "Não foi possível rodar o Radar.";
   }
@@ -48,6 +59,7 @@ export default async function BriefingPage() {
             Cliente{" "}
             <span className="font-medium text-stone-700">{MOOVEFY.clientName}</span>
             {ranAt ? <> · atualizado em {formatDateTimePtBR(ranAt)}</> : null}
+            {brain ? <> · {brain}</> : null}
           </p>
         </div>
         <RodarAgora testId="rodar-agora" />

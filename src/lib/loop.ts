@@ -27,7 +27,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { analyze } from "@/lib/analyst";
-import { MOOVEFY } from "@/lib/clients/moovefy";
+import { fetchClientBrain } from "@/lib/brain";
 import { collectBlog } from "@/lib/collectors/blog";
 import { planCollection, readWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, RawEvent } from "@/lib/types";
@@ -35,11 +35,22 @@ import type { IntelligenceItem, RawEvent } from "@/lib/types";
 const CACHE_DIR = join(process.cwd(), ".cache");
 const DEFAULT_LIMIT = 5;
 
+/** De onde veio o contexto que ancorou o analista (transparência na UI). */
+export type BrainSourceNote = {
+  clientName: string;
+  /** live = Brain real do Formare; fixture = resumo local; none = sem contexto. */
+  mode: "live" | "fixture" | "none";
+  /** nº de fatos confirmados usados (só em mode=live). */
+  nodeCount?: number;
+};
+
 export type RadarLoopResult = {
   /** itens de inteligência do dia, ordenados por impacto (score DESC). */
   items: IntelligenceItem[];
   /** ISO de quando o loop de fato rodou (não muda ao reler do cache). */
   ranAt: string;
+  /** por cliente: o contexto veio do Brain real ou de fallback? (honestidade) */
+  brainSources?: BrainSourceNote[];
 };
 
 export type RunRadarLoopOptions = {
@@ -84,20 +95,6 @@ function byScoreDesc(items: IntelligenceItem[]): IntelligenceItem[] {
 }
 
 /**
- * Contexto (Brain) do cliente para ancorar o analista.
- * Hoje só a Moovefy tem contexto (a fixture do F1). Cliente sem contexto ganha
- * uma âncora honesta: o analista é instruído a ser conservador, não a inventar.
- */
-function brainContextFor(clientName: string): string {
-  if (clientName === MOOVEFY.clientName) return MOOVEFY.brainContext;
-  return (
-    `Ainda NÃO há base de conhecimento carregada para ${clientName}. ` +
-    "Seja conservador: gere itens só quando o impacto for óbvio pelo próprio movimento, " +
-    "com scores baixos, e deixe claro no porQueImporta que falta contexto do cliente."
-  );
-}
-
-/**
  * Roda o loop do Radar dirigido pela watchlist.
  * Reusa o resultado do dia quando houver (a menos que `force`).
  */
@@ -109,7 +106,8 @@ export async function runRadarLoop(
   if (!force) {
     const cached = readLoopCache();
     if (cached) {
-      return { items: byScoreDesc(cached.items), ranAt: cached.ranAt };
+      // preserva TUDO do cache (inclusive brainSources), só reordenando os itens.
+      return { ...cached, items: byScoreDesc(cached.items) };
     }
   }
 
@@ -144,16 +142,25 @@ export async function runRadarLoop(
     throw new Error(`Nenhuma coleta funcionou — ${failures.join(" | ")}`);
   }
 
-  // Analisa por cliente (1 chamada ao gateway por cliente com eventos).
+  // Analisa por cliente (1 chamada ao gateway por cliente com eventos),
+  // ancorado no Brain REAL quando a porta de leitura está de pé (F3).
   const items: IntelligenceItem[] = [];
+  const brainSources: BrainSourceNote[] = [];
   for (const [clientName, events] of eventsByClient) {
     if (events.length === 0) continue;
-    items.push(...(await analyze(events, clientName, brainContextFor(clientName))));
+    const brain = await fetchClientBrain(clientName);
+    brainSources.push({
+      clientName,
+      mode: brain.mode,
+      nodeCount: brain.mode === "live" ? brain.nodeCount : undefined,
+    });
+    items.push(...(await analyze(events, clientName, brain.context)));
   }
 
   const result: RadarLoopResult = {
     items: byScoreDesc(items),
     ranAt: new Date().toISOString(),
+    brainSources,
   };
 
   writeLoopCache(result);

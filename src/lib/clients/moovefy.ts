@@ -1,12 +1,12 @@
 /**
- * FIXTURE DE TESTE — conhecimento da Moovefy (o cliente do F1).
+ * FALLBACK LOCAL — conhecimento da Moovefy (escrito a partir da descrição do
+ * Rafael no F1).
  *
- * Substituto PROVISÓRIO do Brain real, escrito a partir da descrição do Rafael,
- * pra o analista raciocinar ancorado em contexto REAL enquanto a "porta estreita"
- * de leitura do Brain do Formare ainda não existe. Quando a porta estiver pronta
- * e aprovada, isto é trocado pela leitura do Brain de verdade.
+ * Desde a F3 o titular é o BRAIN REAL, lido pela porta estreita de leitura
+ * (`src/lib/brain.ts`). Este resumo só entra quando a porta está fora do ar —
+ * e o sistema DIZ que caiu no contexto local (nunca finge que é o Brain).
  *
- * (`isFixture: true` deixa explícito que é dado de teste, não o Brain real.)
+ * (`isFixture: true` deixa explícito que é substituto, não o Brain real.)
  */
 
 export const MOOVEFY = {
