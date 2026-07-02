@@ -16,7 +16,7 @@ import { completeViaGateway } from "@/lib/gateway";
 import type { IntelligenceItem, RawEvent } from "@/lib/types";
 
 const SYSTEM =
-  'Você é o Analista de Inteligência de Mercado do Radar — um analista sênior de market intelligence B2B. Seu trabalho é olhar movimentos de um CONCORRENTE e avaliar o impacto REAL e ESPECÍFICO para UM cliente (não para "o mercado em geral"). Regras: (1) você ANCORA cada análise no que se sabe do cliente — sempre cite o produto, público ou diferencial dele que é afetado; (2) você é HONESTO — se um movimento não importa para este cliente, dê score baixo ou nem gere item, e nunca invente fatos; (3) impacto é medido EM RELAÇÃO AO CLIENTE (mexe com o território/clientes/posicionamento dele?), não por popularidade.';
+  'Você é o Analista de Inteligência de Mercado do Radar — um analista sênior de market intelligence B2B. Seu trabalho é olhar movimentos de CONCORRENTES e avaliar o impacto REAL e ESPECÍFICO para UM cliente (não para "o mercado em geral"). Regras: (1) você ANCORA cada análise no que se sabe do cliente — sempre cite o produto, público ou diferencial dele que é afetado; (2) você é HONESTO — se um movimento não importa para este cliente, dê score baixo ou nem gere item, e nunca invente fatos; (3) impacto é medido EM RELAÇÃO AO CLIENTE (mexe com o território/clientes/posicionamento dele?), não por popularidade; (4) cada movimento vem marcado com o NOME do concorrente que o fez — cite esse nome no sinal.';
 
 /** Forma crua de um item vindo do LLM, antes de validar/normalizar. */
 type RawAnalysisEntry = {
@@ -32,14 +32,14 @@ function stableItemId(eventId: string, sinal: string): string {
   return createHash("sha1").update(`${eventId}:${sinal}`).digest("hex").slice(0, 16);
 }
 
-/** Bloco numerado de movimentos (1..N) com título, categoria, url e descrição/excerpt. */
+/** Bloco numerado de movimentos (1..N) com concorrente, título, categoria, url e descrição. */
 function buildEventsBlock(events: RawEvent[]): string {
   return events
     .map((event, index) => {
       const n = index + 1;
       const category = event.category ?? "sem categoria";
       const body = event.description || event.excerpt || "(sem descrição)";
-      return `${n}. ${event.title} [${category}] — ${event.url}\n   ${body}`;
+      return `${n}. [${event.competitorName}] ${event.title} [${category}] — ${event.url}\n   ${body}`;
     })
     .join("\n");
 }
@@ -51,7 +51,7 @@ function buildPrompt(clientName: string, brainContext: string, events: RawEvent[
 O QUE SABEMOS DO CLIENTE (a base de conhecimento dele):
 ${brainContext}
 
-MOVIMENTOS RECENTES DO CONCORRENTE:
+MOVIMENTOS RECENTES DOS CONCORRENTES (cada um marcado com [Nome do concorrente]):
 ${buildEventsBlock(events)}
 
 TAREFA:
@@ -134,6 +134,7 @@ export async function analyze(
       porQueImporta,
       acao,
       fonte: { url: event.url, titulo: event.title },
+      concorrente: event.competitorName,
       score: clampScore(entry.score),
       eventIds: [event.id],
       createdAt,

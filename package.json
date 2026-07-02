@@ -8,6 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx scripts/test-radar-f1.mts",
+    "smoke:f2": "tsx scripts/test-radar-f2.mts",
     "collect": "tsx scripts/collect.mts",
     "analyze": "tsx scripts/analyze.mts"
   },

@@ -43,5 +43,8 @@ next-env.d.ts
 # radar collectors cache (respostas do Firecrawl — não versionar)
 /.cache/
 
+# estado editável do Radar (a watchlist do Rafael — o seed vive no código)
+/data/
+
 # permitir o exemplo (sem segredos)
 !.env.example

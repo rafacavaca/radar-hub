@@ -81,6 +81,11 @@ function FeedRow({ item }: { item: IntelligenceItem }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <h2 className="font-medium leading-snug text-stone-900">{item.sinal}</h2>
+          {item.concorrente ? (
+            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500">
+              {item.concorrente}
+            </span>
+          ) : null}
           {category ? <CategoryChip category={category} /> : null}
         </div>
         <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-stone-600">

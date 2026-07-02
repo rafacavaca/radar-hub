@@ -7,16 +7,16 @@
  *                 É isso que vira briefing/feed e, com aprovação, demanda no Formare.
  */
 
-/** De onde veio o sinal. Por enquanto só o concorrente do F1. */
-export type SignalSource = "rdstation";
-
 export type SignalKind = "blog" | "news" | "page" | "release" | "material";
 
 /** Um sinal cru, como coletado — sem raciocínio ainda. */
 export type RawEvent = {
   /** id estável (hash da url) — serve pra deduplicar entre coletas. */
   id: string;
-  source: SignalSource;
+  /** id do concorrente na watchlist de onde o sinal veio (ex.: "rd-station"). */
+  source: string;
+  /** nome do concorrente, pra exibir e pro analista citar (ex.: "RD Station"). */
+  competitorName: string;
   kind: SignalKind;
   url: string;
   title: string;
@@ -53,6 +53,8 @@ export type IntelligenceItem = {
   acao: string;
   /** de onde veio o sinal. */
   fonte: Fonte;
+  /** nome do concorrente que fez o movimento (com multi-concorrente, situa o leitor). */
+  concorrente?: string;
   /** impacto estimado em VOCÊ (0-100), não popularidade. */
   score: number;
   /** trechos/fatos do Brain que ancoraram o raciocínio (pra explicabilidade). */

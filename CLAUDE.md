@@ -27,9 +27,10 @@ O Radar compartilha o **Brain** (banco Supabase) com o **OS Formare**, que está
 npm run typecheck   # tsc --noEmit
 npm run build       # next build
 npm run smoke       # tsx scripts/test-radar-f1.mts  (o loop F1 ponta-a-ponta)
+npm run smoke:f2    # tsx scripts/test-radar-f2.mts  (a watchlist — 0 créditos, 0 LLM)
 ```
 
-Só considere uma tarefa concluída com os **três verdes**. O `smoke` é o **juiz do F1**: roda o loop contra 1 cliente real e confirma ≥1 item de briefing bem-formado. Sem ele verde, o F1 não está pronto.
+Só considere uma tarefa concluída com **tudo verde**. O `smoke` é o **juiz do F1**: roda o loop contra 1 cliente real e confirma ≥1 item de briefing bem-formado. O `smoke:f2` é o juiz do **cadastro de quem vigiar**.
 
 ---
 
@@ -46,6 +47,20 @@ Só considere uma tarefa concluída com os **três verdes**. O `smoke` é o **ju
 - [ ] Há um **botão** que envia o item como demanda pro Formare.
 
 **Fora do F1:** decisores/LinkedIn, os 4 pilares completos, multi-cliente, alertas multi-canal.
+
+**Status: F1 COMPLETA e validada pelo Rafael (02/jul/2026).** O bilhete de teste atravessou a porta estreita (serviço isolado `/root/radar-door/`, DESLIGADA por ora) e caiu na aba Revisar do Formare como rascunho pendente.
+
+---
+
+## 🎯 F2 — Cadastro de quem vigiar (a watchlist)
+
+O concorrente deixou de ser fixo no código: a lista vive em **`data/watchlist.json`** (banco próprio do Radar; gitignored — o seed Moovefy+RD Station vive em `src/lib/watchlist.ts`) e o **loop coleta o que estiver nela**.
+
+- **Tela:** `/vigiar` — adicionar/pausar/reativar/remover concorrentes por cliente.
+- **API:** `GET/POST /api/watchlist` (actions: `add` | `remove` | `toggle`).
+- **Coletor genérico:** `src/lib/collectors/blog.ts` — varre a listagem pública de QUALQUER blog (heurística de post: slug hifenizado ≥8 chars, sem segmentos de seção, sem URLs "pai"). `collectors/rdstation.ts` é só um atalho pro genérico (mantém o smoke F1).
+- **Cliente sem Brain carregado:** o analista recebe âncora honesta ("falta contexto, seja conservador") — nunca inventa.
+- **Roadmap completo (o destino):** `docs/roadmap/radar-hub-visao-completa.md` (doc do Rafael, 02/jul). Próximas fases dali: ler o Brain real, analistas por lente, ação no Formare, Pergunte ao Radar, multi-cliente.
 
 ---
 

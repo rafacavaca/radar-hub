@@ -1,9 +1,15 @@
 /**
  * Loop do Radar — o "rodar agora" ponta-a-ponta, com CACHE DE DIA.
  *
- * Fluxo: coletar movimentos do concorrente (RD Station) -> o analista cruza com
- * o Brain do cliente (Moovefy) -> devolve `IntelligenceItem[]` ordenado por
- * impacto (score DESC), junto de `ranAt` (quando o loop de fato rodou).
+ * Desde a F2 quem dirige o loop é a WATCHLIST (`data/watchlist.json`): para
+ * cada cliente, coleta os movimentos de CADA concorrente habilitado, e o
+ * analista cruza tudo com o Brain do cliente -> `IntelligenceItem[]` ordenado
+ * por impacto (score DESC), junto de `ranAt` (quando o loop de fato rodou).
+ *
+ * TOLERÂNCIA A FALHA (um bloco com falha não contamina o resto):
+ *   Um concorrente cuja coleta falhe é registrado e PULADO — os outros seguem.
+ *   Só lançamos quando NADA foi coletado e houve pelo menos uma falha (aí a
+ *   tela mostra o erro real, em vez de fingir "nenhum movimento").
  *
  * POR QUE O CACHE IMPORTA (custo):
  *   Cada rodada gasta gateway (raciocínio Claude) e potencialmente Firecrawl.
@@ -22,8 +28,9 @@ import { join } from "node:path";
 
 import { analyze } from "@/lib/analyst";
 import { MOOVEFY } from "@/lib/clients/moovefy";
-import { collectRDStation } from "@/lib/collectors/rdstation";
-import type { IntelligenceItem } from "@/lib/types";
+import { collectBlog } from "@/lib/collectors/blog";
+import { planCollection, readWatchlist } from "@/lib/watchlist";
+import type { IntelligenceItem, RawEvent } from "@/lib/types";
 
 const CACHE_DIR = join(process.cwd(), ".cache");
 const DEFAULT_LIMIT = 5;
@@ -38,7 +45,7 @@ export type RadarLoopResult = {
 export type RunRadarLoopOptions = {
   /** ignora o cache do dia e roda de novo (o botão "Rodar agora"). */
   force?: boolean;
-  /** quantos movimentos do concorrente coletar. Padrão: 5. */
+  /** quantos movimentos coletar POR CONCORRENTE. Padrão: 5. */
   limit?: number;
 };
 
@@ -77,7 +84,21 @@ function byScoreDesc(items: IntelligenceItem[]): IntelligenceItem[] {
 }
 
 /**
- * Roda o loop do Radar para o cliente do F1 (Moovefy).
+ * Contexto (Brain) do cliente para ancorar o analista.
+ * Hoje só a Moovefy tem contexto (a fixture do F1). Cliente sem contexto ganha
+ * uma âncora honesta: o analista é instruído a ser conservador, não a inventar.
+ */
+function brainContextFor(clientName: string): string {
+  if (clientName === MOOVEFY.clientName) return MOOVEFY.brainContext;
+  return (
+    `Ainda NÃO há base de conhecimento carregada para ${clientName}. ` +
+    "Seja conservador: gere itens só quando o impacto for óbvio pelo próprio movimento, " +
+    "com scores baixos, e deixe claro no porQueImporta que falta contexto do cliente."
+  );
+}
+
+/**
+ * Roda o loop do Radar dirigido pela watchlist.
  * Reusa o resultado do dia quando houver (a menos que `force`).
  */
 export async function runRadarLoop(
@@ -92,10 +113,43 @@ export async function runRadarLoop(
     }
   }
 
-  // Coleta usa o cache diário do Firecrawl (não passamos `force` aqui de
-  // propósito — "Rodar agora" re-raciocina sem re-raspar, poupando créditos).
-  const events = await collectRDStation({ limit: opts.limit ?? DEFAULT_LIMIT });
-  const items = await analyze(events, MOOVEFY.clientName, MOOVEFY.brainContext);
+  const watchlist = readWatchlist();
+  const targets = planCollection(watchlist);
+
+  // Coleta POR CONCORRENTE, tolerando falha individual. A coleta usa o cache
+  // diário do Firecrawl (não passamos `force` aqui de propósito — "Rodar agora"
+  // re-raciocina sem re-raspar, poupando créditos).
+  const eventsByClient = new Map<string, RawEvent[]>();
+  const failures: string[] = [];
+  let collectedTotal = 0;
+
+  for (const target of targets) {
+    try {
+      const events = await collectBlog(target.competitor, {
+        limit: opts.limit ?? DEFAULT_LIMIT,
+      });
+      const bucket = eventsByClient.get(target.clientName) ?? [];
+      bucket.push(...events);
+      eventsByClient.set(target.clientName, bucket);
+      collectedTotal += events.length;
+    } catch (err) {
+      const message = (err as Error).message;
+      failures.push(`${target.competitor.name}: ${message}`);
+      console.warn(`[loop] coleta de ${target.competitor.name} falhou: ${message}`);
+    }
+  }
+
+  // Nada coletado E houve falha -> erro real (a tela mostra o motivo).
+  if (collectedTotal === 0 && failures.length > 0) {
+    throw new Error(`Nenhuma coleta funcionou — ${failures.join(" | ")}`);
+  }
+
+  // Analisa por cliente (1 chamada ao gateway por cliente com eventos).
+  const items: IntelligenceItem[] = [];
+  for (const [clientName, events] of eventsByClient) {
+    if (events.length === 0) continue;
+    items.push(...(await analyze(events, clientName, brainContextFor(clientName))));
+  }
 
   const result: RadarLoopResult = {
     items: byScoreDesc(items),

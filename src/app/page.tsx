@@ -79,6 +79,11 @@ function BriefingCard({ item }: { item: IntelligenceItem }) {
       <div className="flex items-start gap-4">
         <ScoreBadge score={item.score} />
         <div className="min-w-0 flex-1">
+          {item.concorrente ? (
+            <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+              {item.concorrente}
+            </p>
+          ) : null}
           <h2 className="text-lg font-semibold leading-snug tracking-tight text-stone-900">
             {item.sinal}
           </h2>
