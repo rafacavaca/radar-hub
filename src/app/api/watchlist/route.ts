@@ -20,6 +20,7 @@ import {
   readWatchlist,
   removeCompetitor,
   setCompetitorEnabled,
+  type AddCompetitorInput,
 } from "@/lib/watchlist";
 
 export const dynamic = "force-dynamic";
@@ -54,20 +55,38 @@ export async function POST(req: Request) {
   try {
     switch (payload.action) {
       case "add": {
-        if (
-          !isString(payload.clientName) ||
-          !isString(payload.name) ||
-          !isString(payload.blogUrl)
-        ) {
-          return badRequest("Envie clientName, name e blogUrl como texto.");
+        if (!isString(payload.clientName) || !isString(payload.name)) {
+          return badRequest("Envie clientName e name como texto.");
         }
         if (payload.siteUrl !== undefined && !isString(payload.siteUrl)) {
           return badRequest("O campo siteUrl, quando enviado, precisa ser texto.");
         }
+        if (payload.blogUrl !== undefined && !isString(payload.blogUrl)) {
+          return badRequest("O campo blogUrl, quando enviado, precisa ser texto.");
+        }
+        // fontes descobertas/confirmadas na tela: [{kind, url}] — a lib valida
+        // tipo e URL uma a uma (mensagens amigáveis).
+        let sources: Array<{ kind: string; url: string }> | undefined;
+        if (payload.sources !== undefined) {
+          if (!Array.isArray(payload.sources)) {
+            return badRequest("O campo sources precisa ser uma lista.");
+          }
+          sources = [];
+          for (const s of payload.sources) {
+            const kind = (s as Record<string, unknown>)?.kind;
+            const url = (s as Record<string, unknown>)?.url;
+            if (!isString(kind) || !isString(url)) {
+              return badRequest("Cada fonte precisa de kind e url como texto.");
+            }
+            sources.push({ kind, url });
+          }
+        }
         const data = addCompetitor(payload.clientName, {
           name: payload.name,
-          blogUrl: payload.blogUrl,
+          blogUrl: isString(payload.blogUrl) ? payload.blogUrl : undefined,
           siteUrl: isString(payload.siteUrl) ? payload.siteUrl : undefined,
+          // a lib valida kind/url em runtime com mensagens amigáveis.
+          sources: sources as AddCompetitorInput["sources"],
         });
         return NextResponse.json({ data });
       }

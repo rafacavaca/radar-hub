@@ -3,30 +3,47 @@
 /**
  * WATCHLIST EDITOR — o painel client onde o Rafael edita a vigilância.
  *
- * Renderiza SEMPRE a partir de `initial` (props vindas do server component).
- * Cada mutação (adicionar / pausar / reativar / remover) fala com
- * `/api/watchlist` e, ao dar certo, chama `router.refresh()` — o server
- * component re-renderiza com a lista nova e volta como `initial`. Por isso NÃO
- * guardamos cópia da lista em estado: estado local é só para campos do
- * formulário, erro e "carregando". Erro da API aparece em pt-BR na própria
- * linha/formulário.
+ * FLUXO NOVO (descoberta de fontes): ele digita só NOME + SITE do concorrente
+ * -> "Descobrir fontes" fareja as páginas públicas (blog/notícias, novidades,
+ * produto, vagas) -> os candidatos aparecem com checkbox (óbvios já marcados,
+ * cada um com uma frase honesta) -> "Adicionar à vigilância".
+ * A URL manual continua existindo como opção avançada — nunca trava.
+ *
+ * Renderiza SEMPRE a partir de `initial` (props do server component); cada
+ * mutação chama a API e `router.refresh()`. Estado local só para o fluxo de
+ * adicionar (passo, campos, candidatos, erro, loading).
  */
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import type { Competitor, WatchClient, Watchlist } from "@/lib/watchlist";
-
-/** O corpo aceito por POST /api/watchlist (espelha o contrato da rota). */
-type WatchlistAction =
-  | { action: "add"; clientName: string; name: string; blogUrl: string; siteUrl?: string }
-  | { action: "remove"; clientName: string; competitorId: string }
-  | { action: "toggle"; clientName: string; competitorId: string; enabled: boolean };
+import type { SourceCandidate } from "@/lib/discovery";
+import type { Competitor, SourceKind, WatchClient, Watchlist } from "@/lib/watchlist";
 
 const INPUT_CLASS =
   "w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none";
 
-/** POST na API; normaliza o retorno em ok/erro pt-BR para a UI. */
+const KIND_CHIP: Record<SourceKind, string> = {
+  blog: "Blog",
+  noticias: "Notícias",
+  releases: "Novidades",
+  produto: "Produto",
+  vagas: "Vagas",
+};
+
+type WatchlistAction =
+  | {
+      action: "add";
+      clientName: string;
+      name: string;
+      siteUrl?: string;
+      blogUrl?: string;
+      sources?: Array<{ kind: SourceKind; url: string }>;
+    }
+  | { action: "remove"; clientName: string; competitorId: string }
+  | { action: "toggle"; clientName: string; competitorId: string; enabled: boolean };
+
+/** POST na API da watchlist; normaliza o retorno em ok/erro pt-BR. */
 async function postWatchlist(
   action: WatchlistAction,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -66,40 +83,6 @@ export function WatchlistEditor({ initial }: { initial: Watchlist }) {
 }
 
 function ClientCard({ client }: { client: WatchClient }) {
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const [blogUrl, setBlogUrl] = useState("");
-  const [siteUrl, setSiteUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending) return;
-    setPending(true);
-    setError(null);
-
-    const result = await postWatchlist({
-      action: "add",
-      clientName: client.name,
-      name,
-      blogUrl,
-      siteUrl: siteUrl.trim() ? siteUrl : undefined,
-    });
-
-    if (!result.ok) {
-      setError(result.error);
-      setPending(false);
-      return;
-    }
-
-    setName("");
-    setBlogUrl("");
-    setSiteUrl("");
-    router.refresh();
-    setPending(false);
-  }
-
   return (
     <div
       data-testid="watchlist-client"
@@ -122,73 +105,240 @@ function ClientCard({ client }: { client: WatchClient }) {
         </p>
       )}
 
-      <form
-        data-testid="watchlist-add"
-        onSubmit={onSubmit}
-        className="border-t border-stone-100 px-4 py-4 sm:px-5"
-      >
-        {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-stone-500">
-              Nome do concorrente
-            </span>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Ex.: RD Station"
-              className={INPUT_CLASS}
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-stone-500">
-              Blog ou página de notícias
-            </span>
-            <input
-              type="text"
-              inputMode="url"
-              required
-              value={blogUrl}
-              onChange={(event) => setBlogUrl(event.target.value)}
-              placeholder="https://…"
-              className={INPUT_CLASS}
-            />
-          </label>
-
-          <label className="block sm:col-span-2">
-            <span className="mb-1 block text-xs font-medium text-stone-500">Site (opcional)</span>
-            <input
-              type="text"
-              inputMode="url"
-              value={siteUrl}
-              onChange={(event) => setSiteUrl(event.target.value)}
-              placeholder="https://…"
-              className={INPUT_CLASS}
-            />
-          </label>
-        </div>
-
-        <div className="mt-3">
-          <button
-            type="submit"
-            disabled={pending}
-            className="inline-flex min-h-[40px] items-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-60"
-          >
-            {pending ? "Adicionando…" : "Adicionar à vigilância"}
-          </button>
-        </div>
-
-        <p className="mt-3 text-xs text-stone-400">
-          Adicionou alguém? Vá ao Briefing e use “Rodar agora” para varrer já.
-        </p>
-      </form>
+      <AddCompetitorFlow clientName={client.name} />
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O fluxo de adicionar: nome+site -> descobrir -> confirmar (manual = avançado)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Candidate = SourceCandidate & { checked: boolean };
+
+function AddCompetitorFlow({ clientName }: { clientName: string }) {
+  const router = useRouter();
+
+  const [name, setName] = useState("");
+  const [siteUrl, setSiteUrl] = useState("");
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualUrl, setManualUrl] = useState("");
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<null | "discover" | "add">(null);
+
+  function reset() {
+    setName("");
+    setSiteUrl("");
+    setManualUrl("");
+    setManualOpen(false);
+    setCandidates(null);
+    setNotice(null);
+    setError(null);
+  }
+
+  /** Passo 1 -> 2: fareja o site e mostra os candidatos. */
+  async function discover(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy("discover");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/discover-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteUrl }),
+      });
+      const payload = (await res.json().catch(() => null)) as {
+        data?: { candidates: SourceCandidate[]; warning?: string };
+        error?: string;
+      } | null;
+      if (!res.ok || !payload?.data) {
+        setError(payload?.error ?? "Não foi possível investigar o site.");
+        return;
+      }
+      const found = payload.data.candidates.map((c) => ({ ...c, checked: c.preChecked }));
+      setCandidates(found);
+      if (payload.data.warning || found.length === 0) {
+        setNotice(payload.data.warning ?? "Não achei fontes óbvias — use a URL manual abaixo.");
+        setManualOpen(true);
+      }
+    } catch {
+      setError("Falha de conexão ao investigar o site.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Passo final: adiciona com as fontes confirmadas (e/ou a manual). */
+  async function add() {
+    if (busy) return;
+    setBusy("add");
+    setError(null);
+    const chosen = (candidates ?? [])
+      .filter((c) => c.checked)
+      .map((c) => ({ kind: c.kind, url: c.url }));
+
+    const result = await postWatchlist({
+      action: "add",
+      clientName,
+      name,
+      siteUrl: siteUrl.trim() || undefined,
+      blogUrl: manualUrl.trim() || undefined,
+      sources: chosen.length > 0 ? chosen : undefined,
+    });
+
+    if (!result.ok) {
+      setError(result.error);
+      setBusy(null);
+      return;
+    }
+    reset();
+    router.refresh();
+    setBusy(null);
+  }
+
+  return (
+    <form
+      data-testid="watchlist-add"
+      onSubmit={discover}
+      className="border-t border-stone-100 px-4 py-4 sm:px-5"
+    >
+      {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-stone-500">
+            Nome do concorrente
+          </span>
+          <input
+            type="text"
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Ex.: RD Station"
+            className={INPUT_CLASS}
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-stone-500">Site</span>
+          <input
+            type="text"
+            inputMode="url"
+            required={!manualOpen}
+            value={siteUrl}
+            onChange={(event) => setSiteUrl(event.target.value)}
+            placeholder="concorrente.com.br"
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      {/* Passo 2 — candidatos descobertos, com checkbox e frase honesta. */}
+      {candidates !== null && candidates.length > 0 ? (
+        <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/60 p-3.5">
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+            Fontes encontradas — confirme o que vigiar
+          </p>
+          <ul className="mt-2 space-y-2">
+            {candidates.map((c, index) => (
+              <li key={c.url} data-testid="watchlist-candidate">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={c.checked}
+                    onChange={() =>
+                      setCandidates((prev) =>
+                        (prev ?? []).map((p, i) =>
+                          i === index ? { ...p, checked: !p.checked } : p,
+                        ),
+                      )
+                    }
+                    className="mt-1 h-4 w-4 accent-stone-900"
+                  />
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-stone-900">{c.titulo}</span>
+                      <span className="rounded-full bg-stone-200/70 px-2 py-0.5 text-xs text-stone-600">
+                        {KIND_CHIP[c.kind]}
+                        {c.coletavel ? "" : " · em breve"}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-stone-400">{c.url}</span>
+                    <span className="mt-0.5 block text-xs text-stone-500">{c.descricao}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {notice ? <p className="mt-3 text-sm text-amber-700">{notice}</p> : null}
+
+      {/* Opção avançada — nunca travar o Rafael. */}
+      {manualOpen ? (
+        <label className="mt-3 block">
+          <span className="mb-1 block text-xs font-medium text-stone-500">
+            URL manual (blog/notícias)
+          </span>
+          <input
+            type="text"
+            inputMode="url"
+            value={manualUrl}
+            onChange={(event) => setManualUrl(event.target.value)}
+            placeholder="https://…"
+            className={INPUT_CLASS}
+          />
+        </label>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setManualOpen(true)}
+          className="mt-3 text-xs text-stone-400 underline-offset-2 hover:text-stone-600 hover:underline"
+        >
+          prefiro colar a URL do blog manualmente
+        </button>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          type="submit"
+          data-testid="watchlist-discover"
+          disabled={busy !== null || !siteUrl.trim()}
+          className="inline-flex min-h-[40px] items-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:opacity-50"
+        >
+          {busy === "discover" ? "Investigando o site…" : "Descobrir fontes"}
+        </button>
+
+        <button
+          type="button"
+          onClick={add}
+          disabled={
+            busy !== null ||
+            !name.trim() ||
+            (!(candidates ?? []).some((c) => c.checked) && !manualUrl.trim())
+          }
+          className="inline-flex min-h-[40px] items-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
+        >
+          {busy === "add" ? "Adicionando…" : "Adicionar à vigilância"}
+        </button>
+      </div>
+
+      <p className="mt-3 text-xs text-stone-400">
+        Digite nome + site e clique em “Descobrir fontes”. Adicionou alguém? Vá ao Briefing e use
+        “Rodar agora” para varrer já.
+      </p>
+    </form>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Linha de concorrente: nome, fontes registradas, pausar/reativar, remover
+// ─────────────────────────────────────────────────────────────────────────────
 
 function CompetitorRow({
   clientName,
@@ -210,7 +360,7 @@ function CompetitorRow({
       action: "toggle",
       clientName,
       competitorId: competitor.id,
-      enabled: paused, // pausado -> reativa (true); ativo -> pausa (false)
+      enabled: paused,
     });
     if (!result.ok) {
       setError(result.error);
@@ -256,14 +406,28 @@ function CompetitorRow({
             </span>
           ) : null}
         </div>
-        <a
-          href={competitor.blogUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-0.5 block truncate text-xs text-stone-400 underline-offset-2 hover:text-stone-600 hover:underline"
-        >
-          {competitor.blogUrl}
-        </a>
+
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          {competitor.sources.map((source) => (
+            <a
+              key={source.id}
+              data-testid="watchlist-source"
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              title={source.url}
+              className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600 underline-offset-2 hover:bg-stone-200 hover:underline"
+            >
+              {KIND_CHIP[source.kind]}
+              {source.kind === "produto" || source.kind === "vagas" ? (
+                <span className="text-stone-400">· em breve</span>
+              ) : null}
+            </a>
+          ))}
+          {competitor.sources.length === 0 ? (
+            <span className="text-xs text-stone-400">sem fontes — adicione uma URL manual</span>
+          ) : null}
+        </div>
         {error ? <p className="mt-1.5 text-sm text-red-600">{error}</p> : null}
       </div>
 
@@ -275,13 +439,7 @@ function CompetitorRow({
           disabled={busy !== null}
           className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-60"
         >
-          {busy === "toggle"
-            ? paused
-              ? "Reativando…"
-              : "Pausando…"
-            : paused
-              ? "Reativar"
-              : "Pausar"}
+          {busy === "toggle" ? (paused ? "Reativando…" : "Pausando…") : paused ? "Reativar" : "Pausar"}
         </button>
         <button
           type="button"

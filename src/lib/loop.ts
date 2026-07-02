@@ -123,17 +123,25 @@ export async function runRadarLoop(
 
   for (const target of targets) {
     try {
-      const events = await collectBlog(target.competitor, {
+      const events = await collectBlog(target.competitor, target.source, {
         limit: opts.limit ?? DEFAULT_LIMIT,
       });
       const bucket = eventsByClient.get(target.clientName) ?? [];
-      bucket.push(...events);
+      // dedupe por id (fontes do mesmo concorrente podem repetir um artigo).
+      const seen = new Set(bucket.map((e) => e.id));
+      for (const event of events) {
+        if (seen.has(event.id)) continue;
+        seen.add(event.id);
+        bucket.push(event);
+        collectedTotal++;
+      }
       eventsByClient.set(target.clientName, bucket);
-      collectedTotal += events.length;
     } catch (err) {
       const message = (err as Error).message;
-      failures.push(`${target.competitor.name}: ${message}`);
-      console.warn(`[loop] coleta de ${target.competitor.name} falhou: ${message}`);
+      failures.push(`${target.competitor.name} (${target.source.kind}): ${message}`);
+      console.warn(
+        `[loop] coleta de ${target.competitor.name}/${target.source.kind} falhou: ${message}`,
+      );
     }
   }
 

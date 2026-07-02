@@ -64,6 +64,14 @@ O concorrente deixou de ser fixo no código: a lista vive em **`data/watchlist.j
 
 ---
 
+## 🎯 F3 + F4 — Brain real, app público e o botão formalizado (02/jul)
+
+- **F3:** o analista raciocina ancorado no **Brain REAL** via porta de leitura (`GET /brain` — só confirmado, nunca rascunho). Fallback honesto rotulado. Selo no briefing: "Brain ao vivo (N fatos)". Juiz: `npm run smoke:f3`.
+- **Público:** `radar.formare.tech` (Cloudflare Tunnel do Rafael) com **fechadura** (`src/proxy.ts` + `/entrar`, senha em `RADAR_APP_PASSWORD`). Serviços systemd: `radar-door` (:8090), `radar-hub` (:3200), `cloudflared-radar`.
+- **F4:** "Gerar no Formare" cria um **card real** em `stage='ideias'` + `tags=['radar']` (forçados pela porta, `POST /task`, INSERT-only, gated). Escrita OFF → pedido vai pra caixa de saída com aviso honesto. Juiz: `npm run smoke:f4`. Teste com escrita LIGADA = só junto com o Rafael.
+
+---
+
 ## 🧱 Stack
 
 - **App:** Next.js 16 (App Router) + React 19 + TypeScript strict + Tailwind v4 — mesma base do Formare (coerência e reuso).

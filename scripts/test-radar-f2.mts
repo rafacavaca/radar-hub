@@ -14,7 +14,7 @@
  * Uso: npm run smoke:f2
  */
 
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -148,13 +148,81 @@ function rodar(): Criterio[] {
   const alvoSeed = planCollection(WATCHLIST_SEED)[0];
   const continuidade =
     alvoSeed?.clientName === "Moovefy" &&
-    alvoSeed?.competitor.blogUrl === "https://www.rdstation.com/blog/";
+    alvoSeed?.source.url === "https://www.rdstation.com/blog/";
   criterios.push({
     nome: "Continuidade: alvo do seed == blog que o F1 varria",
     feito: continuidade,
     detalhe: alvoSeed
-      ? `${alvoSeed.clientName} <- ${alvoSeed.competitor.name} (${alvoSeed.competitor.blogUrl})`
+      ? `${alvoSeed.clientName} <- ${alvoSeed.competitor.name} (${alvoSeed.source.url})`
       : "seed sem alvo de coleta",
+  });
+
+  // 7) FONTES (descoberta): adicionar com múltiplas fontes -> só as coletáveis
+  //    entram no plano; produto/vagas ficam registradas (fase futura).
+  let fontesOk = false;
+  let fontesDetalhe = "";
+  try {
+    addCompetitor(CLIENTE, {
+      name: "Pipefy",
+      siteUrl: "https://www.pipefy.com/",
+      sources: [
+        { kind: "blog", url: "https://www.pipefy.com/blog/" },
+        { kind: "vagas", url: "https://www.pipefy.com/careers/" },
+      ],
+    });
+    const alvos = planCollection(readWatchlist()).filter((t) => t.competitor.id === "pipefy");
+    const registrado = readWatchlist()
+      .clients.find((c) => c.name === CLIENTE)
+      ?.competitors.find((c) => c.id === "pipefy");
+    fontesOk =
+      alvos.length === 1 &&
+      alvos[0].source.kind === "blog" &&
+      registrado?.sources.length === 2;
+    fontesDetalhe = `plano coleta=${alvos.map((t) => t.source.kind).join(",") || "nada"}; registradas=${registrado?.sources.length ?? 0}`;
+    removeCompetitor(CLIENTE, "pipefy");
+  } catch (err) {
+    fontesDetalhe = `falhou: ${(err as Error).message}`;
+  }
+  criterios.push({
+    nome: "Fontes múltiplas: coletáveis entram no plano, vagas fica só registrada",
+    feito: fontesOk,
+    detalhe: fontesDetalhe,
+  });
+
+  // 8) MIGRAÇÃO: arquivo no formato antigo (blogUrl) é lido e vira `sources`.
+  let migraOk = false;
+  let migraDetalhe = "";
+  try {
+    const legado = {
+      clients: [
+        {
+          name: CLIENTE,
+          competitors: [
+            {
+              id: "antigo",
+              name: "Antigo",
+              blogUrl: "https://antigo.com/blog/",
+              enabled: true,
+            },
+          ],
+        },
+      ],
+    };
+    writeFileSync(join(TEMP_DIR, "watchlist.json"), JSON.stringify(legado), "utf8");
+    const lido = readWatchlist();
+    const migrado = lido.clients[0].competitors.find((c) => c.id === "antigo");
+    const noPlano = planCollection(lido).some(
+      (t) => t.competitor.id === "antigo" && t.source.url === "https://antigo.com/blog/",
+    );
+    migraOk = migrado?.sources?.[0]?.kind === "blog" && noPlano;
+    migraDetalhe = `sources=${migrado?.sources?.length ?? 0}, no plano=${noPlano}`;
+  } catch (err) {
+    migraDetalhe = `falhou: ${(err as Error).message}`;
+  }
+  criterios.push({
+    nome: "Migração: formato antigo (blogUrl) vira fontes sem perder o alvo",
+    feito: migraOk,
+    detalhe: migraDetalhe,
   });
 
   return criterios;

@@ -25,10 +25,19 @@
 import { createHash } from "node:crypto";
 
 import { scrape } from "@/lib/firecrawl";
-import type { Competitor } from "@/lib/watchlist";
-import type { RawEvent } from "@/lib/types";
+import type { Competitor, SourceKind, WatchSource } from "@/lib/watchlist";
+import type { RawEvent, SignalKind } from "@/lib/types";
 
 const DEFAULT_LIMIT = 5;
+
+/** Tipo de fonte da watchlist -> tipo de sinal do evento. */
+const SIGNAL_KIND_BY_SOURCE: Record<SourceKind, SignalKind> = {
+  blog: "blog",
+  noticias: "news",
+  releases: "release",
+  produto: "page",
+  vagas: "page",
+};
 const EXCERPT_MAX_CHARS = 600;
 
 /** Segmentos de caminho que denunciam página de SEÇÃO (não post). */
@@ -84,8 +93,9 @@ function segmentsAfterBase(pathname: string, basePath: string): string[] {
 
 /**
  * Uma URL parece POST real deste blog? (ver heurística no topo do arquivo)
+ * Exportada: a DESCOBERTA de fontes usa isso pra contar artigos num candidato.
  */
-function isLikelyPostUrl(rawUrl: string, blogHost: string, basePath: string): boolean {
+export function isLikelyPostUrl(rawUrl: string, blogHost: string, basePath: string): boolean {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -182,23 +192,24 @@ function selectPostUrls(
 }
 
 /**
- * Coleta os posts recentes do blog de UM concorrente da watchlist.
+ * Coleta os itens recentes de UMA FONTE (listagem pública) de um concorrente.
  * A raspagem da listagem é obrigatória (se falhar, lança — o loop decide se
  * tolera). A raspagem de um post individual que falhe é ignorada (log + segue),
  * para não perder o lote inteiro por causa de uma URL problemática.
  */
 export async function collectBlog(
-  competitor: Pick<Competitor, "id" | "name" | "blogUrl">,
+  competitor: Pick<Competitor, "id" | "name">,
+  source: Pick<WatchSource, "kind" | "url">,
   opts: CollectBlogOptions = {},
 ): Promise<RawEvent[]> {
   const limit = opts.limit ?? DEFAULT_LIMIT;
   const force = opts.force ?? false;
 
-  const blogHost = new URL(competitor.blogUrl).hostname;
-  const basePath = basePathOf(competitor.blogUrl);
+  const blogHost = new URL(source.url).hostname;
+  const basePath = basePathOf(source.url);
 
   // 1. Listagem (markdown + links renderizados).
-  const listing = await scrape(competitor.blogUrl, {
+  const listing = await scrape(source.url, {
     formats: ["markdown", "links"],
     onlyMainContent: true,
     force,
@@ -208,7 +219,7 @@ export async function collectBlog(
   const postUrls = selectPostUrls(listing.links, blogHost, basePath, limit);
   if (postUrls.length === 0) {
     console.warn(
-      `[collect:${competitor.id}] nenhuma URL de post reconhecida em ${competitor.blogUrl}`,
+      `[collect:${competitor.id}] nenhuma URL de post reconhecida em ${source.url}`,
     );
   }
 
@@ -233,7 +244,7 @@ export async function collectBlog(
       id: stableId(url),
       source: competitor.id,
       competitorName: competitor.name,
-      kind: "blog",
+      kind: SIGNAL_KIND_BY_SOURCE[source.kind],
       url,
       title,
       description,

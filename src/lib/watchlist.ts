@@ -16,16 +16,45 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-/** Um concorrente vigiado. `blogUrl` é o que o coletor varre hoje. */
+/** Tipos de fonte pública que registramos por concorrente. */
+export type SourceKind = "blog" | "noticias" | "releases" | "produto" | "vagas";
+
+/** Tipos que o coletor JÁ SABE varrer (listagens de artigos/notas). Os demais
+ * (produto/vagas) ficam registrados e entram na coleta em fase futura. */
+export const COLLECTIBLE_KINDS: ReadonlySet<SourceKind> = new Set([
+  "blog",
+  "noticias",
+  "releases",
+]);
+
+/** Uma fonte pública vigiável de um concorrente. */
+export type WatchSource = {
+  /** id estável dentro do concorrente (kind + hash curto da url). */
+  id: string;
+  kind: SourceKind;
+  url: string;
+};
+
+/** Um concorrente vigiado — com uma ou mais fontes públicas. */
 export type Competitor = {
   /** id estável (slug do nome) — usado como `source` dos eventos coletados. */
   id: string;
   name: string;
-  /** listagem pública que o coletor varre (blog/notícias). Obrigatória. */
-  blogUrl: string;
-  /** site institucional (informativo; futuro monitor visual). Opcional. */
+  /** site institucional (base da descoberta de fontes). Opcional. */
   siteUrl?: string;
-  /** desligado = fica na lista mas o Radar não varre. */
+  /** desligado = fica na lista mas o Radar não varre nenhuma fonte dele. */
+  enabled: boolean;
+  /** páginas públicas registradas (blog, notícias, releases, produto, vagas). */
+  sources: WatchSource[];
+};
+
+/** Formato ANTIGO (F2 inicial): uma única blogUrl por concorrente. Ainda é
+ * aceito na leitura e migrado automaticamente para `sources`. */
+type LegacyCompetitor = {
+  id: string;
+  name: string;
+  blogUrl: string;
+  siteUrl?: string;
   enabled: boolean;
 };
 
@@ -37,8 +66,12 @@ export type WatchClient = {
 
 export type Watchlist = { clients: WatchClient[] };
 
-/** Um alvo concreto de coleta: cliente + concorrente habilitado. */
-export type CollectionTarget = { clientName: string; competitor: Competitor };
+/** Um alvo concreto de coleta: cliente + concorrente + UMA fonte coletável. */
+export type CollectionTarget = {
+  clientName: string;
+  competitor: Competitor;
+  source: WatchSource;
+};
 
 /** SEED — o estado do F1, pra nada quebrar quando o arquivo ainda não existe. */
 export const WATCHLIST_SEED: Watchlist = {
@@ -49,9 +82,11 @@ export const WATCHLIST_SEED: Watchlist = {
         {
           id: "rd-station",
           name: "RD Station",
-          blogUrl: "https://www.rdstation.com/blog/",
           siteUrl: "https://www.rdstation.com/",
           enabled: true,
+          sources: [
+            { id: "blog-rd", kind: "blog", url: "https://www.rdstation.com/blog/" },
+          ],
         },
       ],
     },
@@ -91,7 +126,42 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-/** A estrutura lida do disco é uma watchlist plausível? */
+const SOURCE_KINDS: ReadonlySet<string> = new Set([
+  "blog",
+  "noticias",
+  "releases",
+  "produto",
+  "vagas",
+]);
+
+/** id estável de uma fonte: kind + hash curto da url (não colide entre urls). */
+export function sourceId(kind: SourceKind, url: string): string {
+  let hash = 0;
+  for (let i = 0; i < url.length; i++) hash = (hash * 31 + url.charCodeAt(i)) >>> 0;
+  return `${kind}-${hash.toString(36)}`;
+}
+
+/** O concorrente lido do disco é válido (formato novo OU legado)? */
+function isValidStoredCompetitor(comp: unknown): boolean {
+  if (!comp || typeof comp !== "object") return false;
+  const c = comp as Partial<Competitor & LegacyCompetitor>;
+  if (typeof c.id !== "string" || typeof c.name !== "string" || typeof c.enabled !== "boolean") {
+    return false;
+  }
+  if (Array.isArray(c.sources)) {
+    return c.sources.every(
+      (s) =>
+        s &&
+        typeof s.id === "string" &&
+        typeof s.url === "string" &&
+        typeof s.kind === "string" &&
+        SOURCE_KINDS.has(s.kind),
+    );
+  }
+  return typeof c.blogUrl === "string"; // formato legado
+}
+
+/** A estrutura lida do disco é uma watchlist plausível (novo ou legado)? */
 function isValidWatchlist(value: unknown): value is Watchlist {
   if (!value || typeof value !== "object") return false;
   const clients = (value as Watchlist).clients;
@@ -101,15 +171,32 @@ function isValidWatchlist(value: unknown): value is Watchlist {
       c &&
       typeof c.name === "string" &&
       Array.isArray(c.competitors) &&
-      c.competitors.every(
-        (comp) =>
-          comp &&
-          typeof comp.id === "string" &&
-          typeof comp.name === "string" &&
-          typeof comp.blogUrl === "string" &&
-          typeof comp.enabled === "boolean",
-      ),
+      c.competitors.every(isValidStoredCompetitor),
   );
+}
+
+/**
+ * MIGRAÇÃO do formato legado: `blogUrl` vira uma fonte `kind='blog'`.
+ * Devolve [watchlist, mudou] — se mudou, quem chamou persiste o formato novo.
+ */
+function migrateShape(watchlist: Watchlist): [Watchlist, boolean] {
+  let changed = false;
+  for (const client of watchlist.clients) {
+    client.competitors = client.competitors.map((comp) => {
+      const legacy = comp as unknown as LegacyCompetitor & Partial<Competitor>;
+      if (Array.isArray(legacy.sources)) return comp;
+      changed = true;
+      const url = legacy.blogUrl;
+      return {
+        id: legacy.id,
+        name: legacy.name,
+        siteUrl: legacy.siteUrl,
+        enabled: legacy.enabled,
+        sources: url ? [{ id: sourceId("blog", url), kind: "blog" as const, url }] : [],
+      };
+    });
+  }
+  return [watchlist, changed];
 }
 
 /**
@@ -121,7 +208,17 @@ export function readWatchlist(): Watchlist {
   if (existsSync(path)) {
     try {
       const parsed = JSON.parse(readFileSync(path, "utf8"));
-      if (isValidWatchlist(parsed)) return parsed;
+      if (isValidWatchlist(parsed)) {
+        const [migrated, changed] = migrateShape(parsed);
+        if (changed) {
+          try {
+            writeWatchlist(migrated); // persiste já no formato novo
+          } catch {
+            // sem escrita ainda dá pra operar em memória.
+          }
+        }
+        return migrated;
+      }
       console.warn(`[watchlist] ${path} malformado — voltando ao seed.`);
     } catch (err) {
       console.warn(`[watchlist] falha lendo ${path}: ${(err as Error).message} — seed.`);
@@ -151,14 +248,20 @@ function findClient(watchlist: Watchlist, clientName: string): WatchClient {
   return client;
 }
 
+export type AddSourceInput = { kind: SourceKind; url: string };
+
 export type AddCompetitorInput = {
   name: string;
-  blogUrl: string;
+  /** LEGADO/manual: uma URL de blog direta (vira fonte kind='blog'). */
+  blogUrl?: string;
   siteUrl?: string;
+  /** fontes descobertas/confirmadas na tela (o caminho novo). */
+  sources?: AddSourceInput[];
 };
 
 /**
  * Adiciona um concorrente ao cliente e persiste. Devolve a lista atualizada.
+ * Aceita o caminho NOVO (`sources` descobertas) e o manual/legado (`blogUrl`).
  * Lança Error com mensagem amigável (pt-BR) quando a entrada é inválida —
  * a API converte em 400 e a tela mostra ao Rafael.
  */
@@ -166,15 +269,42 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
   const name = (input.name ?? "").trim();
   const blogUrl = (input.blogUrl ?? "").trim();
   const siteUrl = (input.siteUrl ?? "").trim();
+  const rawSources = Array.isArray(input.sources) ? input.sources : [];
 
   if (!name) throw new Error("Dê um nome ao concorrente.");
-  if (!blogUrl) throw new Error("Informe o endereço do blog/notícias do concorrente.");
-  if (!isHttpUrl(blogUrl)) {
-    throw new Error("O endereço do blog precisa ser uma URL completa (https://…).");
-  }
   if (siteUrl && !isHttpUrl(siteUrl)) {
     throw new Error("O endereço do site precisa ser uma URL completa (https://…).");
   }
+
+  // Monta as fontes: as confirmadas na descoberta e/ou a URL manual.
+  const sources: WatchSource[] = [];
+  const seenUrls = new Set<string>();
+  const pushSource = (kind: SourceKind, url: string): void => {
+    const clean = url.trim();
+    if (!clean || seenUrls.has(clean)) return;
+    seenUrls.add(clean);
+    sources.push({ id: sourceId(kind, clean), kind, url: clean });
+  };
+
+  for (const s of rawSources) {
+    const kind = String(s?.kind ?? "");
+    const url = String(s?.url ?? "").trim();
+    if (!SOURCE_KINDS.has(kind)) throw new Error(`Tipo de fonte desconhecido: ${kind}`);
+    if (!isHttpUrl(url)) {
+      throw new Error("Toda fonte precisa ser uma URL completa (https://…).");
+    }
+    pushSource(kind as SourceKind, url);
+  }
+  if (blogUrl) {
+    if (!isHttpUrl(blogUrl)) {
+      throw new Error("O endereço do blog precisa ser uma URL completa (https://…).");
+    }
+    pushSource("blog", blogUrl);
+  }
+  if (sources.length === 0) {
+    throw new Error("Escolha ao menos uma fonte pra vigiar (ou informe uma URL manual).");
+  }
+
   const id = slugify(name);
   if (!id) throw new Error("Esse nome não gera um identificador válido — use letras/números.");
 
@@ -187,9 +317,9 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
   client.competitors.push({
     id,
     name,
-    blogUrl,
     siteUrl: siteUrl || undefined,
     enabled: true,
+    sources,
   });
   writeWatchlist(watchlist);
   return watchlist;
@@ -224,16 +354,19 @@ export function setCompetitorEnabled(
 }
 
 /**
- * O PLANO DE COLETA: quais (cliente, concorrente) o loop deve varrer agora.
- * Função pura — só concorrentes `enabled` com `blogUrl` entram.
+ * O PLANO DE COLETA: quais (cliente, concorrente, FONTE) o loop varre agora.
+ * Função pura — só concorrentes `enabled`, e só fontes de tipo COLETÁVEL
+ * (blog/notícias/releases; produto e vagas ficam registradas pra fase futura).
  */
 export function planCollection(watchlist: Watchlist): CollectionTarget[] {
   const targets: CollectionTarget[] = [];
   for (const client of watchlist.clients) {
     for (const competitor of client.competitors) {
       if (!competitor.enabled) continue;
-      if (!competitor.blogUrl) continue;
-      targets.push({ clientName: client.name, competitor });
+      for (const source of competitor.sources) {
+        if (!COLLECTIBLE_KINDS.has(source.kind)) continue;
+        targets.push({ clientName: client.name, competitor, source });
+      }
     }
   }
   return targets;
