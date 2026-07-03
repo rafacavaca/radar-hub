@@ -172,6 +172,181 @@ export function buildGeneralItems(readings: LensReading[]): IntelligenceItem[] {
   return byScoreDesc(items);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// RODADA PARCIAL (F16) — por cliente ou por concorrente, com MERGE no dia.
+// Evita rodar TUDO pra ver uma novidade pontual: atualiza só o escopo pedido
+// e preserva o resto do resultado do dia.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type RunScope = {
+  clientName: string;
+  /** limita a UM concorrente do cliente (id da watchlist). */
+  competitorId?: string;
+};
+
+type ScopeNames = { clientName: string; competitorId?: string; competitorName?: string };
+
+type FreshPatch = {
+  events: ClientEvent[];
+  readings: LensReading[];
+  crossInsights: CrossInsight[];
+  brainSource: BrainSourceNote;
+  failures: string[];
+};
+
+/**
+ * MERGE de uma rodada parcial no resultado do dia (função PURA — o smoke testa
+ * direto aqui): troca SÓ os dados do escopo (cliente, e opcionalmente um
+ * concorrente dele) pelos frescos; o resto fica intacto. A visão Geral é
+ * re-derivada das leituras já mescladas.
+ *
+ * Honestidade: se a rodada fresca veio VAZIA e sem falhas (ex.: fontes por
+ * mudança sem nada novo), NADA é apagado — só o carimbo/brain atualizam.
+ */
+export function mergeLoopResult(
+  base: RadarLoopResult | null,
+  scope: ScopeNames,
+  fresh: FreshPatch,
+): RadarLoopResult {
+  const inScopeEvent = (e: ClientEvent): boolean =>
+    e.clientName === scope.clientName && (!scope.competitorId || e.source === scope.competitorId);
+  const inScopeReading = (r: { clientName: string; concorrente?: string }): boolean =>
+    r.clientName === scope.clientName &&
+    (!scope.competitorName || r.concorrente === scope.competitorName);
+
+  const baseEvents = base?.events ?? [];
+  const baseReadings = base?.readings ?? [];
+  const baseCross = base?.crossInsights ?? [];
+
+  const nothingNew =
+    fresh.events.length === 0 && fresh.readings.length === 0 && fresh.failures.length === 0;
+
+  const events = nothingNew
+    ? baseEvents
+    : [...baseEvents.filter((e) => !inScopeEvent(e)), ...fresh.events];
+  const readings = nothingNew
+    ? baseReadings
+    : [...baseReadings.filter((r) => !inScopeReading(r)), ...fresh.readings];
+  const crossInsights = nothingNew
+    ? baseCross
+    : [...baseCross.filter((c) => !inScopeReading(c)), ...fresh.crossInsights];
+
+  const brainSources = [
+    ...(base?.brainSources ?? []).filter((b) => b.clientName !== scope.clientName),
+    fresh.brainSource,
+  ];
+
+  return {
+    items: buildGeneralItems(readings),
+    readings: byScoreDesc(readings),
+    crossInsights: byScoreDesc(crossInsights),
+    events,
+    ranAt: new Date().toISOString(),
+    brainSources,
+    failures: fresh.failures.length > 0 ? fresh.failures : undefined,
+  };
+}
+
+/**
+ * Roda SÓ um escopo (cliente, ou um concorrente do cliente) e mescla no dia.
+ * Custo: coleta só os alvos do escopo + lentes/cruzamento só sobre os eventos
+ * frescos (1 chamada por lente ativa + 1 do cruzamento).
+ */
+export async function runRadarPartial(scope: RunScope, opts: { limit?: number } = {}): Promise<{
+  result: RadarLoopResult;
+  summary: { eventos: number; leituras: number; cruzamentos: number; falhas: string[] };
+}> {
+  const watchlist = readWatchlist();
+  const client = watchlist.clients.find((c) => c.name === scope.clientName);
+  if (!client) throw new Error(`Cliente não encontrado: ${scope.clientName}`);
+
+  let competitorName: string | undefined;
+  if (scope.competitorId) {
+    const competitor = client.competitors.find((c) => c.id === scope.competitorId);
+    if (!competitor) throw new Error(`Concorrente não encontrado: ${scope.competitorId}`);
+    competitorName = competitor.name;
+  }
+
+  const targets = planCollection(watchlist).filter(
+    (t) =>
+      t.clientName === scope.clientName &&
+      (!scope.competitorId || t.competitor.id === scope.competitorId),
+  );
+  if (targets.length === 0) {
+    throw new Error(
+      "Nada pra coletar nesse escopo — o concorrente está pausado ou sem fontes coletáveis.",
+    );
+  }
+
+  // 1) COLETA só do escopo (mesma tolerância a falha do loop cheio).
+  const failures: string[] = [];
+  const freshEvents: ClientEvent[] = [];
+  const seen = new Set<string>();
+  for (const target of targets) {
+    try {
+      const method = collectionMethod(target.source.kind);
+      const events =
+        method === "diff"
+          ? await collectByDiff(target.competitor, target.source)
+          : await collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT });
+      for (const event of events) {
+        if (seen.has(event.id)) continue;
+        seen.add(event.id);
+        freshEvents.push({ ...event, clientName: scope.clientName });
+      }
+    } catch (err) {
+      const message = (err as Error).message;
+      failures.push(`coleta ${target.competitor.name} (${target.source.kind}): ${message}`);
+      console.warn(`[loop:parcial] coleta falhou: ${message}`);
+    }
+  }
+
+  // 2) ANÁLISE só dos eventos frescos (lentes ativas + cruzamento).
+  const brain = await fetchClientBrain(scope.clientName);
+  const brainSource: BrainSourceNote = {
+    clientName: scope.clientName,
+    mode: brain.mode,
+    nodeCount: brain.mode === "live" ? brain.nodeCount : undefined,
+  };
+
+  const readings: LensReading[] = [];
+  const crossInsights: CrossInsight[] = [];
+  if (freshEvents.length > 0) {
+    for (const lens of activeLensesFor(scope.clientName)) {
+      const out = await withGatewayRetry(
+        `lente ${lens.id} (${scope.clientName})`,
+        () => analyzeLens(lens, freshEvents, scope.clientName, brain.context),
+        failures,
+      );
+      if (out) readings.push(...out);
+    }
+    const cross = await withGatewayRetry(
+      `cruzamento (${scope.clientName})`,
+      () => crossReference(freshEvents, scope.clientName, brain.context),
+      failures,
+    );
+    if (cross) crossInsights.push(...cross);
+  }
+
+  // 3) MERGE no resultado do dia e persiste.
+  const merged = mergeLoopResult(
+    readLoopCache(),
+    { clientName: scope.clientName, competitorId: scope.competitorId, competitorName },
+    { events: freshEvents, readings, crossInsights, brainSource, failures },
+  );
+  writeLoopCache(merged);
+
+  return {
+    result: merged,
+    summary: {
+      eventos: freshEvents.length,
+      leituras: readings.length,
+      cruzamentos: crossInsights.length,
+      falhas: failures,
+    },
+  };
+}
+
 /**
  * Roda o loop do Radar: coleta pela watchlist, lê com as lentes ativas de
  * cada cliente, deriva a visão geral. Reusa o resultado do dia (a menos que

@@ -124,7 +124,7 @@ export default async function BriefingPage({
             {brain ? <> · {brain}</> : null}
           </p>
         </div>
-        <RodarAgora testId="rodar-agora" />
+        <RodarAgora testId="rodar-agora" cliente={cliente || undefined} />
       </header>
 
       {/* Seletor de lente (+ cliente, quando houver mais de um). */}

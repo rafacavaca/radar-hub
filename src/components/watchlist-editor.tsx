@@ -673,6 +673,75 @@ function FindMoreSources({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// "Rodar" UM concorrente (F16): rodada parcial — coleta/analisa só ele e
+// mescla no dia. O resto do briefing fica como está.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function RunCompetitor({
+  clientName,
+  competitor,
+  disabled,
+}: {
+  clientName: string;
+  competitor: Competitor;
+  disabled: boolean;
+}) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "running">("idle");
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run() {
+    if (state !== "idle") return;
+    setState("running");
+    setNote(null);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/run?cliente=${encodeURIComponent(clientName)}&concorrente=${encodeURIComponent(competitor.id)}`,
+        { cache: "no-store" },
+      );
+      const payload = (await res.json().catch(() => null)) as {
+        resumo?: { eventos: number; leituras: number };
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        setError(payload?.error ?? "não deu pra rodar agora");
+        return;
+      }
+      const r = payload?.resumo;
+      setNote(
+        r && (r.eventos > 0 || r.leituras > 0)
+          ? `✓ ${r.eventos} sinal(is), ${r.leituras} leitura(s) — veja no Briefing`
+          : "✓ rodou — nada novo desta vez",
+      );
+      router.refresh();
+    } catch {
+      setError("falha de conexão");
+    } finally {
+      setState("idle");
+    }
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {note ? <span className="max-w-[180px] truncate text-xs text-emerald-700">{note}</span> : null}
+      {error ? <span className="max-w-[160px] truncate text-xs text-red-600">{error}</span> : null}
+      <button
+        type="button"
+        data-testid="run-competitor"
+        onClick={run}
+        disabled={disabled || state !== "idle" || !competitor.enabled}
+        title={`Coleta e analisa só ${competitor.name} (o resto do dia fica como está)`}
+        className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-50"
+      >
+        {state === "running" ? "Rodando…" : "Rodar"}
+      </button>
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Linha de concorrente: nome, fontes registradas, pausar/reativar, remover
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -770,6 +839,7 @@ function CompetitorRow({
       </div>
 
       <div className="flex flex-none items-center gap-1">
+        <RunCompetitor clientName={clientName} competitor={competitor} disabled={busy !== null} />
         <button
           type="button"
           data-testid="watchlist-toggle"
