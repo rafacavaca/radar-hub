@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/feed", label: "Feed" },
   { href: "/vigiar", label: "Vigiar" },
   { href: "/perguntar", label: "Perguntar" },
+  { href: "/analistas", label: "Analistas" },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
@@ -21,6 +22,9 @@ function isActive(pathname: string, href: string): boolean {
 
 export function SiteNav() {
   const pathname = usePathname();
+
+  // Modo apresentação (F6) é limpo/exportável — sem chrome do app.
+  if (pathname.startsWith("/apresentar")) return null;
 
   return (
     <header className="sticky top-0 z-20 border-b border-stone-200 bg-stone-50/85 backdrop-blur">

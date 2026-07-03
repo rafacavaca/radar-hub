@@ -26,9 +26,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "itemId obrigatório" }, { status: 400 });
     }
 
-    // Recupera o item pelo id no resultado do loop (cacheado no dia — barato).
-    const { items } = await runRadarLoop();
-    const item = items.find((it) => it.id === itemId);
+    // Recupera pelo id: item da visão Geral OU leitura de lente (F6).
+    const { items, readings } = await runRadarLoop();
+    let item = items.find((it) => it.id === itemId);
+    if (!item) {
+      const reading = (readings ?? []).find((r) => r.id === itemId);
+      if (reading) {
+        // PRODUTO não vira card — vira nota de roadmap (/api/roadmap-note).
+        if (reading.lens === "produto") {
+          return NextResponse.json(
+            { error: "leituras de Produto viram nota de roadmap, não card" },
+            { status: 400 },
+          );
+        }
+        item = {
+          id: reading.id,
+          clientName: reading.clientName,
+          sinal: reading.sinal,
+          porQueImporta: reading.leitura,
+          acao: reading.acao,
+          fonte: reading.fonte,
+          concorrente: reading.concorrente,
+          score: reading.score,
+          eventIds: reading.eventIds,
+          createdAt: reading.createdAt,
+        };
+      }
+    }
     if (!item) {
       return NextResponse.json({ error: "item não encontrado" }, { status: 404 });
     }

@@ -38,6 +38,31 @@ export type Fonte = {
 };
 
 /**
+ * LEITURA DE LENTE (F6): o mesmo sinal lido por UM analista-lente (comercial,
+ * produto ou marketing), no idioma do time dele. 1 sinal -> 0..3 leituras.
+ */
+export type LensReading = {
+  id: string;
+  clientName: string;
+  /** qual lente produziu ("comercial" | "produto" | "marketing"). */
+  lens: "comercial" | "produto" | "marketing";
+  /** o que aconteceu (1 frase objetiva). */
+  sinal: string;
+  /** a leitura NO IDIOMA DO TIME (risco/oportunidade, roadmap, discurso…). */
+  leitura: string;
+  /** ação recomendada no formato da lente. */
+  acao: string;
+  /** SÓ comercial: a conta/cliente afetado, quando identificável. */
+  contaAfetada?: string;
+  /** impacto pra ESTE time (0-100). */
+  score: number;
+  fonte: Fonte;
+  concorrente?: string;
+  eventIds: string[];
+  createdAt: string;
+};
+
+/**
  * O item de inteligência: um sinal já cruzado com o Brain do cliente e
  * transformado em decisão. Este é o "produto" do Radar.
  */
@@ -61,5 +86,7 @@ export type IntelligenceItem = {
   brainRefs?: string[];
   /** de qual(is) RawEvent este item nasceu. */
   eventIds?: string[];
+  /** F6: quais lentes leram este sinal (o item Geral agrega as leituras). */
+  lentes?: Array<"comercial" | "produto" | "marketing">;
   createdAt: string;
 };
