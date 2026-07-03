@@ -126,7 +126,7 @@ function describeDiff(kind: SourceKind, diff: ContentDiff): string {
  */
 export async function collectByDiff(
   competitor: Pick<Competitor, "id" | "name">,
-  source: Pick<WatchSource, "id" | "kind" | "url">,
+  source: Pick<WatchSource, "id" | "kind" | "url" | "label">,
   opts: { force?: boolean } = {},
 ): Promise<RawEvent[]> {
   let markdown = "";
@@ -168,13 +168,37 @@ export async function collectByDiff(
   file.snapshots[key] = { items, hash, capturedAt };
   writeSnapshots(file);
 
-  // 1ª captura = linha de base (sem evento) OU mesmo estado = sem evento.
-  if (!prev || prev.hash === hash) return [];
+  const label = source.label?.trim() || KIND_LABEL[source.kind] || source.kind;
+
+  // 1ª CAPTURA = linha de base — mas o CONTEÚDO de hoje é intel valiosa
+  // (o portfólio do concorrente ENTRA no sistema já, pros analistas lerem).
+  // Das próximas em diante, só a MUDANÇA vira sinal.
+  if (!prev) {
+    const resumo = items.slice(0, 12).join(" · ").slice(0, 520);
+    const id = createHash("sha1").update(`${key}:baseline:${hash}`).digest("hex").slice(0, 16);
+    return [
+      {
+        id,
+        source: competitor.id,
+        competitorName: competitor.name,
+        kind: "page",
+        url: source.url,
+        title: `${competitor.name} — retrato inicial: ${label}`,
+        description: `O que a página de ${label} mostra hoje: ${resumo}`,
+        category: source.kind,
+        publishedAt: null,
+        collectedAt: capturedAt,
+        excerpt: `O que a página de ${label} mostra hoje: ${resumo}`,
+      },
+    ];
+  }
+
+  // mesmo estado = sem evento.
+  if (prev.hash === hash) return [];
 
   const diff = diffItems(prev.items, items);
   if (!diff.changed) return [];
 
-  const label = KIND_LABEL[source.kind] ?? source.kind;
   const id = createHash("sha1").update(`${key}:${hash}`).digest("hex").slice(0, 16);
   return [
     {

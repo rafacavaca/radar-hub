@@ -51,7 +51,7 @@ type WatchlistAction =
       name: string;
       siteUrl?: string;
       blogUrl?: string;
-      sources?: Array<{ kind: SourceKind; url: string }>;
+      sources?: Array<{ kind: SourceKind; url: string; label?: string }>;
     }
   | { action: "remove"; clientName: string; competitorId: string }
   | { action: "toggle"; clientName: string; competitorId: string; enabled: boolean }
@@ -59,7 +59,7 @@ type WatchlistAction =
       action: "add-sources";
       clientName: string;
       competitorId: string;
-      sources: Array<{ kind: SourceKind; url: string }>;
+      sources: Array<{ kind: SourceKind; url: string; label?: string }>;
     }
   | { action: "add-client"; clientName: string }
   | { action: "remove-client"; clientName: string };
@@ -264,7 +264,7 @@ function AddCompetitorFlow({ clientName }: { clientName: string }) {
     setError(null);
     const chosen = (candidates ?? [])
       .filter((c) => c.checked)
-      .map((c) => ({ kind: c.kind, url: c.url }));
+      .map((c) => ({ kind: c.kind, url: c.url, label: c.titulo }));
 
     const result = await postWatchlist({
       action: "add",
@@ -610,7 +610,7 @@ function FindMoreSources({
     if (state !== "idle") return;
     const chosen = (candidates ?? [])
       .filter((c) => c.checked)
-      .map((c) => ({ kind: c.kind, url: c.url }));
+      .map((c) => ({ kind: c.kind, url: c.url, label: c.titulo }));
     if (chosen.length === 0) return;
     setState("adding");
     setError(null);
@@ -860,7 +860,11 @@ function CompetitorRow({
                 title={`${source.url}${status?.tone === "bad" ? ` — última rodada falhou` : ""}`}
                 className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600 underline-offset-2 hover:bg-stone-200 hover:underline"
               >
-                {KIND_CHIP[source.kind]}
+                {source.label ? (
+                  <span className="max-w-[150px] truncate font-medium">{source.label}</span>
+                ) : (
+                  KIND_CHIP[source.kind]
+                )}
                 {source.kind === "produto" || source.kind === "vagas" ? (
                   <span className="text-stone-400">· por mudança</span>
                 ) : null}

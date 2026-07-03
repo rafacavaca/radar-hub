@@ -85,7 +85,8 @@ const SYSTEM =
   "REGRAS DE HONESTIDADE (invioláveis): (1) 'ja_temos' e 'meio_pronto' SÓ com evidência EXPLÍCITA no Brain — se o Brain é silencioso sobre o que o cliente tem/faz por dentro neste tema, o veredito é OBRIGATORIAMENTE 'sem_dado_interno'; " +
   "(2) NUNCA invente feature, roadmap, projeto parado ou capacidade — na dúvida, 'sem_dado_interno'; " +
   "(3) no campo 'interno', se for sem_dado_interno, escreva algo como 'O Brain não registra o que a <cliente> tem internamente sobre isto'. " +
-  "(4) score 0-100 = valor da oportunidade pro cliente. " +
+  "(4) score 0-100 = valor da oportunidade pro cliente; " +
+  "(5) seja SELETIVO e CONCISO: gere NO MÁXIMO os 8 cruzamentos mais valiosos (o motor tem tempo limitado). " +
   'Responda SÓ com um array JSON válido (campos CURTOS, uma frase cada), sem texto fora: ' +
   '[ { "sinal": "...", "externo": "...", "interno": "...", "verdict": "gap", "oportunidade": "...", "score": 0, "eventIndex": 1 } ]. ' +
   "Se nenhum movimento se cruzar com o cliente, responda [].";
@@ -129,11 +130,15 @@ function clampScore(value: unknown): number {
  * Nunca lança por resposta malformada do LLM (-> []).
  */
 export async function crossReference(
-  events: RawEvent[],
+  allEvents: RawEvent[],
   clientName: string,
   brainContext: string,
 ): Promise<CrossInsight[]> {
-  if (events.length === 0) return [];
+  if (allEvents.length === 0) return [];
+
+  // CAP: cruzamento com muitos eventos estoura o teto de 40s do gateway
+  // (geração longa). 12 movimentos bastam pra achar os cruzamentos do dia.
+  const events = allEvents.slice(0, 12);
 
   const content = await completeViaGateway({
     system: SYSTEM,

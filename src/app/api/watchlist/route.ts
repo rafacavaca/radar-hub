@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         }
         // fontes descobertas/confirmadas na tela: [{kind, url}] — a lib valida
         // tipo e URL uma a uma (mensagens amigáveis).
-        let sources: Array<{ kind: string; url: string }> | undefined;
+        let sources: Array<{ kind: string; url: string; label?: string }> | undefined;
         if (payload.sources !== undefined) {
           if (!Array.isArray(payload.sources)) {
             return badRequest("O campo sources precisa ser uma lista.");
@@ -82,10 +82,11 @@ export async function POST(req: Request) {
           for (const s of payload.sources) {
             const kind = (s as Record<string, unknown>)?.kind;
             const url = (s as Record<string, unknown>)?.url;
+            const label = (s as Record<string, unknown>)?.label;
             if (!isString(kind) || !isString(url)) {
               return badRequest("Cada fonte precisa de kind e url como texto.");
             }
-            sources.push({ kind, url });
+            sources.push({ kind, url, ...(isString(label) ? { label } : {}) });
           }
         }
         const data = addCompetitor(payload.clientName, {
@@ -132,14 +133,15 @@ export async function POST(req: Request) {
         if (!Array.isArray(payload.sources)) {
           return badRequest("Envie sources como lista de {kind, url}.");
         }
-        const sources: Array<{ kind: string; url: string }> = [];
+        const sources: Array<{ kind: string; url: string; label?: string }> = [];
         for (const s of payload.sources) {
           const kind = (s as Record<string, unknown>)?.kind;
           const url = (s as Record<string, unknown>)?.url;
+          const label = (s as Record<string, unknown>)?.label;
           if (!isString(kind) || !isString(url)) {
             return badRequest("Cada fonte precisa de kind e url como texto.");
           }
-          sources.push({ kind, url });
+          sources.push({ kind, url, ...(isString(label) ? { label } : {}) });
         }
         // a lib valida kind/url em runtime com mensagens amigáveis.
         const result = addSourcesToCompetitor(

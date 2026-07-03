@@ -43,6 +43,8 @@ export type WatchSource = {
   id: string;
   kind: SourceKind;
   url: string;
+  /** nome humano da página (vem da descoberta, ex.: "CYNERGY WMS Suite"). */
+  label?: string;
 };
 
 /** Um concorrente vigiado — com uma ou mais fontes públicas. */
@@ -293,7 +295,7 @@ export function removeClient(clientName: string): Watchlist {
   return watchlist;
 }
 
-export type AddSourceInput = { kind: SourceKind; url: string };
+export type AddSourceInput = { kind: SourceKind; url: string; label?: string };
 
 export type AddCompetitorInput = {
   name: string;
@@ -324,11 +326,17 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
   // Monta as fontes: as confirmadas na descoberta e/ou a URL manual.
   const sources: WatchSource[] = [];
   const seenUrls = new Set<string>();
-  const pushSource = (kind: SourceKind, url: string): void => {
+  const pushSource = (kind: SourceKind, url: string, label?: string): void => {
     const clean = url.trim();
     if (!clean || seenUrls.has(clean)) return;
     seenUrls.add(clean);
-    sources.push({ id: sourceId(kind, clean), kind, url: clean });
+    const cleanLabel = label?.trim().slice(0, 60);
+    sources.push({
+      id: sourceId(kind, clean),
+      kind,
+      url: clean,
+      label: cleanLabel || undefined,
+    });
   };
 
   for (const s of rawSources) {
@@ -338,7 +346,7 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
     if (!isHttpUrl(url)) {
       throw new Error("Toda fonte precisa ser uma URL completa (https://…).");
     }
-    pushSource(kind as SourceKind, url);
+    pushSource(kind as SourceKind, url, typeof s?.label === "string" ? s.label : undefined);
   }
   if (blogUrl) {
     if (!isHttpUrl(blogUrl)) {
@@ -394,7 +402,13 @@ export function addSourcesToCompetitor(
     const key = url.replace(/\/$/, "");
     if (existing.has(key)) continue;
     existing.add(key);
-    competitor.sources.push({ id: sourceId(kind as SourceKind, url), kind: kind as SourceKind, url });
+    const label = typeof s?.label === "string" ? s.label.trim().slice(0, 60) : undefined;
+    competitor.sources.push({
+      id: sourceId(kind as SourceKind, url),
+      kind: kind as SourceKind,
+      url,
+      label: label || undefined,
+    });
     added++;
   }
   if (added > 0) writeWatchlist(watchlist);
