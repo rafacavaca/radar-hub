@@ -24,7 +24,7 @@
 
 import { isLikelyPostUrl } from "@/lib/collectors/blog";
 import { scrape } from "@/lib/firecrawl";
-import { COLLECTIBLE_KINDS, type SourceKind } from "@/lib/watchlist";
+import { collectionMethod, type SourceKind } from "@/lib/watchlist";
 
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_HTML_BYTES = 2_000_000;
@@ -258,9 +258,10 @@ export async function discoverSources(siteInput: string): Promise<DiscoveryResul
   // 4. Monta os candidatos com evidência honesta.
   const candidates: SourceCandidate[] = [];
   for (const [kind, url] of bestByKind) {
-    const coletavel = COLLECTIBLE_KINDS.has(kind);
+    const method = collectionMethod(kind);
+    const coletavel = method !== null;
     let descricao: string;
-    if (coletavel) {
+    if (method === "list") {
       const posts = await countPosts(url.toString());
       if (posts !== null && posts >= 2) {
         descricao = `Página com ≈${posts} artigos detectados — o Radar varre daqui.`;
@@ -269,11 +270,13 @@ export async function discoverSources(siteInput: string): Promise<DiscoveryResul
       } else {
         descricao = "O site bloqueia leitura simples — a coleta usará o Firecrawl (funciona, gasta 1 crédito).";
       }
-    } else {
+    } else if (method === "diff") {
       descricao =
         kind === "vagas"
-          ? "Página de vagas — registrada agora; a vigilância desse tipo entra numa fase futura."
-          : "Página de soluções/produto — registrada agora; o monitor visual entra numa fase futura.";
+          ? "Página de vagas — vigiada por MUDANÇA: quando abrir/fechar vaga, vira sinal."
+          : "Página de produtos/soluções — vigiada por MUDANÇA: quando mudar, vira sinal.";
+    } else {
+      descricao = "Página registrada — a vigilância desse tipo entra numa fase futura.";
     }
     candidates.push({
       kind,

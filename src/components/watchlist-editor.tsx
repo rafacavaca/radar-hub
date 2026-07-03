@@ -310,6 +310,7 @@ function AddCompetitorFlow({ clientName }: { clientName: string }) {
                       <span className="text-sm font-medium text-stone-900">{c.titulo}</span>
                       <span className="rounded-full bg-stone-200/70 px-2 py-0.5 text-xs text-stone-600">
                         {KIND_CHIP[c.kind]}
+                        {c.kind === "produto" || c.kind === "vagas" ? " · por mudança" : ""}
                         {c.coletavel ? "" : " · em breve"}
                       </span>
                     </span>
@@ -597,7 +598,7 @@ function CompetitorRow({
             >
               {KIND_CHIP[source.kind]}
               {source.kind === "produto" || source.kind === "vagas" ? (
-                <span className="text-stone-400">· em breve</span>
+                <span className="text-stone-400">· por mudança</span>
               ) : null}
             </a>
           ))}

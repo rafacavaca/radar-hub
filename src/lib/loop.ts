@@ -26,9 +26,10 @@ import { join } from "node:path";
 import { analyzeLens } from "@/lib/analyst-lens";
 import { fetchClientBrain } from "@/lib/brain";
 import { collectBlog } from "@/lib/collectors/blog";
+import { collectByDiff } from "@/lib/collectors/content-diff";
 import { crossReference, type CrossInsight } from "@/lib/cross-reference";
 import { activeLensesFor } from "@/lib/lenses";
-import { planCollection, readWatchlist } from "@/lib/watchlist";
+import { collectionMethod, planCollection, readWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, LensReading, RawEvent } from "@/lib/types";
 
 const CACHE_DIR = join(process.cwd(), ".cache");
@@ -199,9 +200,12 @@ export async function runRadarLoop(
 
   for (const target of targets) {
     try {
-      const events = await collectBlog(target.competitor, target.source, {
-        limit: opts.limit ?? DEFAULT_LIMIT,
-      });
+      // despacha por método: listagem (blog/notícias) ou mudança (produto/vagas).
+      const method = collectionMethod(target.source.kind);
+      const events =
+        method === "diff"
+          ? await collectByDiff(target.competitor, target.source)
+          : await collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT });
       const bucket = eventsByClient.get(target.clientName) ?? [];
       const seen = new Set(bucket.map((e) => e.id));
       for (const event of events) {

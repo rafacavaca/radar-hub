@@ -157,8 +157,8 @@ function rodar(): Criterio[] {
       : "seed sem alvo de coleta",
   });
 
-  // 7) FONTES (descoberta): adicionar com múltiplas fontes -> só as coletáveis
-  //    entram no plano; produto/vagas ficam registradas (fase futura).
+  // 7) FONTES (descoberta): blog (por listagem) E vagas (por mudança) entram
+  //    AMBAS no plano — desde a F12 vagas/produto são coletáveis por diff.
   let fontesOk = false;
   let fontesDetalhe = "";
   try {
@@ -171,20 +171,16 @@ function rodar(): Criterio[] {
       ],
     });
     const alvos = planCollection(readWatchlist()).filter((t) => t.competitor.id === "pipefy");
-    const registrado = readWatchlist()
-      .clients.find((c) => c.name === CLIENTE)
-      ?.competitors.find((c) => c.id === "pipefy");
+    const kinds = alvos.map((t) => t.source.kind).sort();
     fontesOk =
-      alvos.length === 1 &&
-      alvos[0].source.kind === "blog" &&
-      registrado?.sources.length === 2;
-    fontesDetalhe = `plano coleta=${alvos.map((t) => t.source.kind).join(",") || "nada"}; registradas=${registrado?.sources.length ?? 0}`;
+      alvos.length === 2 && kinds[0] === "blog" && kinds[1] === "vagas";
+    fontesDetalhe = `plano coleta=[${kinds.join(", ")}] (blog=list, vagas=diff)`;
     removeCompetitor(CLIENTE, "pipefy");
   } catch (err) {
     fontesDetalhe = `falhou: ${(err as Error).message}`;
   }
   criterios.push({
-    nome: "Fontes múltiplas: coletáveis entram no plano, vagas fica só registrada",
+    nome: "Fontes múltiplas: blog (listagem) E vagas (mudança) entram no plano",
     feito: fontesOk,
     detalhe: fontesDetalhe,
   });

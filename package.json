@@ -20,7 +20,8 @@
     "smoke:f9": "tsx scripts/test-radar-f9.mts",
     "smoke:f10": "tsx scripts/test-radar-f10.mts",
     "schedules:run": "tsx scripts/run-schedules.mts",
-    "smoke:f11": "tsx scripts/test-radar-f11.mts"
+    "smoke:f11": "tsx scripts/test-radar-f11.mts",
+    "smoke:f12": "tsx scripts/test-radar-f12.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",

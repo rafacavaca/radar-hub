@@ -15,6 +15,7 @@
 
 import { NextResponse } from "next/server";
 
+import { forgetCompetitorSnapshots } from "@/lib/collectors/content-diff";
 import { removeClientLenses } from "@/lib/lenses";
 import { forgetCompetitorVisual } from "@/lib/visual";
 import {
@@ -101,6 +102,7 @@ export async function POST(req: Request) {
         }
         const data = removeCompetitor(payload.clientName, payload.competitorId);
         forgetCompetitorVisual(payload.competitorId); // limpa prints/paleta dele
+        forgetCompetitorSnapshots(payload.competitorId); // limpa retratos de diff
         return NextResponse.json({ data });
       }
 

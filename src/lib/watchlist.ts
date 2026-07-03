@@ -19,13 +19,23 @@ import { join } from "node:path";
 /** Tipos de fonte pública que registramos por concorrente. */
 export type SourceKind = "blog" | "noticias" | "releases" | "produto" | "vagas";
 
-/** Tipos que o coletor JÁ SABE varrer (listagens de artigos/notas). Os demais
- * (produto/vagas) ficam registrados e entram na coleta em fase futura. */
+/** Tipos coletados por LISTAGEM de artigos (varre a lista → posts). */
+export const LIST_KINDS: ReadonlySet<SourceKind> = new Set(["blog", "noticias", "releases"]);
+/** Tipos coletados por MUDANÇA (snapshot + diff): páginas de produto/vagas. */
+export const DIFF_KINDS: ReadonlySet<SourceKind> = new Set(["produto", "vagas"]);
+
+/** Todos os tipos que o Radar SABE coletar hoje (por um dos dois métodos). */
 export const COLLECTIBLE_KINDS: ReadonlySet<SourceKind> = new Set([
-  "blog",
-  "noticias",
-  "releases",
+  ...LIST_KINDS,
+  ...DIFF_KINDS,
 ]);
+
+/** Como uma fonte é coletada: por listagem, por mudança, ou não coletável. */
+export function collectionMethod(kind: SourceKind): "list" | "diff" | null {
+  if (LIST_KINDS.has(kind)) return "list";
+  if (DIFF_KINDS.has(kind)) return "diff";
+  return null;
+}
 
 /** Uma fonte pública vigiável de um concorrente. */
 export type WatchSource = {
