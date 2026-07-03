@@ -214,11 +214,7 @@ function EmptyClients() {
     <div className="rounded-lg border border-dashed border-stone-300 bg-white px-6 py-14 text-center">
       <p className="text-base font-medium text-stone-700">Nenhum cliente ainda.</p>
       <p className="mt-1 text-sm text-stone-500">
-        Adicione um cliente em{" "}
-        <Link href="/vigiar" className="text-red-600 hover:underline">
-          Concorrentes
-        </Link>
-        .
+        Use o “+ Novo cliente” no rodapé da barra lateral para cadastrar a primeira conta.
       </p>
     </div>
   );

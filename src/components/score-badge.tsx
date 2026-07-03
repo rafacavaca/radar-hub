@@ -1,37 +1,11 @@
 /**
- * Selo de impacto (0-100) — comunica a urgência pela COR, sem exigir leitura.
- * Tiers:  >=70 vermelho (urgente) · 40-69 âmbar (relevante) · <40 cinza (baixo).
+ * Selo de impacto (0-100) — UM tratamento só: número em caixa NEUTRA.
+ * A cor não codifica impacto (um papel por cor: vermelho é só da marca). A
+ * urgência lê-se pelo número e pela ordenação — nunca pela cor do selo.
  * Componente puro (sem estado) — serve em server e client.
  */
 
 import type { IntelligenceItem } from "@/lib/types";
-
-type Tier = { ring: string; text: string; caption: string; label: string };
-
-function tierFor(score: number): Tier {
-  if (score >= 70) {
-    return {
-      ring: "border-red-200 bg-red-50",
-      text: "text-red-700",
-      caption: "text-red-600/80",
-      label: "urgente",
-    };
-  }
-  if (score >= 40) {
-    return {
-      ring: "border-amber-200 bg-amber-50",
-      text: "text-amber-700",
-      caption: "text-amber-600/80",
-      label: "relevante",
-    };
-  }
-  return {
-    ring: "border-stone-200 bg-stone-100",
-    text: "text-stone-600",
-    caption: "text-stone-400",
-    label: "baixo",
-  };
-}
 
 const SIZE = {
   md: { box: "h-14 w-14", num: "text-xl", cap: "text-[9px]" },
@@ -45,20 +19,17 @@ export function ScoreBadge({
   score: number;
   size?: keyof typeof SIZE;
 }) {
-  const tier = tierFor(score);
   const s = SIZE[size];
   return (
     <span
-      className={`inline-flex flex-none flex-col items-center justify-center rounded-xl border ${tier.ring} ${s.box}`}
-      title={`Impacto ${score}/100 — ${tier.label}`}
-      aria-label={`Impacto ${score} de 100, ${tier.label}`}
+      className={`inline-flex flex-none flex-col items-center justify-center rounded-lg border border-stone-200 bg-stone-100 ${s.box}`}
+      title={`Impacto ${score}/100`}
+      aria-label={`Impacto ${score} de 100`}
     >
-      <span className={`font-semibold leading-none tabular-nums ${tier.text} ${s.num}`}>
+      <span className={`font-semibold leading-none tabular-nums text-stone-900 ${s.num}`}>
         {score}
       </span>
-      <span
-        className={`mt-0.5 font-medium uppercase leading-none tracking-wide ${tier.caption} ${s.cap}`}
-      >
+      <span className={`mt-0.5 font-medium uppercase leading-none tracking-wide text-stone-400 ${s.cap}`}>
         impacto
       </span>
     </span>

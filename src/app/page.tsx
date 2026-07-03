@@ -111,47 +111,28 @@ export default async function BriefingPage({
         ? "Radar — Interno × Externo"
         : `Radar ${LENS_LABEL[lente as LensId]}`;
 
+  // No Geral, a manchete editorial ganha a contagem de sinais com análise.
+  const editorialMeta =
+    lente === "geral"
+      ? `${geral.length} ${geral.length === 1 ? "sinal" : "sinais"} com análise`
+      : null;
+
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      {/* Cabeçalho editorial — régua 2px de jornal, rótulo no vermelho da marca. */}
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-stone-900 pb-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
             Briefing do dia
           </p>
-          <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">{title}</h1>
+          <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-stone-900">{title}</h1>
           <p className="mt-1.5 text-sm text-stone-500">
             {result.ranAt ? <>atualizado em {formatDateTimePtBR(result.ranAt)}</> : "ainda não rodou"}
+            {editorialMeta ? <> · {editorialMeta}</> : null}
             {brain ? <> · {brain}</> : null}
           </p>
         </div>
-        <RodarAgora testId="rodar-agora" cliente={cliente || undefined} />
-      </header>
-
-      {/* Seletor de LENTE (a troca de cliente é pela sidebar). */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-stone-200">
-        <nav className="flex flex-wrap items-center gap-1" aria-label="Lentes">
-          {LENS_TABS.map((tab) => {
-            const active = tab.id === lente;
-            const href = `/?lente=${tab.id}${cliente ? `&cliente=${encodeURIComponent(cliente)}` : ""}`;
-            return (
-              <Link
-                key={tab.id}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={
-                  "border-b-2 px-3 py-2 text-sm font-medium transition-colors " +
-                  (active
-                    ? "border-stone-900 text-stone-900"
-                    : "border-transparent text-stone-500 hover:text-stone-900")
-                }
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="flex items-center gap-2 pb-1">
+        <div className="flex items-center gap-2">
           {lente !== "geral" && lente !== "cruzamento" ? (
             <Link
               href={`/apresentar?lente=${lente}&cliente=${encodeURIComponent(cliente)}`}
@@ -161,6 +142,38 @@ export default async function BriefingPage({
               Apresentar ↗
             </Link>
           ) : null}
+          <RodarAgora testId="rodar-agora" cliente={cliente || undefined} />
+        </div>
+      </header>
+
+      {/* Filtro de ÓTICA — segmented control FIXO (não é 2ª fileira de menu: fica
+          pinado no topo do conteúdo e não some ao rolar). */}
+      <div className="sticky top-0 z-20 -mx-5 mt-5 border-b border-stone-200 bg-stone-50/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        <div className="overflow-x-auto">
+          <nav
+            aria-label="Ótica do briefing"
+            className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-100 p-1"
+          >
+            {LENS_TABS.map((tab) => {
+              const active = tab.id === lente;
+              const href = `/?lente=${tab.id}${cliente ? `&cliente=${encodeURIComponent(cliente)}` : ""}`;
+              return (
+                <Link
+                  key={tab.id}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={
+                    "whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
+                    (active
+                      ? "bg-white text-stone-900 shadow-sm"
+                      : "text-stone-500 hover:text-stone-900")
+                  }
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
       </div>
 

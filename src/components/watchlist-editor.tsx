@@ -15,7 +15,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
 import type { SourceCandidate } from "@/lib/discovery";
 import type { SourceStatus } from "@/lib/source-status";
@@ -92,9 +92,10 @@ export function WatchlistEditor({
   if (initial.clients.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
-        <p className="text-base font-medium text-stone-700">Nenhum cliente configurado.</p>
+        <p className="text-base font-medium text-stone-700">Nenhum cliente ainda.</p>
         <p className="mt-1 text-sm text-stone-500">
-          Os clientes do Radar aparecem aqui assim que forem configurados.
+          Use o <span className="font-medium text-stone-700">“+ Novo cliente”</span> no rodapé da
+          barra lateral para cadastrar a primeira conta.
         </p>
       </div>
     );
@@ -110,7 +111,6 @@ export function WatchlistEditor({
           sourceStatus={sourceStatus}
         />
       ))}
-      <AddClientBlock existing={initial.clients.map((c) => c.name)} />
     </div>
   );
 }
@@ -417,137 +417,6 @@ function AddCompetitorFlow({ clientName }: { clientName: string }) {
       <p className="mt-3 text-xs text-stone-400">
         Digite nome + site e clique em “Descobrir fontes”. Adicionou alguém? Vá ao Briefing e use
         “Rodar agora” para varrer já.
-      </p>
-    </form>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Adicionar CLIENTE (F7 — multi-cliente): escolhe dos workspaces reais do
-// Formare (o nome precisa casar pra Brain/cards baterem) ou digita à mão.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function AddClientBlock({ existing }: { existing: string[] }) {
-  const router = useRouter();
-  const [available, setAvailable] = useState<string[] | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
-  const [choice, setChoice] = useState("");
-  const [manual, setManual] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  // Busca os workspaces do Formare uma vez (porta fora do ar -> campo manual).
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/formare-workspaces");
-        const payload = (await res.json().catch(() => null)) as {
-          data?: { workspaces?: string[]; warning?: string };
-        } | null;
-        if (!alive) return;
-        setAvailable(payload?.data?.workspaces ?? []);
-        setWarning(payload?.data?.warning ?? null);
-      } catch {
-        if (!alive) return;
-        setAvailable([]);
-        setWarning("não consegui falar com o Formare agora");
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const options = (available ?? []).filter((name) => !existing.includes(name));
-  const clientName = (choice || manual).trim();
-
-  async function add(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending || !clientName) return;
-    setPending(true);
-    setError(null);
-    const result = await postWatchlist({ action: "add-client", clientName });
-    if (!result.ok) {
-      setError(result.error);
-      setPending(false);
-      return;
-    }
-    setChoice("");
-    setManual("");
-    router.refresh();
-    setPending(false);
-  }
-
-  return (
-    <form
-      data-testid="add-client"
-      onSubmit={add}
-      className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-4 py-4 sm:px-5"
-    >
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-        Adicionar cliente
-      </p>
-      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-stone-500">
-            Clientes do Formare
-          </span>
-          <select
-            value={choice}
-            onChange={(event) => {
-              setChoice(event.target.value);
-              if (event.target.value) setManual("");
-            }}
-            className={INPUT_CLASS}
-          >
-            <option value="">
-              {available === null
-                ? "carregando…"
-                : options.length === 0
-                  ? "nenhum disponível"
-                  : "escolha um cliente…"}
-            </option>
-            {options.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          {warning ? <span className="mt-1 block text-xs text-amber-700">{warning}</span> : null}
-        </label>
-
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-stone-500">
-            Ou digite o nome (precisa ser igual ao do Formare)
-          </span>
-          <input
-            type="text"
-            value={manual}
-            onChange={(event) => {
-              setManual(event.target.value);
-              if (event.target.value) setChoice("");
-            }}
-            placeholder="Ex.: Arosco Alimentos"
-            className={INPUT_CLASS}
-          />
-        </label>
-      </div>
-
-      <div className="mt-3">
-        <button
-          type="submit"
-          disabled={pending || !clientName}
-          className="inline-flex min-h-[40px] items-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
-        >
-          {pending ? "Adicionando…" : "Adicionar cliente"}
-        </button>
-      </div>
-      <p className="mt-3 text-xs text-stone-400">
-        O cliente novo nasce com as 3 lentes padrão e sem concorrentes — adicione quem vigiar no
-        card dele acima.
       </p>
     </form>
   );

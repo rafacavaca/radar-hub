@@ -89,26 +89,37 @@ function Composer({ clients }: { clients: string[] }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5"
+      className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6"
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-        Montar relatório sob medida
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-red-500" />
+        <h2 className="text-[17px] font-semibold tracking-tight text-stone-900">
+          Montar relatório sob medida
+        </h2>
+      </div>
+      <p className="mt-1 text-sm text-stone-500">
+        Descreva em linguagem natural o que você quer — o Radar reúne o material coletado + o Brain
+        do cliente e redige. Honesto: só usa o que coletou.
       </p>
-      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
 
-      <div className="mt-3 space-y-3">
+      {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+
+      <div className="mt-4 space-y-3">
         {clients.length > 1 ? (
-          <select
-            value={client}
-            onChange={(event) => setClient(event.target.value)}
-            className="rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-stone-500 focus:outline-none"
-          >
-            {clients.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">Cliente</span>
+            <select
+              value={client}
+              onChange={(event) => setClient(event.target.value)}
+              className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-stone-500 focus:outline-none sm:w-auto"
+            >
+              {clients.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
 
         <textarea
@@ -116,25 +127,20 @@ function Composer({ clients }: { clients: string[] }) {
           value={request}
           onChange={(event) => setRequest(event.target.value)}
           placeholder="Ex.: relatório comercial + produto comparando os 3 concorrentes desta semana"
-          className={"min-h-[72px] resize-y " + INPUT_CLASS}
+          className={"min-h-[96px] resize-y text-[15px] " + INPUT_CLASS}
         />
 
-        <div>
+        <div className="flex justify-end">
           <button
             type="submit"
             data-testid="compose-run"
             disabled={composing || !request.trim()}
-            className="min-h-[40px] rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+            className="min-h-[40px] rounded-full bg-stone-900 px-5 py-2 text-sm font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
           >
             {composing ? "Montando o relatório…" : "Montar relatório"}
           </button>
         </div>
       </div>
-
-      <p className="mt-3 text-xs text-stone-400">
-        O Radar reúne o material coletado + o Brain do cliente e redige. Honesto: só usa o que
-        coletou.
-      </p>
     </form>
   );
 }

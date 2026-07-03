@@ -7,21 +7,13 @@
  */
 
 import { formatDateTimePtBR } from "@/lib/format";
-import { runRadarLoop, type ClientEvent, type RadarLoopResult } from "@/lib/loop";
+import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
 import { readWatchlist } from "@/lib/watchlist";
 
+import { FeedList } from "@/components/feed-list";
 import { RodarAgora } from "@/components/rodar-agora";
-import { attenuated, RecencyStamp, SourceRef } from "@/components/signal-meta";
 
 export const dynamic = "force-dynamic";
-
-const KIND_LABEL: Record<string, string> = {
-  blog: "artigo",
-  news: "notícia",
-  release: "novidade",
-  page: "página",
-  material: "material",
-};
 
 export default async function FeedPage({
   searchParams,
@@ -55,9 +47,8 @@ export default async function FeedPage({
             Sinais crus coletados
           </h1>
           <p className="mt-1.5 text-sm text-stone-500">
-            {events.length} {events.length === 1 ? "sinal" : "sinais"}
-            {result.ranAt ? <> · atualizado em {formatDateTimePtBR(result.ranAt)}</> : null} · as
-            leituras por time estão no Briefing
+            {result.ranAt ? <>atualizado em {formatDateTimePtBR(result.ranAt)} · </> : null}
+            as leituras por time estão no Briefing
           </p>
         </div>
         <RodarAgora testId="rodar-agora" cliente={cliente || undefined} />
@@ -69,45 +60,10 @@ export default async function FeedPage({
         ) : events.length === 0 ? (
           <EmptyState hasItems={result.items.length > 0} />
         ) : (
-          <ul className="divide-y divide-stone-200 overflow-hidden rounded-lg border border-stone-200 bg-white">
-            {events.map((event) => (
-              <FeedRow
-                key={`${event.clientName}-${event.id}`}
-                event={event}
-                now={result.ranAt || new Date().toISOString()}
-              />
-            ))}
-          </ul>
+          <FeedList events={events} now={result.ranAt || new Date().toISOString()} />
         )}
       </div>
     </section>
-  );
-}
-
-function FeedRow({ event, now }: { event: ClientEvent; now: string }) {
-  const velho = attenuated(event.publishedAt, event.collectedAt, now);
-  return (
-    <li data-testid="feed-item" className={"px-4 py-3.5 sm:px-5 " + (velho ? "opacity-70" : "")}>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
-          {event.competitorName}
-        </span>
-        <span className="text-xs text-stone-400">{KIND_LABEL[event.kind] ?? event.kind}</span>
-        {event.category ? <span className="text-xs text-stone-400">· {event.category}</span> : null}
-      </div>
-      <a
-        href={event.url}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-1 block font-semibold leading-snug text-stone-900 underline-offset-2 hover:underline"
-      >
-        {event.title}
-      </a>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <SourceRef url={event.url} titulo={event.title} />
-        <RecencyStamp publishedAt={event.publishedAt} collectedAt={event.collectedAt} now={now} />
-      </div>
-    </li>
   );
 }
 
