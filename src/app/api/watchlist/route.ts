@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 
 import { removeClientLenses } from "@/lib/lenses";
+import { forgetCompetitorVisual } from "@/lib/visual";
 import {
   addClient,
   addCompetitor,
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
           return badRequest("Envie clientName e competitorId como texto.");
         }
         const data = removeCompetitor(payload.clientName, payload.competitorId);
+        forgetCompetitorVisual(payload.competitorId); // limpa prints/paleta dele
         return NextResponse.json({ data });
       }
 

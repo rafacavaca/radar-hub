@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/perguntar", label: "Perguntar" },
   { href: "/analistas", label: "Analistas" },
   { href: "/relatorios", label: "Relatórios" },
+  { href: "/identidade", label: "Identidade" },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {

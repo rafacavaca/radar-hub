@@ -24,6 +24,8 @@ export type ScrapeResult = {
   title?: string;
   description?: string;
   statusCode?: number;
+  /** URL do print (quando formats inclui "screenshot"). */
+  screenshot?: string;
 };
 
 export type ScrapeOptions = {
@@ -48,6 +50,7 @@ type FirecrawlResponse = {
   data?: {
     markdown?: string;
     links?: string[];
+    screenshot?: string;
     metadata?: {
       title?: string;
       description?: string;
@@ -146,6 +149,7 @@ export async function scrape(url: string, opts: ScrapeOptions = {}): Promise<Scr
     title: payload.data.metadata?.title,
     description: payload.data.metadata?.description,
     statusCode: payload.data.metadata?.statusCode,
+    screenshot: payload.data.screenshot,
   };
 
   writeCache(url, result);
