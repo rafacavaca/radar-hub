@@ -35,7 +35,7 @@ const SUGGESTIONS = [
 // Altura máxima do textarea (mantida em sincronia com a classe max-h-[120px]).
 const MAX_TEXTAREA_PX = 120;
 
-export function AskRadar() {
+export function AskRadar({ clients }: { clients: string[] }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
@@ -122,7 +122,13 @@ export function AskRadar() {
             turn.role === "user" ? (
               <UserBubble key={i} text={turn.text} />
             ) : (
-              <RadarBubble key={i} text={turn.text} fontes={turn.fontes ?? []} />
+              <RadarBubble
+                key={i}
+                text={turn.text}
+                fontes={turn.fontes ?? []}
+                pergunta={turns[i - 1]?.role === "user" ? turns[i - 1].text : ""}
+                clients={clients}
+              />
             ),
           )
         )}
@@ -192,7 +198,17 @@ function UserBubble({ text }: { text: string }) {
   );
 }
 
-function RadarBubble({ text, fontes }: { text: string; fontes: Fonte[] }) {
+function RadarBubble({
+  text,
+  fontes,
+  pergunta,
+  clients,
+}: {
+  text: string;
+  fontes: Fonte[];
+  pergunta: string;
+  clients: string[];
+}) {
   return (
     <div className="flex justify-start">
       <div
@@ -217,7 +233,183 @@ function RadarBubble({ text, fontes }: { text: string; fontes: Fonte[] }) {
             ))}
           </div>
         ) : null}
+
+        <AproveitarActions text={text} pergunta={pergunta} fontes={fontes} clients={clients} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * "Aproveitar" (F8) — captura uma resposta boa do chat: guarda como relatório
+ * no Radar OU manda pro Formare (vira card). O flywheel aplicado ao chat.
+ */
+function AproveitarActions({
+  text,
+  pergunta,
+  fontes,
+  clients,
+}: {
+  text: string;
+  pergunta: string;
+  fontes: Fonte[];
+  clients: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [client, setClient] = useState(clients[0] ?? "");
+  const [busy, setBusy] = useState<null | "radar" | "formare">(null);
+  const [done, setDone] = useState<null | { kind: "radar" } | { kind: "formare"; url?: string }>(
+    null,
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  async function guardarNoRadar() {
+    if (busy) return;
+    setBusy("radar");
+    setError(null);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-from-chat",
+          clientName: client,
+          question: pergunta,
+          answer: text,
+          fontes,
+        }),
+      });
+      if (!res.ok) {
+        const p = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(p?.error ?? "Não deu pra guardar.");
+        return;
+      }
+      setDone({ kind: "radar" });
+    } catch {
+      setError("Falha de conexão.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function gerarNoFormare() {
+    if (busy) return;
+    setBusy("formare");
+    setError(null);
+    try {
+      // guarda primeiro (pra ter um id) e então manda ao Formare.
+      const saved = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-from-chat",
+          clientName: client,
+          question: pergunta,
+          answer: text,
+          fontes,
+        }),
+      });
+      const savedPayload = (await saved.json().catch(() => null)) as {
+        data?: { id?: string };
+        error?: string;
+      } | null;
+      if (!saved.ok || !savedPayload?.data?.id) {
+        setError(savedPayload?.error ?? "Não deu pra preparar o relatório.");
+        return;
+      }
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "to-formare", reportId: savedPayload.data.id }),
+      });
+      const payload = (await res.json().catch(() => null)) as {
+        data?: { mode?: string; ok?: boolean; cardUrl?: string };
+        error?: string;
+      } | null;
+      if (!res.ok || !payload?.data?.ok) {
+        setError(payload?.error ?? "Não deu pra mandar ao Formare.");
+        return;
+      }
+      setDone({
+        kind: "formare",
+        url: payload.data.mode === "live" ? payload.data.cardUrl : undefined,
+      });
+    } catch {
+      setError("Falha de conexão.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (done?.kind === "radar") {
+    return (
+      <p className="mt-3 border-t border-stone-200/70 pt-2.5 text-xs font-medium text-emerald-700">
+        ✓ Guardado em Relatórios ({client})
+      </p>
+    );
+  }
+  if (done?.kind === "formare") {
+    return (
+      <p className="mt-3 border-t border-stone-200/70 pt-2.5 text-xs font-medium text-emerald-700">
+        {done.url ? (
+          <>
+            ✓ Criado no Formare —{" "}
+            <a href={done.url} target="_blank" rel="noreferrer" className="underline">
+              abrir ↗
+            </a>
+          </>
+        ) : (
+          <>✓ Preparado (porta desligada — guardado em Relatórios)</>
+        )}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3 border-t border-stone-200/70 pt-2.5">
+      {!open ? (
+        <button
+          type="button"
+          data-testid="aproveitar"
+          onClick={() => setOpen(true)}
+          className="text-xs font-medium text-stone-500 underline-offset-2 hover:text-stone-800 hover:underline"
+        >
+          Aproveitar esta resposta →
+        </button>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {clients.length > 1 ? (
+            <select
+              value={client}
+              onChange={(e) => setClient(e.target.value)}
+              className="rounded-full border border-stone-300 bg-white px-2.5 py-1 text-xs text-stone-700"
+            >
+              {clients.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <button
+            type="button"
+            onClick={guardarNoRadar}
+            disabled={busy !== null}
+            className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+          >
+            {busy === "radar" ? "Guardando…" : "Guardar no Radar"}
+          </button>
+          <button
+            type="button"
+            onClick={gerarNoFormare}
+            disabled={busy !== null}
+            className="rounded-full bg-stone-900 px-3 py-1 text-xs font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+          >
+            {busy === "formare" ? "Enviando…" : "Gerar no Formare"}
+          </button>
+          {error ? <span className="text-xs text-red-600">{error}</span> : null}
+        </div>
+      )}
     </div>
   );
 }

@@ -6,9 +6,15 @@
  * as fontes e a honestidade vêm da API, que só afirma o que o Radar coletou.
  */
 
+import { readWatchlist } from "@/lib/watchlist";
+
 import { AskRadar } from "@/components/ask-radar";
 
+export const dynamic = "force-dynamic";
+
 export default function PerguntarPage() {
+  const clients = readWatchlist().clients.map((c) => c.name);
+
   return (
     <section className="mx-auto max-w-3xl px-5 py-8 sm:px-6 sm:py-10">
       <header>
@@ -25,7 +31,7 @@ export default function PerguntarPage() {
       </header>
 
       <div className="mt-8">
-        <AskRadar />
+        <AskRadar clients={clients} />
       </div>
     </section>
   );

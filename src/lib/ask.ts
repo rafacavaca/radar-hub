@@ -89,7 +89,7 @@ function shortDate(dia: string): string {
 }
 
 /** Bloco numerado do material: cada item vira uma fonte citável [n]. */
-function buildMaterialBlock(items: Array<IntelligenceItem & { dia: string }>): string {
+export function buildMaterialBlock(items: Array<IntelligenceItem & { dia: string }>): string {
   if (items.length === 0) return "(nenhum item coletado ainda)";
   return items
     .map((item, index) => {

@@ -164,6 +164,62 @@ export async function sendTaskToFormare(item: IntelligenceItem): Promise<SendTas
 }
 
 /**
+ * "Gerar no Formare" de um RELATÓRIO (F8): manda o documento inteiro pra virar
+ * um card ('ideias', tags radar+relatorio) que o Redator do Formare retoma.
+ * Mesma disciplina do /task: 403 (escrita off) -> caixa de saída, ok honesto.
+ */
+export async function sendReportToFormare(report: {
+  clientName: string;
+  titulo: string;
+  corpo: string;
+}): Promise<SendTaskResult> {
+  const base = doorBaseUrl();
+  const secret = doorSecret();
+  const payload = {
+    workspaceName: report.clientName,
+    titulo: report.titulo,
+    corpo: report.corpo,
+  };
+
+  if (!base || !secret) {
+    const savedTo = saveTaskToOutbox({ kind: "report", ...payload });
+    return { mode: "dry-run", ok: true, savedTo, reason: "porta não configurada" };
+  }
+
+  try {
+    const res = await fetch(`${base}/report-task`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(LIVE_TIMEOUT_MS),
+    });
+    if (res.status === 403) {
+      const savedTo = saveTaskToOutbox({ kind: "report", ...payload });
+      return { mode: "dry-run", ok: true, savedTo, reason: "porta de escrita desligada" };
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { mode: "live", ok: false, error: `porta ${res.status}: ${text.slice(0, 200)}` };
+    }
+    const data = (await res.json()) as {
+      data?: { cardId?: string; workspaceId?: string };
+      error?: string;
+    };
+    if (data.error || !data.data?.cardId || !data.data.workspaceId) {
+      return { mode: "live", ok: false, error: data.error ?? "resposta sem cardId" };
+    }
+    return {
+      mode: "live",
+      ok: true,
+      cardId: data.data.cardId,
+      cardUrl: buildCardUrl(data.data.workspaceId, data.data.cardId),
+    };
+  } catch (err) {
+    return { mode: "live", ok: false, error: (err as Error).message };
+  }
+}
+
+/**
  * Envia itens de inteligência ao Formare pela porta estreita.
  * Sem RADAR_INTAKE_URL/SECRET -> DRY-RUN (registra local, não envia nada).
  */

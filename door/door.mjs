@@ -188,6 +188,64 @@ async function handleTask(req, res) {
   }
 }
 
+/**
+ * POST /report-task — um RELATÓRIO do Radar vira 1 CARD do Formare (F8).
+ * Igual ao /task, mas o corpo é o DOCUMENTO inteiro (markdown), pra o Redator
+ * do Formare retomar/refinar. stage='ideias' + tags=['radar','relatorio']
+ * FORÇADOS no servidor. INSERT-only. Gated por DOOR_WRITE_ENABLED.
+ */
+async function handleReportTask(req, res) {
+  if (!WRITE_ENABLED) {
+    return json(res, 403, { error: "porta de escrita DESLIGADA (DOOR_WRITE_ENABLED != true)" });
+  }
+
+  let raw = "";
+  for await (const chunk of req) raw += chunk;
+  let body;
+  try {
+    body = JSON.parse(raw || "{}");
+  } catch {
+    return json(res, 400, { error: "invalid json" });
+  }
+
+  const workspaceName = typeof body.workspaceName === "string" ? body.workspaceName.trim() : "";
+  const titulo = String(body.titulo ?? "").trim();
+  const corpo = String(body.corpo ?? "").trim();
+  if (!workspaceName || !titulo || !corpo) {
+    return json(res, 400, { error: "workspaceName + titulo + corpo obrigatorios" });
+  }
+
+  const title = `[Radar] ${titulo}`.slice(0, 200);
+  const description = `${corpo}\n\n— relatório gerado pelo Radar em ${new Date().toISOString()}`;
+
+  const client = await pool.connect();
+  try {
+    const ws = await client.query("select id from workspaces where name = $1 limit 1", [
+      workspaceName,
+    ]);
+    if (ws.rowCount === 0) {
+      return json(res, 404, { error: `cliente nao encontrado: ${workspaceName}` });
+    }
+    const workspaceId = ws.rows[0].id;
+
+    // VALORES DE SEGURANÇA LITERAIS — stage inicial + tags. INSERT-only.
+    const r = await client.query(
+      `insert into cards (workspace_id, title, description, stage, tags)
+       values ($1, $2, $3, 'ideias', array['radar','relatorio'])
+       returning id`,
+      [workspaceId, title, description],
+    );
+
+    return json(res, 200, {
+      data: { cardId: r.rows[0].id, workspaceId, workspace: workspaceName },
+    });
+  } catch (e) {
+    return json(res, 500, { error: String(e?.message ?? e) });
+  } finally {
+    client.release();
+  }
+}
+
 /** POST /intake — escrita pendente/rascunho (gated por DOOR_WRITE_ENABLED). */
 async function handleIntake(req, res) {
   if (!WRITE_ENABLED) {
@@ -279,6 +337,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === "POST" && url.pathname === "/task") {
     return handleTask(req, res);
+  }
+  if (req.method === "POST" && url.pathname === "/report-task") {
+    return handleReportTask(req, res);
   }
   if (req.method === "POST" && url.pathname === "/intake") {
     return handleIntake(req, res);
