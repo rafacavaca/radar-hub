@@ -22,6 +22,9 @@ import { listNotes } from "@/lib/notes";
 import { readWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, LensReading } from "@/lib/types";
 
+import type { CrossInsight, CrossVerdict } from "@/lib/cross-reference";
+
+import { CrossActionButton } from "@/components/cross-action-button";
 import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { LensReadingCard, RoadmapNoteRow } from "@/components/lens-reading-card";
 import { RodarAgora } from "@/components/rodar-agora";
@@ -29,12 +32,38 @@ import { FonteLink, ScoreBadge } from "@/components/score-badge";
 
 export const dynamic = "force-dynamic";
 
-const LENS_TABS: Array<{ id: "geral" | LensId; label: string }> = [
+type TabId = "geral" | LensId | "cruzamento";
+
+const LENS_TABS: Array<{ id: TabId; label: string }> = [
   { id: "geral", label: "Geral" },
   { id: "comercial", label: "Comercial" },
   { id: "produto", label: "Produto" },
   { id: "marketing", label: "Marketing" },
+  { id: "cruzamento", label: "Interno × Externo" },
 ];
+
+const VERDICT_META: Record<CrossVerdict, { label: string; chip: string; hint: string }> = {
+  meio_pronto: {
+    label: "Meio-pronto — reativar",
+    chip: "border-amber-300 bg-amber-50 text-amber-800",
+    hint: "Você começou algo assim e parou. Reative antes do concorrente consolidar.",
+  },
+  gap: {
+    label: "Gap — avaliar entrar",
+    chip: "border-rose-300 bg-rose-50 text-rose-800",
+    hint: "O mercado quer isto e você ainda não tem. Vale decidir se entra.",
+  },
+  ja_temos: {
+    label: "Você já tem",
+    chip: "border-emerald-300 bg-emerald-50 text-emerald-800",
+    hint: "O mercado quer isto e você já entrega. Arme vendas e marketing.",
+  },
+  sem_dado_interno: {
+    label: "Falta dado interno",
+    chip: "border-stone-300 bg-stone-100 text-stone-600",
+    hint: "O Brain não sabe o que você tem por dentro sobre isto — enriqueça o Brain pra destravar.",
+  },
+};
 
 /** Texto honesto sobre a origem do contexto dos analistas. */
 function brainNote(result: RadarLoopResult, clientName: string): string | null {
@@ -55,9 +84,7 @@ export default async function BriefingPage({
   const clients = readWatchlist().clients.map((c) => c.name);
   const cliente =
     params.cliente && clients.includes(params.cliente) ? params.cliente : (clients[0] ?? "");
-  const lente = (LENS_TABS.some((t) => t.id === params.lente) ? params.lente : "geral") as
-    | "geral"
-    | LensId;
+  const lente = (LENS_TABS.some((t) => t.id === params.lente) ? params.lente : "geral") as TabId;
 
   let result: RadarLoopResult = { items: [], ranAt: "" };
   let error: string | null = null;
@@ -73,10 +100,15 @@ export default async function BriefingPage({
   );
   const geral = buildBriefing(result.items.filter((it) => it.clientName === cliente));
   const notes = lente === "produto" ? listNotes(cliente) : [];
+  const crossInsights = (result.crossInsights ?? []).filter((c) => c.clientName === cliente);
   const brain = cliente ? brainNote(result, cliente) : null;
 
   const title =
-    lente === "geral" ? "Radar — Briefing do dia" : `Radar ${LENS_LABEL[lente as LensId]}`;
+    lente === "geral"
+      ? "Radar — Briefing do dia"
+      : lente === "cruzamento"
+        ? "Radar — Interno × Externo"
+        : `Radar ${LENS_LABEL[lente as LensId]}`;
 
   return (
     <section className="mx-auto max-w-3xl px-5 py-8 sm:px-6 sm:py-10">
@@ -139,7 +171,7 @@ export default async function BriefingPage({
             </nav>
           ) : null}
 
-          {lente !== "geral" ? (
+          {lente !== "geral" && lente !== "cruzamento" ? (
             <Link
               href={`/apresentar?lente=${lente}&cliente=${encodeURIComponent(cliente)}`}
               target="_blank"
@@ -156,6 +188,8 @@ export default async function BriefingPage({
           <ErrorState message={error} />
         ) : lente === "geral" ? (
           <GeralView items={geral} />
+        ) : lente === "cruzamento" ? (
+          <CrossView insights={crossInsights} />
         ) : !lensConfig?.enabled ? (
           <LensOffState lente={lente as LensId} />
         ) : (
@@ -280,6 +314,115 @@ function TeamView({
         </div>
       ) : null}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visão INTERNO × EXTERNO — o cruzamento (a mina de ouro)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CrossView({ insights }: { insights: CrossInsight[] }) {
+  if (insights.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
+        <p className="text-base font-medium text-stone-700">Nenhum cruzamento nesta rodada.</p>
+        <p className="mt-1 text-sm text-stone-500">
+          O Radar cruza os movimentos dos concorrentes com o que o Brain sabe do cliente. Quanto
+          mais rico o Brain (o que vocês têm, começaram, deixaram parado), mais ouro aqui.
+        </p>
+      </div>
+    );
+  }
+
+  // separa os acionáveis dos "falta dado interno" (mostrados por último, com convite).
+  const acionaveis = insights.filter((i) => i.verdict !== "sem_dado_interno");
+  const semDado = insights.filter((i) => i.verdict === "sem_dado_interno");
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-stone-500">
+        O mesmo movimento do concorrente, cruzado com o que o cliente tem por dentro. O ouro é o{" "}
+        <span className="font-medium text-amber-700">meio-pronto</span> — algo que vocês começaram e
+        pararam.
+      </p>
+      {acionaveis.map((insight) => (
+        <CrossCard key={insight.id} insight={insight} />
+      ))}
+
+      {semDado.length > 0 ? (
+        <div className="rounded-2xl border border-stone-200 bg-white shadow-sm">
+          <p className="border-b border-stone-100 px-4 py-3 text-xs font-medium uppercase tracking-wide text-stone-400 sm:px-5">
+            Falta dado interno — enriqueça o Brain pra destravar
+          </p>
+          <ul className="divide-y divide-stone-100">
+            {semDado.map((insight) => (
+              <li key={insight.id} className="px-4 py-3 sm:px-5">
+                <p className="text-sm font-medium text-stone-800">
+                  {insight.concorrente ? `${insight.concorrente}: ` : ""}
+                  {insight.sinal}
+                </p>
+                <p className="mt-0.5 text-sm text-stone-500">{insight.interno}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CrossCard({ insight }: { insight: CrossInsight }) {
+  const meta = VERDICT_META[insight.verdict];
+  return (
+    <article
+      data-testid="cross-insight"
+      className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6"
+    >
+      <div className="flex items-start gap-4">
+        <ScoreBadge score={insight.score} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={"rounded-full border px-2 py-0.5 text-xs font-medium " + meta.chip}
+            >
+              {meta.label}
+            </span>
+            {insight.concorrente ? (
+              <span className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                {insight.concorrente}
+              </span>
+            ) : null}
+          </div>
+          <h2 className="mt-1 text-lg font-semibold leading-snug tracking-tight text-stone-900">
+            {insight.sinal}
+          </h2>
+          <FonteLink fonte={insight.fonte} className="mt-1 max-w-full text-sm" />
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-400">Externo</p>
+          <p className="mt-1 text-sm leading-relaxed text-stone-700">{insight.externo}</p>
+        </div>
+        <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+            Interno (o cliente)
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-stone-700">{insight.interno}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-xl border-l-2 border-emerald-400 bg-emerald-50/60 py-3 pl-4 pr-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Oportunidade</p>
+        <p className="mt-1 leading-relaxed text-stone-800">{insight.oportunidade}</p>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-stone-100 pt-4">
+        <span className="text-xs text-stone-400">{meta.hint}</span>
+        <CrossActionButton insightId={insight.id} verdict={insight.verdict} />
+      </div>
+    </article>
   );
 }
 

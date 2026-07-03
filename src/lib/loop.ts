@@ -26,6 +26,7 @@ import { join } from "node:path";
 import { analyzeLens } from "@/lib/analyst-lens";
 import { fetchClientBrain } from "@/lib/brain";
 import { collectBlog } from "@/lib/collectors/blog";
+import { crossReference, type CrossInsight } from "@/lib/cross-reference";
 import { activeLensesFor } from "@/lib/lenses";
 import { planCollection, readWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, LensReading, RawEvent } from "@/lib/types";
@@ -50,6 +51,8 @@ export type RadarLoopResult = {
   items: IntelligenceItem[];
   /** TODAS as leituras por lente (as visões de time filtram daqui). */
   readings?: LensReading[];
+  /** F9: cruzamentos interno×externo (a aba "Interno × Externo"). */
+  crossInsights?: CrossInsight[];
   /** sinais crus coletados (o Feed mostra isto, sem lente). */
   events?: ClientEvent[];
   /** ISO de quando o loop de fato rodou (não muda ao reler do cache). */
@@ -66,6 +69,38 @@ export type RunRadarLoopOptions = {
   /** quantos movimentos coletar POR FONTE. Padrão: 5. */
   limit?: number;
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Chama o gateway com RECUO: até 2 tentativas. Se o erro for do DISJUNTOR do
+ * gateway (503 "degradado", circuito aberto por uma chamada anterior que
+ * estourou 40s), espera ele fechar antes de tentar de novo — insistir na hora
+ * só devolve 503. Falha final -> registra e devolve null (não derruba a rodada).
+ */
+async function withGatewayRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  failures: string[],
+): Promise<T | null> {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const message = (err as Error).message;
+      console.warn(`[loop] ${label} falhou (tentativa ${attempt}): ${message}`);
+      if (attempt === 2) {
+        failures.push(`${label}: ${message}`);
+        return null;
+      }
+      // disjuntor aberto precisa de mais tempo pra fechar; timeout comum, menos.
+      await sleep(/degradado|503|circuito/i.test(message) ? 20000 : 4000);
+    }
+  }
+  return null;
+}
 
 /** Carimbo do dia (YYYY-MM-DD, UTC) — mesma convenção do cache do Firecrawl. */
 function todayStamp(): string {
@@ -189,8 +224,10 @@ export async function runRadarLoop(
     throw new Error(`Nenhuma coleta funcionou — ${failures.join(" | ")}`);
   }
 
-  // 2) LENTES: cada lente ativa lê os movimentos do cliente pela sua régua.
+  // 2) LENTES + CRUZAMENTO: cada lente ativa lê os movimentos pela sua régua;
+  //    o cruzamento interno×externo roda uma vez por cliente.
   const readings: LensReading[] = [];
+  const crossInsights: CrossInsight[] = [];
   const brainSources: BrainSourceNote[] = [];
   const allEvents: ClientEvent[] = [];
 
@@ -206,27 +243,27 @@ export async function runRadarLoop(
     });
 
     for (const lens of activeLensesFor(clientName)) {
-      // 1 retry por lente: o gateway tem timeout de 40s e às vezes um pico
-      // derruba UMA chamada — perder a visão de um time por isso é caro.
-      let done = false;
-      for (let attempt = 1; attempt <= 2 && !done; attempt++) {
-        try {
-          readings.push(...(await analyzeLens(lens, events, clientName, brain.context)));
-          done = true;
-        } catch (err) {
-          const message = (err as Error).message;
-          console.warn(
-            `[loop] lente ${lens.id} de ${clientName} falhou (tentativa ${attempt}): ${message}`,
-          );
-          if (attempt === 2) failures.push(`lente ${lens.id} (${clientName}): ${message}`);
-        }
-      }
+      const out = await withGatewayRetry(
+        `lente ${lens.id} (${clientName})`,
+        () => analyzeLens(lens, events, clientName, brain.context),
+        failures,
+      );
+      if (out) readings.push(...out);
     }
+
+    // Cruzamento interno×externo (mesma disciplina de recuo).
+    const cross = await withGatewayRetry(
+      `cruzamento (${clientName})`,
+      () => crossReference(events, clientName, brain.context),
+      failures,
+    );
+    if (cross) crossInsights.push(...cross);
   }
 
   const result: RadarLoopResult = {
     items: buildGeneralItems(readings),
     readings: byScoreDesc(readings),
+    crossInsights: byScoreDesc(crossInsights),
     events: allEvents,
     ranAt: new Date().toISOString(),
     brainSources,

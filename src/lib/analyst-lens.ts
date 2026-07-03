@@ -64,7 +64,7 @@ function buildSystem(lens: LensConfig): string {
     `Você lê movimentos de concorrentes e responde UMA pergunta, sempre para o ${lens.team}: "${LENS_QUESTION[lens.id]}" ` +
     `SUA RÉGUA DE RELEVÂNCIA (definida pelo dono da agência — siga à risca): ${lens.regua} ` +
     "Regras: (1) um movimento SÓ vira leitura se PASSA na régua — na dúvida, NÃO gere (menos e certeiro vence mais e raso); " +
-    "(2) a leitura é escrita NO IDIOMA DESTE TIME, ancorada no que se sabe do cliente — cite o produto/público/diferencial afetado; " +
+    "(2) a leitura é escrita NO IDIOMA DESTE TIME, ancorada no que se sabe do cliente — cite o produto/público/diferencial afetado; seja CONCISO: cada campo com 1-2 frases no máximo; " +
     "(3) HONESTIDADE: nunca invente fatos, números, contas ou lançamentos; o que não está no material não existe;" +
     extraProduto +
     extraComercial +

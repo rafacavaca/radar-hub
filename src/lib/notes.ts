@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { CrossInsight } from "@/lib/cross-reference";
 import type { LensReading } from "@/lib/types";
 
 export type RoadmapNote = {
@@ -85,6 +86,29 @@ export function saveNoteFromReading(reading: LensReading): RoadmapNote {
     fonte: reading.fonte,
     concorrente: reading.concorrente,
     score: reading.score,
+    createdAt: new Date().toISOString(),
+  };
+  file.notes.push(note);
+  writeFile(file);
+  return note;
+}
+
+/** Guarda um insight interno×externo (F9) como nota de roadmap. Idempotente. */
+export function saveNoteFromCross(insight: CrossInsight): RoadmapNote {
+  const id = createHash("sha1").update(`note-cross:${insight.id}`).digest("hex").slice(0, 16);
+  const file = readFile();
+  const existing = file.notes.find((n) => n.id === id);
+  if (existing) return existing;
+
+  const note: RoadmapNote = {
+    id,
+    clientName: insight.clientName,
+    sinal: insight.sinal,
+    leitura: `Externo: ${insight.externo}\nInterno: ${insight.interno}`,
+    acao: insight.oportunidade,
+    fonte: insight.fonte,
+    concorrente: insight.concorrente,
+    score: insight.score,
     createdAt: new Date().toISOString(),
   };
   file.notes.push(note);
