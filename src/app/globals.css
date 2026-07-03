@@ -1,21 +1,155 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   Radar Hub — Design System (papel quente · tinta charcoal · vermelho Radar)
+   Identidade própria. UMA fonte (Archivo). Datas em 1º plano. Um papel por cor.
+   Fundação por TOKENS: os valores crus ficam em :root; o @theme remapeia a
+   paleta do Tailwind pra o app inteiro herdar a pele nova sem reescrever tudo.
+   =========================================================================== */
+
 :root {
-  /* Pele clara e profissional — dashboard de inteligência lê melhor em papel. */
-  --background: #fafaf9; /* stone-50 */
-  --foreground: #1c1917; /* stone-900 */
+  /* Marca — vermelho Radar (o ponto vermelho, sóbrio) */
+  --radar-50: #f9edec;
+  --radar-100: #f1d7d4;
+  --radar-300: #d3908a;
+  --radar-500: #b8443c;
+  --radar-600: #a03a33;
+  --radar-700: #85302a;
+  --radar-ink: #451512;
+
+  /* Tinta / neutros (charcoal quente) + papel */
+  --ink-950: #14130f;
+  --ink-900: #1e1c17;
+  --ink-700: #3a362e;
+  --ink-500: #6b6559;
+  --ink-400: #8c8578;
+  --ink-300: #b4ad9e;
+  --ink-200: #d8d2c6;
+  --ink-150: #e7e2d8;
+  --ink-100: #f0ece3;
+  --paper: #f6f4ef;
+  --white: #ffffff;
+
+  /* Recência — semáforo (fresco verde / resto cinza) */
+  --fresh: #1f8a4c;
+  --fresh-fill: #e6f3ea;
+  --old: #8c8578;
+  --old-fill: #ece8df;
+
+  /* Status */
+  --success: #1f8a4c; --success-fill: #e6f3ea;
+  --warning: #c77a16; --warning-fill: #f8edd9;
+  --danger: #cc241b; --danger-fill: #fbe7e4;
+  --info: #2a6fdb; --info-fill: #e7effb;
+
+  /* Aliases semânticos (uso direto em componentes novos) */
+  --text-strong: var(--ink-950);
+  --text-body: var(--ink-700);
+  --text-secondary: var(--ink-500);
+  --text-meta: var(--ink-400);
+  --text-link: var(--radar-600);
+  --surface-app: var(--paper);
+  --surface-card: var(--white);
+  --surface-hover: var(--ink-100);
+  --border-hairline: var(--ink-150);
+  --border-strong: var(--ink-200);
+  --accent: var(--radar-500);
+
+  --focus-ring: 0 0 0 2px var(--white), 0 0 0 4px var(--radar-500);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  /* UMA fonte — Archivo em toda a interface (sem serifa, sem mono). */
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+
+  /* Neutros: stone → tinta quente sobre papel (canvas = stone-50 = paper). */
+  --color-stone-50: #f6f4ef;
+  --color-stone-100: #f0ece3;
+  --color-stone-200: #e7e2d8;
+  --color-stone-300: #d8d2c6;
+  --color-stone-400: #8c8578;
+  --color-stone-500: #6b6559;
+  --color-stone-600: #565049;
+  --color-stone-700: #3a362e;
+  --color-stone-800: #1e1c17;
+  --color-stone-900: #14130f;
+  --color-stone-950: #14130f;
+
+  /* Marca: red → vermelho Radar (dot, ação primária, links, foco). */
+  --color-red-50: #f9edec;
+  --color-red-100: #f1d7d4;
+  --color-red-200: #f1d7d4;
+  --color-red-300: #d3908a;
+  --color-red-400: #c75b52;
+  --color-red-500: #b8443c;
+  --color-red-600: #a03a33;
+  --color-red-700: #85302a;
+  --color-red-800: #6e2823;
+
+  /* Fresco / sucesso: emerald → verde do semáforo. */
+  --color-emerald-50: #e6f3ea;
+  --color-emerald-100: #e6f3ea;
+  --color-emerald-300: #8fcaa5;
+  --color-emerald-400: #6fb88a;
+  --color-emerald-500: #2e9a5b;
+  --color-emerald-600: #1f8a4c;
+  --color-emerald-700: #1b7a43;
+  --color-emerald-800: #155e34;
+
+  /* "Mudou" / warning: amber → âmbar do rebranding. */
+  --color-amber-50: #f8edd9;
+  --color-amber-100: #f8edd9;
+  --color-amber-300: #e7c78a;
+  --color-amber-400: #d9a94e;
+  --color-amber-700: #c77a16;
+  --color-amber-800: #a9670f;
+
+  /* Gap / danger: rose → vermelho de status. */
+  --color-rose-50: #fbe7e4;
+  --color-rose-100: #fbe7e4;
+  --color-rose-300: #e8a69f;
+  --color-rose-400: #db7a70;
+  --color-rose-800: #cc241b;
+
+  /* Cantos crispos de CRM (3 selos · 6 controles · 8 cards · 12 dialogs). */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+
+  /* Elevação baixíssima, quente. */
+  --shadow-sm: 0 1px 2px rgba(20, 19, 15, 0.05);
+  --shadow-md: 0 1px 3px rgba(20, 19, 15, 0.07), 0 4px 12px rgba(20, 19, 15, 0.06);
+  --shadow-lg: 0 4px 12px rgba(20, 19, 15, 0.1), 0 16px 40px rgba(20, 19, 15, 0.16);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", sans-serif;
+  background: var(--paper);
+  color: var(--ink-700);
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--radar-100);
+}
+
+/* Pulso do ponto vermelho — só quando o Radar está "vivo" (varrendo/carregando). */
+@keyframes radar-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(184, 68, 60, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(184, 68, 60, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(184, 68, 60, 0);
+  }
+}
+.radar-pulse {
+  animation: radar-pulse 1.8s var(--ease-out) infinite;
 }
