@@ -14,7 +14,8 @@
     "smoke:f5": "tsx scripts/test-radar-f5.mts",
     "smoke:f6": "tsx scripts/test-radar-f6.mts",
     "collect": "tsx scripts/collect.mts",
-    "analyze": "tsx scripts/analyze.mts"
+    "analyze": "tsx scripts/analyze.mts",
+    "smoke:f7": "tsx scripts/test-radar-f7.mts"
   },
   "dependencies": {
     "next": "16.2.7",

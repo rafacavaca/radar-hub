@@ -15,9 +15,12 @@
 
 import { NextResponse } from "next/server";
 
+import { removeClientLenses } from "@/lib/lenses";
 import {
+  addClient,
   addCompetitor,
   readWatchlist,
+  removeClient,
   removeCompetitor,
   setCompetitorEnabled,
   type AddCompetitorInput,
@@ -114,8 +117,22 @@ export async function POST(req: Request) {
         return NextResponse.json({ data });
       }
 
+      // F7 — multi-cliente
+      case "add-client": {
+        if (!isString(payload.clientName)) return badRequest("Envie clientName como texto.");
+        const data = addClient(payload.clientName);
+        return NextResponse.json({ data });
+      }
+
+      case "remove-client": {
+        if (!isString(payload.clientName)) return badRequest("Envie clientName como texto.");
+        const data = removeClient(payload.clientName);
+        removeClientLenses(payload.clientName); // limpa a config das lentes dele
+        return NextResponse.json({ data });
+      }
+
       default:
-        return badRequest("Ação desconhecida. Use add, remove ou toggle.");
+        return badRequest("Ação desconhecida. Use add, remove, toggle, add-client ou remove-client.");
     }
   } catch (err) {
     // A lib lança Error (pt-BR) para entradas inválidas -> 400 com a mensagem.

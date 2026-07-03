@@ -28,7 +28,6 @@ import type { IntelligenceItem } from "@/lib/types";
 const CACHE_DIR = join(process.cwd(), ".cache");
 const MAX_DAYS = 14;
 const MAX_ITEMS = 40;
-const CLIENT_NAME = "Moovefy"; // cliente único do F1; multi-cliente é fase futura.
 
 /** Uma fonte citável devolvida ao chat (mapeada de um item citado [n]). */
 export type AskSource = {
@@ -122,7 +121,7 @@ const SYSTEM =
   "Responda APENAS com base no MATERIAL fornecido (itens de inteligência coletados, o Brain do cliente e a watchlist). Regras invioláveis: " +
   "(1) HONESTIDADE: se o material não cobre a pergunta, diga claramente que o Radar ainda não coletou isso — e, se fizer sentido, sugira adicionar o concorrente/fonte na tela Vigiar. NUNCA invente fatos, números, datas ou lançamentos. " +
   "(2) FONTES: ao afirmar um fato coletado, cite o número do item entre colchetes, ex.: [2]. Só cite números que existem no material. " +
-  "(3) O Brain do cliente é contexto confirmado — pode usar, dizendo 'segundo o Brain da Moovefy…' (sem número). " +
+  "(3) O Brain dos clientes é contexto confirmado — pode usar, dizendo 'segundo o Brain de <cliente>…' (sem número). " +
   "(4) Direto, útil e em pt-BR; markdown leve (negrito, listas curtas). Quando opinar/recomendar, deixe claro que é a sua leitura a partir do material. " +
   'Responda SÓ com um objeto JSON válido: {"resposta": "…", "fontesUsadas": [2, 5]} — fontesUsadas = números dos itens citados (pode ser []).';
 
@@ -144,7 +143,7 @@ function buildPrompt(
   return `QUEM O RADAR VIGIA HOJE:
 ${watchlistBlock}
 
-O QUE O BRAIN SABE DO CLIENTE:
+O QUE O BRAIN SABE DOS CLIENTES (cada um rotulado):
 ${brainContext}
 
 MATERIAL COLETADO (itens de inteligência, do mais recente pro mais antigo — cite por [n]):
@@ -171,12 +170,21 @@ function extractJson(content: string): { resposta?: unknown; fontesUsadas?: unkn
 /** Pergunta ao Radar. Nunca lança por resposta malformada do LLM. */
 export async function askRadar(question: string, history: AskTurn[] = []): Promise<AskAnswer> {
   const items = collectRecentItems();
-  const brain = await fetchClientBrain(CLIENT_NAME);
+
+  // MULTI-CLIENTE (F7): o Brain de TODOS os clientes do Radar entra como
+  // contexto, cada um rotulado (a leitura tem cache diário — barato).
+  const clientNames = readWatchlist().clients.map((c) => c.name);
+  const brains: string[] = [];
+  for (const name of clientNames) {
+    const brain = await fetchClientBrain(name);
+    brains.push(`— ${name}:\n${brain.context}`);
+  }
+
   const prompt = buildPrompt(
     question,
     history,
     buildMaterialBlock(items),
-    brain.context,
+    brains.join("\n\n"),
     buildWatchlistBlock(),
   );
 

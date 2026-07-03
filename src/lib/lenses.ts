@@ -222,6 +222,14 @@ export function updateLens(clientName: string, lensId: LensId, patch: LensPatch)
   return file;
 }
 
+/** Limpa a config de lentes de um cliente removido do Radar (F7). */
+export function removeClientLenses(clientName: string): void {
+  const file = readLenses();
+  const before = file.clients.length;
+  file.clients = file.clients.filter((c) => c.clientName !== clientName);
+  if (file.clients.length !== before) writeFile(file);
+}
+
 /** Restaura a lente ao padrão de fábrica (mantém enabled). */
 export function resetLens(clientName: string, lensId: LensId): LensesFile {
   const file = readLenses();

@@ -57,7 +57,11 @@ export default async function FeedPage() {
         ) : (
           <ul className="divide-y divide-stone-200 overflow-hidden rounded-2xl border border-stone-200 bg-white">
             {events.map((event) => (
-              <FeedRow key={`${event.clientName}-${event.id}`} event={event} />
+              <FeedRow
+                key={`${event.clientName}-${event.id}`}
+                event={event}
+                showClient={new Set(events.map((e) => e.clientName)).size > 1}
+              />
             ))}
           </ul>
         )}
@@ -66,10 +70,15 @@ export default async function FeedPage() {
   );
 }
 
-function FeedRow({ event }: { event: ClientEvent }) {
+function FeedRow({ event, showClient }: { event: ClientEvent; showClient: boolean }) {
   return (
     <li data-testid="feed-item" className="px-4 py-4 sm:px-5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {showClient ? (
+          <span className="rounded-full border border-stone-200 px-2 py-0.5 text-xs font-medium text-stone-500">
+            {event.clientName}
+          </span>
+        ) : null}
         <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
           {event.competitorName}
         </span>

@@ -248,6 +248,41 @@ function findClient(watchlist: Watchlist, clientName: string): WatchClient {
   return client;
 }
 
+/**
+ * Adiciona um CLIENTE novo (F7 — multi-cliente): nasce sem concorrentes; a
+ * estrutura (lentes com defaults, Brain via porta, briefing próprio) replica
+ * sozinha. O nome deve casar com `workspaces.name` do Formare pra Brain e
+ * cards baterem — a tela oferece a lista real pela porta.
+ */
+export function addClient(clientName: string): Watchlist {
+  const name = (clientName ?? "").trim();
+  if (!name) throw new Error("Dê o nome do cliente.");
+  if (name.length > 120) throw new Error("Nome de cliente longo demais.");
+
+  const watchlist = readWatchlist();
+  if (watchlist.clients.some((c) => c.name === name)) {
+    throw new Error(`"${name}" já está no Radar.`);
+  }
+  watchlist.clients.push({ name, competitors: [] });
+  writeWatchlist(watchlist);
+  return watchlist;
+}
+
+/** Remove um CLIENTE do Radar (só a vigilância — NÃO toca o Formare). */
+export function removeClient(clientName: string): Watchlist {
+  const watchlist = readWatchlist();
+  const before = watchlist.clients.length;
+  watchlist.clients = watchlist.clients.filter((c) => c.name !== clientName);
+  if (watchlist.clients.length === before) {
+    throw new Error(`Cliente não encontrado: ${clientName}`);
+  }
+  if (watchlist.clients.length === 0) {
+    throw new Error("O Radar precisa de pelo menos um cliente — adicione outro antes de remover este.");
+  }
+  writeWatchlist(watchlist);
+  return watchlist;
+}
+
 export type AddSourceInput = { kind: SourceKind; url: string };
 
 export type AddCompetitorInput = {

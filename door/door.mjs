@@ -95,6 +95,23 @@ async function handleBrainRead(req, res, url) {
 }
 
 /**
+ * GET /workspaces — lista os CLIENTES (workspaces) do Formare, só o nome (F7).
+ * Read-only e mínimo: serve pro Radar oferecer os nomes CERTOS ao cadastrar um
+ * cliente (o nome precisa casar com workspaces.name pra Brain e cards baterem).
+ */
+async function handleWorkspacesList(res) {
+  const client = await pool.connect();
+  try {
+    const r = await client.query("select name from workspaces order by name");
+    return json(res, 200, { data: { workspaces: r.rows.map((row) => row.name) } });
+  } catch (e) {
+    return json(res, 500, { error: String(e?.message ?? e) });
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * POST /task — "Ação no Formare" (F4): transforma UM item de inteligência do
  * Radar num CARD do Formare, no estágio inicial 'ideias' (a caixa de entrada
  * de trabalho), carimbado com a tag 'radar'. Gated por DOOR_WRITE_ENABLED.
@@ -256,6 +273,9 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && url.pathname === "/brain") {
     return handleBrainRead(req, res, url);
+  }
+  if (req.method === "GET" && url.pathname === "/workspaces") {
+    return handleWorkspacesList(res);
   }
   if (req.method === "POST" && url.pathname === "/task") {
     return handleTask(req, res);
