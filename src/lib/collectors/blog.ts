@@ -24,6 +24,7 @@
 
 import { createHash } from "node:crypto";
 
+import { collectFromFeed, resolveFeedUrl } from "@/lib/collectors/rss";
 import { scrape } from "@/lib/firecrawl";
 import type { Competitor, SourceKind, WatchSource } from "@/lib/watchlist";
 import type { RawEvent, SignalKind } from "@/lib/types";
@@ -233,6 +234,35 @@ export function dominantContentCluster(candidates: string[]): string[] {
   return pool[0][1];
 }
 
+/** Padrões comuns de 2ª página de listagem (os 2 mais frequentes). */
+function page2Urls(listingUrl: string): string[] {
+  const clean = listingUrl.replace(/\/$/, "");
+  return [`${clean}/page/2/`, `${clean}?page=2`];
+}
+
+/**
+ * Coleta além da 1ª página: tenta a 2ª página da listagem e devolve URLs de
+ * post novas. Best-effort — qualquer falha vira lista vazia (não atrapalha).
+ */
+async function paginate(
+  listingUrl: string,
+  blogHost: string,
+  basePath: string,
+  need: number,
+  force: boolean,
+): Promise<string[]> {
+  for (const url of page2Urls(listingUrl)) {
+    try {
+      const page = await scrape(url, { formats: ["links"], onlyMainContent: true, force });
+      const urls = selectPostUrls(page.links, blogHost, basePath, need);
+      if (urls.length > 0) return urls;
+    } catch {
+      // página 2 não existe nesse padrão — tenta o próximo
+    }
+  }
+  return [];
+}
+
 /**
  * Coleta os itens recentes de UMA FONTE (listagem pública) de um concorrente.
  * A raspagem da listagem é obrigatória (se falhar, lança — o loop decide se
@@ -257,8 +287,35 @@ export async function collectBlog(
     force,
   });
 
-  // 2-3. Filtra URLs prováveis de post e pega as primeiras N.
-  const postUrls = selectPostUrls(listing.links, blogHost, basePath, limit);
+  // 1b. FEED primeiro (padrão-ouro): se a listagem tem RSS/Atom, coletamos dele
+  //     — 1 fetch traz N itens já estruturados (título/data/resumo), sem raspar
+  //     post a post (0 crédito Firecrawl). Só cai no HTML se não houver feed.
+  try {
+    const feedUrl = await resolveFeedUrl(source.url, listing.links, { force });
+    if (feedUrl) {
+      const feedEvents = await collectFromFeed(
+        competitor,
+        feedUrl,
+        SIGNAL_KIND_BY_SOURCE[source.kind],
+        limit,
+      );
+      if (feedEvents.length > 0) {
+        console.log(`[collect:${competitor.id}] via feed ${feedUrl} — ${feedEvents.length} itens`);
+        return feedEvents;
+      }
+    }
+  } catch (err) {
+    console.warn(`[collect:${competitor.id}] resolução de feed falhou: ${(err as Error).message}`);
+  }
+
+  // 2-3. Sem feed: filtra URLs prováveis de post. Só pagina se a 1ª página deu
+  //      uma listagem REAL (>=2 posts) mas curta — evita sondar páginas-2 que
+  //      não existem em sites fora do padrão (não queima créditos à toa).
+  let postUrls = selectPostUrls(listing.links, blogHost, basePath, limit);
+  if (postUrls.length >= 2 && postUrls.length < limit) {
+    const extra = await paginate(source.url, blogHost, basePath, limit - postUrls.length, force);
+    postUrls = [...new Set([...postUrls, ...extra])].slice(0, limit);
+  }
   if (postUrls.length === 0) {
     console.warn(
       `[collect:${competitor.id}] nenhuma URL de post reconhecida em ${source.url}`,
