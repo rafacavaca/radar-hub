@@ -138,25 +138,79 @@ export function deleteReport(id: string): void {
 const REPORT_SYSTEM =
   "Você é o RADAR, redigindo um RELATÓRIO de inteligência de mercado para o dono da agência Formare. " +
   "Escreva um documento claro e apresentável, em pt-BR, a partir APENAS do MATERIAL fornecido (itens coletados + o Brain do cliente). " +
-  "Regras: (1) HONESTIDADE — só afirme o que está no material; se algo não foi coletado, diga que ainda não há dado, não invente; " +
-  "(2) estruture com títulos markdown (##), listas e negrito; abra com um resumo executivo de 2-3 linhas; feche com recomendações; " +
-  "(3) cite os fatos coletados por [n] usando os números do material; " +
-  "(4) foque no cliente indicado e no que foi pedido; " +
-  "(5) seja CONCISO e direto — no máximo ~700 palavras (o motor tem tempo limitado; um relatório enxuto e certeiro vence um longo). " +
-  'Responda SÓ com um objeto JSON válido: {"titulo": "…", "corpo": "…(markdown)…", "fontesUsadas": [1,3]}.';
+  "FORMATO: responda em MARKDOWN PURO (NÃO use JSON, NÃO embrulhe em ```). " +
+  "A PRIMEIRA linha é o título como cabeçalho markdown de nível 1, ex.: '# Inteligência competitiva — <cliente>'. " +
+  "Depois: um resumo executivo de 2-3 linhas, seções com '## ', listas e **negrito**, e uma seção final de recomendações. " +
+  "Regras: (1) HONESTIDADE — só afirme o que está no material; se algo não foi coletado, diga que ainda não há dado, NÃO invente; " +
+  "(2) cite os fatos coletados por [n] usando os números do material (ex.: [2]); " +
+  "(3) foque no cliente indicado e no que foi pedido; " +
+  "(4) seja CONCISO — no máximo ~700 palavras (o motor tem tempo limitado; enxuto e certeiro vence longo).";
 
 /** Itens no material do relatório — enxuto pra caber no tempo do gateway (40s). */
 const REPORT_MAX_ITEMS = 18;
 
-/** Extrai o objeto JSON da resposta do LLM; falha -> null (nunca lança). */
-function extractJson(content: string): Record<string, unknown> | null {
-  try {
-    const match = content.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    return JSON.parse(match[0]) as Record<string, unknown>;
-  } catch {
-    return null;
+/**
+ * Interpreta a saída do motor como DOCUMENTO — robusto a modelo desobediente.
+ * Caminho principal: markdown puro (título = 1º cabeçalho). Salvamento: se
+ * vier JSON (mesmo INVÁLIDO por quebras de linha não-escapadas, o bug que
+ * mostrava "titulo: json"), extrai o campo `corpo`/`titulo` por regex.
+ */
+function parseReportOutput(content: string): { titulo: string; corpo: string } {
+  // tira cercas de código (```markdown ... ``` ou ```json ... ```).
+  let text = content
+    .trim()
+    .replace(/^```[a-zA-Z]*\s*\n?/, "")
+    .replace(/\n?```\s*$/, "")
+    .trim();
+
+  // SALVAMENTO: parece um objeto JSON? tenta parse estrito e, se falhar
+  // (quebras de linha reais dentro das strings), resgata por regex.
+  if (text.startsWith("{") && /"corpo"\s*:/.test(text)) {
+    try {
+      const o = JSON.parse(text) as { titulo?: unknown; corpo?: unknown };
+      if (typeof o.corpo === "string" && o.corpo.trim()) {
+        return {
+          titulo: typeof o.titulo === "string" ? o.titulo.trim() : deriveTitle(o.corpo),
+          corpo: o.corpo.trim(),
+        };
+      }
+    } catch {
+      // JSON inválido — resgata os campos crus.
+    }
+    const mCorpo = text.match(/"corpo"\s*:\s*"([\s\S]*?)"\s*(?:,\s*"[a-zA-Z]+"\s*:|\}\s*$)/);
+    if (mCorpo) {
+      const unesc = (s: string) =>
+        s.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+      const mTit = text.match(/"titulo"\s*:\s*"([\s\S]*?)"\s*,/);
+      const corpo = unesc(mCorpo[1]).trim();
+      return { titulo: mTit ? unesc(mTit[1]).replace(/\n/g, " ").trim() : deriveTitle(corpo), corpo };
+    }
   }
+
+  // MARKDOWN: título = 1º cabeçalho (# / ## …); some da linha, vira o campo título.
+  const lines = text.split("\n");
+  let titulo = "";
+  if (lines.length > 0 && /^#{1,3}\s+\S/.test(lines[0])) {
+    titulo = lines[0].replace(/^#{1,3}\s+/, "").trim();
+    text = lines.slice(1).join("\n").trim();
+  }
+  if (!titulo) titulo = deriveTitle(text);
+  return { titulo, corpo: text };
+}
+
+/** Fontes = citações [n] presentes no corpo, mapeadas ao material (anti-invenção). */
+function fontesFromBody(corpo: string, items: Array<{ fonte: { url: string; titulo: string }; concorrente?: string }>): AskSource[] {
+  const fontes: AskSource[] = [];
+  const seen = new Set<string>();
+  for (const m of corpo.matchAll(/\[(\d+)\]/g)) {
+    const n = Number(m[1]);
+    if (!Number.isInteger(n) || n < 1 || n > items.length) continue;
+    const item = items[n - 1];
+    if (seen.has(item.fonte.url)) continue;
+    seen.add(item.fonte.url);
+    fontes.push({ titulo: item.fonte.titulo, url: item.fonte.url, concorrente: item.concorrente });
+  }
+  return fontes;
 }
 
 /**
@@ -196,30 +250,8 @@ ${request}`;
     }
   }
   if (lastErr) throw lastErr;
-  const parsed = extractJson(content);
 
-  const corpo =
-    typeof parsed?.corpo === "string" && parsed.corpo.trim().length > 0
-      ? parsed.corpo.trim()
-      : content.trim();
-  const titulo =
-    typeof parsed?.titulo === "string" && parsed.titulo.trim().length > 0
-      ? parsed.titulo.trim()
-      : deriveTitle(corpo);
-
-  // Fontes: SÓ as citadas que existem no material (anti-invenção, como no ask).
-  const fontes: AskSource[] = [];
-  const seen = new Set<string>();
-  if (Array.isArray(parsed?.fontesUsadas)) {
-    for (const raw of parsed.fontesUsadas) {
-      const n = Number(raw);
-      if (!Number.isInteger(n) || n < 1 || n > items.length) continue;
-      const item = items[n - 1];
-      if (seen.has(item.fonte.url)) continue;
-      seen.add(item.fonte.url);
-      fontes.push({ titulo: item.fonte.titulo, url: item.fonte.url, concorrente: item.concorrente });
-    }
-  }
-
+  const { titulo, corpo } = parseReportOutput(content);
+  const fontes = fontesFromBody(corpo, items);
   return { titulo, corpo, fontes };
 }

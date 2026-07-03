@@ -77,11 +77,17 @@ async function rodar(): Promise<Criterio[]> {
       "Monte um relatório curto sobre o movimento mais importante dos concorrentes e a ação recomendada.",
     );
     const fontesReais = draft.fontes.every((f) => items.some((it) => it.fonte.url === f.url));
-    const bom = draft.titulo.trim().length > 0 && draft.corpo.trim().length > 120 && fontesReais;
+    // guarda do bug do "titulo: json": nada de blob JSON/cerca de código no documento.
+    const naoEhBlob =
+      draft.titulo.trim().toLowerCase() !== "json" &&
+      !/^\s*[{`]/.test(draft.corpo) &&
+      !draft.corpo.includes('"corpo"');
+    const bom =
+      draft.titulo.trim().length > 0 && draft.corpo.trim().length > 120 && fontesReais && naoEhBlob;
     criterios.push({
-      nome: "Montar sob medida: documento com título+corpo e fontes REAIS (honesto)",
+      nome: "Montar sob medida: documento limpo (markdown, não blob JSON) com fontes REAIS",
       feito: bom,
-      detalhe: `titulo="${draft.titulo.slice(0, 40)}", corpo=${draft.corpo.length} chars, fontes ok=${fontesReais}`,
+      detalhe: `titulo="${draft.titulo.slice(0, 40)}", corpo=${draft.corpo.length} chars, fontes ok=${fontesReais}, limpo=${naoEhBlob}`,
     });
 
     // 4) Gerar no Formare a partir do relatório composto.
