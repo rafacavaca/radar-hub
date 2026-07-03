@@ -7,6 +7,7 @@
  * cadastro; a varredura mora no Briefing/Feed.
  */
 
+import { listSourceStatus } from "@/lib/source-status";
 import { readWatchlist } from "@/lib/watchlist";
 
 import { WatchlistEditor } from "@/components/watchlist-editor";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default function VigiarPage() {
   const watchlist = readWatchlist();
+  const sourceStatus = listSourceStatus();
 
   const clientCount = watchlist.clients.length;
   const watchedCount = watchlist.clients.reduce(
@@ -36,7 +38,7 @@ export default function VigiarPage() {
       </header>
 
       <div className="mt-8">
-        <WatchlistEditor initial={watchlist} />
+        <WatchlistEditor initial={watchlist} sourceStatus={sourceStatus} />
       </div>
     </section>
   );

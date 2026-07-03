@@ -18,7 +18,20 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 import type { SourceCandidate } from "@/lib/discovery";
+import type { SourceStatus } from "@/lib/source-status";
 import type { Competitor, SourceKind, WatchClient, Watchlist } from "@/lib/watchlist";
+
+/** Status por fonte (chave `${competitorId}:${sourceId}`) — F18, transparência. */
+type StatusMap = Record<string, SourceStatus>;
+
+/** Texto curto e honesto do status de uma fonte. */
+function statusLabel(status: SourceStatus | undefined): { text: string; tone: "ok" | "quiet" | "bad" } | null {
+  if (!status) return null; // nunca rodou — sem selo (a 1ª rodada cria)
+  if (status.erro) return { text: "falhou", tone: "bad" };
+  if (status.eventos > 0)
+    return { text: `${status.eventos} ${status.eventos === 1 ? "sinal" : "sinais"}`, tone: "ok" };
+  return { text: "sem novidade", tone: "quiet" };
+}
 
 const INPUT_CLASS =
   "w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none";
@@ -69,7 +82,13 @@ async function postWatchlist(
   }
 }
 
-export function WatchlistEditor({ initial }: { initial: Watchlist }) {
+export function WatchlistEditor({
+  initial,
+  sourceStatus = {},
+}: {
+  initial: Watchlist;
+  sourceStatus?: StatusMap;
+}) {
   if (initial.clients.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
@@ -88,6 +107,7 @@ export function WatchlistEditor({ initial }: { initial: Watchlist }) {
           key={client.name}
           client={client}
           removable={initial.clients.length > 1}
+          sourceStatus={sourceStatus}
         />
       ))}
       <AddClientBlock existing={initial.clients.map((c) => c.name)} />
@@ -95,7 +115,15 @@ export function WatchlistEditor({ initial }: { initial: Watchlist }) {
   );
 }
 
-function ClientCard({ client, removable }: { client: WatchClient; removable: boolean }) {
+function ClientCard({
+  client,
+  removable,
+  sourceStatus,
+}: {
+  client: WatchClient;
+  removable: boolean;
+  sourceStatus: StatusMap;
+}) {
   const router = useRouter();
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
@@ -148,7 +176,12 @@ function ClientCard({ client, removable }: { client: WatchClient; removable: boo
       {client.competitors.length > 0 ? (
         <ul className="divide-y divide-stone-100">
           {client.competitors.map((competitor) => (
-            <CompetitorRow key={competitor.id} clientName={client.name} competitor={competitor} />
+            <CompetitorRow
+              key={competitor.id}
+              clientName={client.name}
+              competitor={competitor}
+              sourceStatus={sourceStatus}
+            />
           ))}
         </ul>
       ) : (
@@ -748,9 +781,11 @@ function RunCompetitor({
 function CompetitorRow({
   clientName,
   competitor,
+  sourceStatus,
 }: {
   clientName: string;
   competitor: Competitor;
+  sourceStatus: StatusMap;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<null | "toggle" | "remove">(null);
@@ -813,22 +848,39 @@ function CompetitorRow({
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          {competitor.sources.map((source) => (
-            <a
-              key={source.id}
-              data-testid="watchlist-source"
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              title={source.url}
-              className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600 underline-offset-2 hover:bg-stone-200 hover:underline"
-            >
-              {KIND_CHIP[source.kind]}
-              {source.kind === "produto" || source.kind === "vagas" ? (
-                <span className="text-stone-400">· por mudança</span>
-              ) : null}
-            </a>
-          ))}
+          {competitor.sources.map((source) => {
+            const status = statusLabel(sourceStatus[`${competitor.id}:${source.id}`]);
+            return (
+              <a
+                key={source.id}
+                data-testid="watchlist-source"
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                title={`${source.url}${status?.tone === "bad" ? ` — última rodada falhou` : ""}`}
+                className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600 underline-offset-2 hover:bg-stone-200 hover:underline"
+              >
+                {KIND_CHIP[source.kind]}
+                {source.kind === "produto" || source.kind === "vagas" ? (
+                  <span className="text-stone-400">· por mudança</span>
+                ) : null}
+                {status ? (
+                  <span
+                    data-testid="source-status"
+                    className={
+                      status.tone === "ok"
+                        ? "text-emerald-700"
+                        : status.tone === "bad"
+                          ? "text-red-600"
+                          : "text-stone-400"
+                    }
+                  >
+                    · {status.text}
+                  </span>
+                ) : null}
+              </a>
+            );
+          })}
           {competitor.sources.length === 0 ? (
             <span className="text-xs text-stone-400">sem fontes — adicione uma URL manual</span>
           ) : null}

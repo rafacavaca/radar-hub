@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape";
+const FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v2/search";
 const CACHE_DIR = join(process.cwd(), ".cache", "firecrawl");
 
 /** O que devolvemos ao chamador — forma estável, independente da API. */
@@ -35,6 +36,9 @@ export type ScrapeOptions = {
   onlyMainContent?: boolean;
   /** ignora o cache em disco e força uma chamada fresca à API. */
   force?: boolean;
+  /** espera (ms) o JavaScript renderizar antes de capturar — o "gatilho
+   * conteúdo vazio" usa isto pra sites-casca (SPA). Só quando precisa. */
+  waitFor?: number;
 };
 
 /** Envelope gravado no cache — guarda quando foi cacheado, para expirar por dia. */
@@ -103,9 +107,11 @@ function writeCache(url: string, result: ScrapeResult): void {
  * (ex.: HTTP 402 = "Insufficient credits").
  */
 export async function scrape(url: string, opts: ScrapeOptions = {}): Promise<ScrapeResult> {
-  const { formats = ["markdown"], onlyMainContent = true, force = false } = opts;
+  const { formats = ["markdown"], onlyMainContent = true, force = false, waitFor } = opts;
 
-  if (!force) {
+  // waitFor (render JS) sempre busca fresco: o cache do dia pode ser justamente
+  // a captura vazia que motivou o retry.
+  if (!force && !waitFor) {
     const cached = readCache(url);
     if (cached) return cached;
   }
@@ -125,7 +131,7 @@ export async function scrape(url: string, opts: ScrapeOptions = {}): Promise<Scr
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ url, formats, onlyMainContent }),
+      body: JSON.stringify({ url, formats, onlyMainContent, ...(waitFor ? { waitFor } : {}) }),
     });
   } catch (err) {
     throw new Error(`Firecrawl: falha de rede ao raspar ${url}: ${(err as Error).message}`);
@@ -154,4 +160,37 @@ export async function scrape(url: string, opts: ScrapeOptions = {}): Promise<Scr
 
   writeCache(url, result);
   return result;
+}
+
+export type SearchHit = { url: string; title: string; description?: string };
+
+/**
+ * BUSCA WEB (F17) — a rede de segurança da descoberta: acha páginas que o
+ * crawl da navegação não pegou (`site:dominio blog OR imprensa…`).
+ * Gasta crédito — usar SÓ quando a descoberta rendeu pouco. Nunca lança por
+ * resposta estranha: devolve [] e o chamador segue sem a rede de segurança.
+ */
+export async function searchWeb(query: string, limit = 6): Promise<SearchHit[]> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) return [];
+
+  try {
+    const response = await fetch(FIRECRAWL_SEARCH_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query, limit }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!response.ok) return [];
+    const payload = (await response.json()) as {
+      success?: boolean;
+      data?: { web?: Array<{ url?: string; title?: string; description?: string }> } | Array<{ url?: string; title?: string; description?: string }>;
+    };
+    const rows = Array.isArray(payload.data) ? payload.data : (payload.data?.web ?? []);
+    return rows
+      .filter((r) => typeof r?.url === "string")
+      .map((r) => ({ url: r.url as string, title: (r.title ?? "").trim(), description: r.description }));
+  } catch {
+    return [];
+  }
 }

@@ -25,7 +25,8 @@
     "smoke:f13": "tsx scripts/test-radar-f13.mts",
     "smoke:f14": "tsx scripts/test-radar-f14.mts",
     "smoke:f15": "tsx scripts/test-radar-f15.mts",
-    "smoke:f16": "tsx scripts/test-radar-f16.mts"
+    "smoke:f16": "tsx scripts/test-radar-f16.mts",
+    "smoke:f17": "tsx scripts/test-radar-f17.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",

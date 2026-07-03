@@ -138,7 +138,21 @@ export async function collectByDiff(
     return [];
   }
 
-  const items = structuralItems(markdown);
+  let items = structuralItems(markdown);
+
+  // GATILHO "CONTEÚDO VAZIO" (F17): casca JS sem itens -> 1 retry com render.
+  if (items.length === 0) {
+    try {
+      const rendered = await scrape(source.url, {
+        formats: ["markdown"],
+        onlyMainContent: true,
+        waitFor: 3500,
+      });
+      items = structuralItems(rendered.markdown);
+    } catch (err) {
+      console.warn(`[diff:${competitor.id}/${source.kind}] retry com render falhou: ${(err as Error).message}`);
+    }
+  }
   if (items.length === 0) {
     console.warn(`[diff:${competitor.id}/${source.kind}] página sem itens estruturais — nada a comparar`);
     return [];

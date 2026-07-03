@@ -23,7 +23,7 @@
  */
 
 import { isLikelyPostUrl } from "@/lib/collectors/blog";
-import { scrape } from "@/lib/firecrawl";
+import { scrape, searchWeb } from "@/lib/firecrawl";
 import { completeViaGateway } from "@/lib/gateway";
 import { collectionMethod, type SourceKind } from "@/lib/watchlist";
 
@@ -465,6 +465,41 @@ export async function discoverSources(siteInput: string): Promise<DiscoveryResul
     // produto demais pré-marcado vira spam: pré-marca só as 4 primeiras páginas.
     if (candidate.kind === "produto" && ++produtosMarcados > 4) candidate.preChecked = false;
     candidates.push(candidate);
+  }
+
+  // 6. REDE DE SEGURANÇA (F17): descoberta rendeu pouco (<2 coletáveis)?
+  //    Busca web `site:dominio (blog OR imprensa…)` acha o que o crawl perdeu.
+  //    Gasta 1 crédito — só neste caso raro. Resultados passam pelo MESMO
+  //    entendimento (anti-invenção: só URLs devolvidas pela busca).
+  const coletaveis = candidates.filter((c) => c.coletavel).length;
+  if (coletaveis < 2) {
+    const dominio = baseDomainOf(siteHost);
+    const hits = await searchWeb(
+      `site:${dominio} (blog OR noticias OR novidades OR imprensa OR products OR solutions)`,
+      6,
+    );
+    const hitEntries = hits
+      .filter((h) => {
+        try {
+          return isSameSite(new URL(h.url).hostname, siteHost);
+        } catch {
+          return false;
+        }
+      })
+      .map((h) => ({ path: new URL(h.url).pathname.replace(/\/$/, "") || "/", text: h.title }))
+      .filter((e) => e.path !== "/" && !isLeafArticle(e.path));
+    if (hitEntries.length > 0) {
+      const extra = await understandSite(hitEntries);
+      for (const entry of extra) {
+        const url = `${origin}${entry.path}`;
+        const key = normalized(url);
+        if (seenUrls.has(key)) continue;
+        seenUrls.add(key);
+        candidates.push(
+          await buildCandidate(entry.kind, url, entry.label || KIND_LABEL[entry.kind], true),
+        );
+      }
+    }
   }
 
   // ordena: coletáveis primeiro, depois pela ordem dos tipos.

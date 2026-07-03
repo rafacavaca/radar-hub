@@ -29,6 +29,7 @@ import { collectBlog } from "@/lib/collectors/blog";
 import { collectByDiff } from "@/lib/collectors/content-diff";
 import { crossReference, type CrossInsight } from "@/lib/cross-reference";
 import { activeLensesFor } from "@/lib/lenses";
+import { recordSourceRun } from "@/lib/source-status";
 import { collectionMethod, planCollection, readWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, LensReading, RawEvent } from "@/lib/types";
 
@@ -289,6 +290,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
         method === "diff"
           ? await collectByDiff(target.competitor, target.source)
           : await collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT });
+      recordSourceRun(target.competitor.id, target.source.id, { eventos: events.length });
       for (const event of events) {
         if (seen.has(event.id)) continue;
         seen.add(event.id);
@@ -296,6 +298,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
       }
     } catch (err) {
       const message = (err as Error).message;
+      recordSourceRun(target.competitor.id, target.source.id, { eventos: 0, erro: message });
       failures.push(`coleta ${target.competitor.name} (${target.source.kind}): ${message}`);
       console.warn(`[loop:parcial] coleta falhou: ${message}`);
     }
@@ -381,6 +384,7 @@ export async function runRadarLoop(
         method === "diff"
           ? await collectByDiff(target.competitor, target.source)
           : await collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT });
+      recordSourceRun(target.competitor.id, target.source.id, { eventos: events.length });
       const bucket = eventsByClient.get(target.clientName) ?? [];
       const seen = new Set(bucket.map((e) => e.id));
       for (const event of events) {
@@ -392,6 +396,7 @@ export async function runRadarLoop(
       eventsByClient.set(target.clientName, bucket);
     } catch (err) {
       const message = (err as Error).message;
+      recordSourceRun(target.competitor.id, target.source.id, { eventos: 0, erro: message });
       failures.push(`coleta ${target.competitor.name} (${target.source.kind}): ${message}`);
       console.warn(
         `[loop] coleta de ${target.competitor.name}/${target.source.kind} falhou: ${message}`,

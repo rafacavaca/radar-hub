@@ -234,6 +234,15 @@ export function dominantContentCluster(candidates: string[]): string[] {
   return pool[0][1];
 }
 
+/**
+ * A captura parece uma CASCA vazia de site JavaScript? (quase sem texto e sem
+ * links) — o gatilho do retry com render (F17). Função pura, testável.
+ */
+export function isEmptyShell(markdown: string, links: string[]): boolean {
+  const textLen = (markdown ?? "").replace(/\s+/g, " ").trim().length;
+  return textLen < 200 && (links ?? []).length < 5;
+}
+
 /** Padrões comuns de 2ª página de listagem (os 2 mais frequentes). */
 function page2Urls(listingUrl: string): string[] {
   const clean = listingUrl.replace(/\/$/, "");
@@ -281,11 +290,26 @@ export async function collectBlog(
   const basePath = basePathOf(source.url);
 
   // 1. Listagem (markdown + links renderizados).
-  const listing = await scrape(source.url, {
+  let listing = await scrape(source.url, {
     formats: ["markdown", "links"],
     onlyMainContent: true,
     force,
   });
+
+  // GATILHO "CONTEÚDO VAZIO" (F17): casca de site em JavaScript vem sem links/
+  // texto — re-captura UMA vez esperando o render (waitFor). Só quando precisa.
+  if (isEmptyShell(listing.markdown, listing.links)) {
+    console.log(`[collect:${competitor.id}] listagem veio vazia — re-capturando com render JS`);
+    try {
+      listing = await scrape(source.url, {
+        formats: ["markdown", "links"],
+        onlyMainContent: true,
+        waitFor: 3500,
+      });
+    } catch (err) {
+      console.warn(`[collect:${competitor.id}] retry com render falhou: ${(err as Error).message}`);
+    }
+  }
 
   // 1b. FEED primeiro (padrão-ouro): se a listagem tem RSS/Atom, coletamos dele
   //     — 1 fetch traz N itens já estruturados (título/data/resumo), sem raspar
