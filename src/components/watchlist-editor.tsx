@@ -166,7 +166,7 @@ function ClientCard({
             data-testid="remove-client"
             onClick={removeClient}
             disabled={removing}
-            className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+            className="inline-flex min-h-[40px] items-center rounded-md px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
           >
             {removing ? "Removendo…" : "Remover cliente"}
           </button>
@@ -395,7 +395,7 @@ function AddCompetitorFlow({ clientName }: { clientName: string }) {
           type="submit"
           data-testid="watchlist-discover"
           disabled={busy !== null || !siteUrl.trim()}
-          className="inline-flex min-h-[40px] items-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:opacity-50"
+          className="inline-flex min-h-[40px] items-center rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:opacity-50"
         >
           {busy === "discover" ? "Investigando o site…" : "Descobrir fontes"}
         </button>
@@ -408,7 +408,7 @@ function AddCompetitorFlow({ clientName }: { clientName: string }) {
             !name.trim() ||
             (!(candidates ?? []).some((c) => c.checked) && !manualUrl.trim())
           }
-          className="inline-flex min-h-[40px] items-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
+          className="inline-flex min-h-[40px] items-center rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
         >
           {busy === "add" ? "Adicionando…" : "Adicionar à vigilância"}
         </button>
@@ -554,7 +554,7 @@ function FindMoreSources({
               type="button"
               onClick={add}
               disabled={state !== "idle" || !candidates.some((c) => c.checked)}
-              className="inline-flex min-h-[36px] items-center rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+              className="inline-flex min-h-[36px] items-center rounded-md bg-stone-900 px-3.5 py-1.5 text-xs font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
             >
               {state === "adding"
                 ? "Adicionando…"
@@ -635,7 +635,7 @@ function RunCompetitor({
         onClick={run}
         disabled={disabled || state !== "idle" || !competitor.enabled}
         title={`Coleta e analisa só ${competitor.name} (o resto do dia fica como está)`}
-        className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-50"
+        className="inline-flex min-h-[40px] items-center rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-50"
       >
         {state === "running" ? "Rodando…" : "Rodar"}
       </button>
@@ -770,7 +770,7 @@ function CompetitorRow({
           data-testid="watchlist-toggle"
           onClick={toggle}
           disabled={busy !== null}
-          className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-60"
+          className="inline-flex min-h-[40px] items-center rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-60"
         >
           {busy === "toggle" ? (paused ? "Reativando…" : "Pausando…") : paused ? "Reativar" : "Pausar"}
         </button>
@@ -779,7 +779,7 @@ function CompetitorRow({
           data-testid="watchlist-remove"
           onClick={remove}
           disabled={busy !== null}
-          className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+          className="inline-flex min-h-[40px] items-center rounded-md px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
         >
           {busy === "remove" ? "Removendo…" : "Remover"}
         </button>

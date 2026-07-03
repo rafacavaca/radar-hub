@@ -87,7 +87,7 @@ export function CrossActionButton({
         data-testid="cross-action"
         onClick={run}
         disabled={state === "busy"}
-        className="inline-flex items-center rounded-full bg-stone-900 px-3.5 py-1.5 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex items-center rounded-md bg-stone-900 px-3.5 py-1.5 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {state === "busy" ? "…" : label}
       </button>

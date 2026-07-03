@@ -28,7 +28,7 @@ export function ApagarNotaButton({ noteId }: { noteId: string }) {
       type="button"
       onClick={remove}
       disabled={busy}
-      className="rounded-full px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+      className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
     >
       {busy ? "Apagando…" : "Apagar"}
     </button>

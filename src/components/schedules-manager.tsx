@@ -147,7 +147,7 @@ function CreateForm({ clients }: { clients: string[] }) {
       <button
         type="submit"
         disabled={pending || !request.trim()}
-        className="mt-2 inline-flex min-h-[40px] items-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
+        className="mt-2 inline-flex min-h-[40px] items-center rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
       >
         {pending ? "Agendando…" : "Agendar relatório"}
       </button>
@@ -206,7 +206,7 @@ function ScheduleRow({ schedule }: { schedule: Schedule }) {
           data-testid="schedule-toggle"
           onClick={toggle}
           disabled={busy !== null}
-          className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-60"
+          className="inline-flex min-h-[40px] items-center rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-60"
         >
           {busy === "toggle" ? "…" : paused ? "Retomar" : "Pausar"}
         </button>
@@ -215,7 +215,7 @@ function ScheduleRow({ schedule }: { schedule: Schedule }) {
           data-testid="schedule-delete"
           onClick={remove}
           disabled={busy !== null}
-          className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+          className="inline-flex min-h-[40px] items-center rounded-md px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
         >
           {busy === "delete" ? "…" : "Apagar"}
         </button>

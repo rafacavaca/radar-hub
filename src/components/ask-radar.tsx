@@ -382,7 +382,7 @@ function AproveitarActions({
             <select
               value={client}
               onChange={(e) => setClient(e.target.value)}
-              className="rounded-full border border-stone-300 bg-white px-2.5 py-1 text-xs text-stone-700"
+              className="rounded-md border border-stone-300 bg-white px-2.5 py-1 text-xs text-stone-700"
             >
               {clients.map((c) => (
                 <option key={c} value={c}>
@@ -395,7 +395,7 @@ function AproveitarActions({
             type="button"
             onClick={guardarNoRadar}
             disabled={busy !== null}
-            className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+            className="rounded-md border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
           >
             {busy === "radar" ? "Guardando…" : "Guardar no Radar"}
           </button>
@@ -403,7 +403,7 @@ function AproveitarActions({
             type="button"
             onClick={gerarNoFormare}
             disabled={busy !== null}
-            className="rounded-full bg-stone-900 px-3 py-1 text-xs font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+            className="rounded-md bg-stone-900 px-3 py-1 text-xs font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
           >
             {busy === "formare" ? "Enviando…" : "Gerar no Formare"}
           </button>

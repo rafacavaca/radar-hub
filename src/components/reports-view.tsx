@@ -46,6 +46,30 @@ export function ReportsView({ reports, clients }: { reports: Report[]; clients: 
 // Compositor "montar sob medida" — pedido em linguagem natural -> relatório
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Modelos prontos — clicar preenche o pedido; o Rafael ajusta e monta. */
+const TEMPLATES: { label: string; build: (cliente: string) => string }[] = [
+  {
+    label: "Resumo da semana",
+    build: (c) =>
+      `Resumo dos principais movimentos dos concorrentes nesta semana, com o que importa para ${c} e as ações recomendadas.`,
+  },
+  {
+    label: "Comparativo de concorrentes",
+    build: (c) =>
+      `Comparativo dos concorrentes vigiados: posicionamento, lançamentos e mudanças recentes — e onde ${c} se diferencia.`,
+  },
+  {
+    label: "Panorama comercial",
+    build: (c) =>
+      `Relatório na ótica comercial: movimentos que geram risco ou oportunidade de venda para ${c}, com ação para o time comercial.`,
+  },
+  {
+    label: "Oportunidades de produto",
+    build: (c) =>
+      `Relatório na ótica de produto: tendências e lançamentos do mercado versus o roadmap de ${c} — o que já temos, o que está parado e os gaps.`,
+  },
+];
+
 function Composer({ clients }: { clients: string[] }) {
   const router = useRouter();
   const [client, setClient] = useState(clients[0] ?? "");
@@ -102,6 +126,23 @@ function Composer({ clients }: { clients: string[] }) {
         do cliente e redige. Honesto: só usa o que coletou.
       </p>
 
+      <div className="mt-3">
+        <p className="mb-1.5 text-xs font-medium text-stone-500">Comece por um modelo</p>
+        <div className="flex flex-wrap gap-2">
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.label}
+              type="button"
+              data-testid="report-template"
+              onClick={() => setRequest(t.build(client || "o cliente"))}
+              className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition-colors hover:bg-stone-100"
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
 
       <div className="mt-4 space-y-3">
@@ -135,7 +176,7 @@ function Composer({ clients }: { clients: string[] }) {
             type="submit"
             data-testid="compose-run"
             disabled={composing || !request.trim()}
-            className="min-h-[40px] rounded-full bg-stone-900 px-5 py-2 text-sm font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+            className="min-h-[40px] rounded-md bg-stone-900 px-5 py-2 text-sm font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
           >
             {composing ? "Montando o relatório…" : "Montar relatório"}
           </button>
@@ -320,7 +361,7 @@ function ReportActions({ report }: { report: Report }) {
           data-testid="report-to-formare"
           onClick={toFormare}
           disabled={busy !== null}
-          className="rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+          className="rounded-md bg-stone-900 px-3.5 py-1.5 text-xs font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
         >
           {busy === "formare" ? "Enviando…" : "Gerar no Formare"}
         </button>
@@ -331,7 +372,7 @@ function ReportActions({ report }: { report: Report }) {
         data-testid="report-delete"
         onClick={remove}
         disabled={busy !== null}
-        className="rounded-full px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+        className="rounded-md px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
       >
         {busy === "delete" ? "Apagando…" : "Apagar"}
       </button>

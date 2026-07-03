@@ -234,7 +234,7 @@ function LensRow({ clientName, lens }: { clientName: string; lens: LensConfig })
           data-testid="lens-toggle"
           onClick={toggle}
           disabled={busy !== null}
-          className="inline-flex min-h-[40px] flex-none items-center rounded-full px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-50"
+          className="inline-flex min-h-[40px] flex-none items-center rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-50"
         >
           {busy === "toggle"
             ? lens.enabled
@@ -294,7 +294,7 @@ function LensRow({ clientName, lens }: { clientName: string; lens: LensConfig })
           data-testid="lens-save"
           onClick={save}
           disabled={busy !== null || !changed}
-          className="inline-flex min-h-[40px] items-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
+          className="inline-flex min-h-[40px] items-center rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
         >
           {busy === "save" ? "Salvando…" : "Salvar"}
         </button>
@@ -304,7 +304,7 @@ function LensRow({ clientName, lens }: { clientName: string; lens: LensConfig })
           data-testid="lens-reset"
           onClick={reset}
           disabled={busy !== null}
-          className="inline-flex min-h-[40px] items-center rounded-full px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-50"
+          className="inline-flex min-h-[40px] items-center rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-50"
         >
           {busy === "reset" ? "Restaurando…" : "Restaurar padrão"}
         </button>

@@ -52,8 +52,8 @@ export default async function RelatoriosPage({
       </header>
 
       <div className="mt-8 space-y-6">
-        <SchedulesManager schedules={schedules} clients={clients} />
         <ReportsView reports={reports} clients={clients} />
+        <SchedulesManager schedules={schedules} clients={clients} />
       </div>
     </section>
   );

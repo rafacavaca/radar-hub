@@ -1,12 +1,14 @@
 "use client";
 
 /**
- * FEED (lista + filtro de recência) — o painel client do Feed de sinais crus.
+ * FEED (lista + filtros) — o painel client do Feed de sinais crus.
  *
- * Filtra/ordena os eventos JÁ carregados pelo server (não re-roda o loop): um
- * seletor de recência + "priorizar recentes". Fiel ao princípio: velho ATENUA,
- * nunca some — por isso o padrão é "Tudo" com os recentes no topo; quem quiser
- * estreita a janela. Datas ficam em 1º plano (RecencyStamp), fonte citada.
+ * Filtra/ordena os eventos JÁ carregados pelo server (não re-roda o loop):
+ *  - recência (janela) + "priorizar recentes";
+ *  - CONCORRENTE (qual fonte olhar);
+ *  - cada linha EXPANDE pra ver o conteúdo coletado ("conhecimento todo").
+ * Fiel ao princípio: velho ATENUA, nunca some — padrão "Tudo" com recentes no
+ * topo. Datas em 1º plano (RecencyStamp), fonte citada.
  */
 
 import { useState } from "react";
@@ -26,13 +28,23 @@ const KIND_LABEL: Record<string, string> = {
 
 type Range = "all" | "180" | "30";
 
+const SELECT_CLASS =
+  "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-stone-500 focus:outline-none";
+
 export function FeedList({ events, now }: { events: ClientEvent[]; now: string }) {
   const [range, setRange] = useState<Range>("all");
   const [recentes, setRecentes] = useState(true);
+  const [competitor, setCompetitor] = useState<string>("all");
+
+  // concorrentes presentes nos eventos (pra o filtro), em ordem alfabética.
+  const competitors = Array.from(new Set(events.map((e) => e.competitorName)))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   const ageOf = (e: ClientEvent) => ageInDays(e.publishedAt ?? e.collectedAt, now);
 
   let list = events.filter((e) => {
+    if (competitor !== "all" && e.competitorName !== competitor) return false;
     if (range === "all") return true;
     const age = ageOf(e);
     return age !== null && age <= Number(range);
@@ -47,16 +59,30 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
       <div className="flex flex-wrap items-end gap-4">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-stone-500">Recência</span>
-          <select
-            value={range}
-            onChange={(e) => setRange(e.target.value as Range)}
-            className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-stone-500 focus:outline-none"
-          >
+          <select value={range} onChange={(e) => setRange(e.target.value as Range)} className={SELECT_CLASS}>
             <option value="all">Tudo (marcar antigos)</option>
             <option value="30">Últimos 30 dias</option>
             <option value="180">Últimos 6 meses</option>
           </select>
         </label>
+
+        {competitors.length > 1 ? (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">Concorrente</span>
+            <select
+              value={competitor}
+              onChange={(e) => setCompetitor(e.target.value)}
+              className={SELECT_CLASS}
+            >
+              <option value="all">Todos</option>
+              {competitors.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label className="flex items-center gap-2 pb-2">
           <input
@@ -76,10 +102,13 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
       <div className="mt-4">
         {list.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
-            <p className="text-base font-medium text-stone-700">Nenhum sinal neste período.</p>
+            <p className="text-base font-medium text-stone-700">Nenhum sinal neste filtro.</p>
             <button
               type="button"
-              onClick={() => setRange("all")}
+              onClick={() => {
+                setRange("all");
+                setCompetitor("all");
+              }}
               className="mt-3 text-sm font-medium text-red-600 hover:underline"
             >
               Ver tudo
@@ -98,7 +127,10 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
 }
 
 function FeedRow({ event, now }: { event: ClientEvent; now: string }) {
+  const [open, setOpen] = useState(false);
   const velho = attenuated(event.publishedAt, event.collectedAt, now);
+  const conteudo = (event.excerpt || event.description || "").trim();
+
   return (
     <li data-testid="feed-item" className={"px-4 py-3.5 sm:px-5 " + (velho ? "opacity-70" : "")}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -119,7 +151,36 @@ function FeedRow({ event, now }: { event: ClientEvent; now: string }) {
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <SourceRef url={event.url} titulo={event.title} />
         <RecencyStamp publishedAt={event.publishedAt} collectedAt={event.collectedAt} now={now} />
+        <button
+          type="button"
+          data-testid="feed-expand"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="text-xs font-medium text-stone-500 underline-offset-2 hover:text-stone-800 hover:underline"
+        >
+          {open ? "ocultar conteúdo" : "ver conteúdo"}
+        </button>
       </div>
+
+      {open ? (
+        <div className="mt-2 rounded-md border border-stone-200 bg-stone-50/70 p-3 text-sm leading-relaxed text-stone-600">
+          {conteudo ? (
+            <p className="whitespace-pre-line">{conteudo}</p>
+          ) : (
+            <p className="text-stone-400">
+              O Radar guardou só o título deste sinal — abra a fonte para o conteúdo completo.
+            </p>
+          )}
+          <a
+            href={event.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-600 underline-offset-2 hover:underline"
+          >
+            abrir na fonte ↗
+          </a>
+        </div>
+      ) : null}
     </li>
   );
 }

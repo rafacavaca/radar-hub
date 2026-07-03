@@ -41,7 +41,7 @@ export function RodarAgora({
   }
 
   const base =
-    "inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex items-center gap-2 rounded-md px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
   const look =
     variant === "solid"
       ? "bg-stone-900 text-stone-50 hover:bg-stone-700"
