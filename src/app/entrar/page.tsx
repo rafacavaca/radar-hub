@@ -1,11 +1,15 @@
 /**
- * /entrar — a porta de entrada do Radar (senha única do Rafael).
+ * /entrar — a porta de entrada do Radar (e-mail + senha do Rafael).
  *
  * Form HTML puro (sem JS): POST /api/entrar valida e grava o cookie.
- * `?erro=1` mostra o aviso de senha errada.
+ * `?erro=1` mostra o aviso de credenciais erradas. `autocomplete` deixa o
+ * gerenciador de senhas do navegador preencher sozinho.
  */
 
 export const dynamic = "force-dynamic";
+
+const INPUT_CLASS =
+  "w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none";
 
 export default async function EntrarPage({
   searchParams,
@@ -27,29 +31,41 @@ export default async function EntrarPage({
 
         <h1 className="mt-5 text-xl font-semibold tracking-tight text-stone-900">Entrar</h1>
         <p className="mt-1 text-sm text-stone-500">
-          Área restrita da Formare. Digite a senha do Radar.
+          Área restrita da Formare. Entre com seu e-mail e senha.
         </p>
 
         {erro ? (
           <p className="mt-4 rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
-            Senha incorreta. Tente de novo.
+            E-mail ou senha incorretos. Tente de novo.
           </p>
         ) : null}
 
-        <form method="POST" action="/api/entrar" className="mt-5">
+        <form method="POST" action="/api/entrar" className="mt-5 space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">E-mail</span>
+            <input
+              type="email"
+              name="email"
+              required
+              autoFocus
+              autoComplete="email"
+              placeholder="voce@empresa.com"
+              className={INPUT_CLASS}
+            />
+          </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-stone-500">Senha</span>
             <input
               type="password"
               name="senha"
               required
-              autoFocus
-              className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none"
+              autoComplete="current-password"
+              className={INPUT_CLASS}
             />
           </label>
           <button
             type="submit"
-            className="mt-4 inline-flex min-h-[44px] w-full items-center justify-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700"
+            className="mt-1 inline-flex min-h-[44px] w-full items-center justify-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700"
           >
             Entrar no Radar
           </button>
