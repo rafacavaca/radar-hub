@@ -370,6 +370,37 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
   return watchlist;
 }
 
+/**
+ * Adiciona FONTES a um concorrente EXISTENTE (o botão "Achar mais fontes").
+ * Dedupe por URL; valida tipo e URL. Devolve a lista + quantas entraram.
+ */
+export function addSourcesToCompetitor(
+  clientName: string,
+  competitorId: string,
+  sources: AddSourceInput[],
+): { watchlist: Watchlist; added: number } {
+  const watchlist = readWatchlist();
+  const client = findClient(watchlist, clientName);
+  const competitor = client.competitors.find((c) => c.id === competitorId);
+  if (!competitor) throw new Error(`Concorrente não encontrado: ${competitorId}`);
+
+  const existing = new Set(competitor.sources.map((s) => s.url.replace(/\/$/, "")));
+  let added = 0;
+  for (const s of Array.isArray(sources) ? sources : []) {
+    const kind = String(s?.kind ?? "");
+    const url = String(s?.url ?? "").trim();
+    if (!SOURCE_KINDS.has(kind)) throw new Error(`Tipo de fonte desconhecido: ${kind}`);
+    if (!isHttpUrl(url)) throw new Error("Toda fonte precisa ser uma URL completa (https://…).");
+    const key = url.replace(/\/$/, "");
+    if (existing.has(key)) continue;
+    existing.add(key);
+    competitor.sources.push({ id: sourceId(kind as SourceKind, url), kind: kind as SourceKind, url });
+    added++;
+  }
+  if (added > 0) writeWatchlist(watchlist);
+  return { watchlist, added };
+}
+
 /** Remove um concorrente do cliente e persiste. Devolve a lista atualizada. */
 export function removeCompetitor(clientName: string, competitorId: string): Watchlist {
   const watchlist = readWatchlist();

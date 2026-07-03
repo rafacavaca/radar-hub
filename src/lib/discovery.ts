@@ -24,6 +24,7 @@
 
 import { isLikelyPostUrl } from "@/lib/collectors/blog";
 import { scrape } from "@/lib/firecrawl";
+import { completeViaGateway } from "@/lib/gateway";
 import { collectionMethod, type SourceKind } from "@/lib/watchlist";
 
 const FETCH_TIMEOUT_MS = 8000;
@@ -38,11 +39,11 @@ const JOB_BOARD_HOSTS = /(\.|^)(gupy\.io|kenoby\.com|greenhouse\.io|lever\.co|so
 /** Padrões de caminho/subdomínio por tipo (ordem = especificidade). Vocabulário
  * PT-BR ampliado — muitos sites BR usam esses termos. */
 const KIND_PATTERNS: Array<{ kind: SourceKind; re: RegExp }> = [
-  { kind: "vagas", re: /(^|\/)(vagas?|carreiras?|careers?|jobs|trabalhe(-conosco)?|oportunidades)(\/|$)/i },
-  { kind: "releases", re: /(^|\/)(releases?|imprensa|sala-de-imprensa|press(-room)?|comunicados?|novidades|changelog|atualizacoes|lancamentos|whats-new)(\/|$)/i },
+  { kind: "vagas", re: /(^|\/)(vagas?|carreiras?|careers?|jobs|now-hiring|hiring|join-us|trabalhe(-conosco)?|oportunidades)(\/|$)/i },
+  { kind: "releases", re: /(^|\/)(releases?|imprensa|sala-de-imprensa|press(-room)?|newsroom|comunicados?|novidades|changelog|atualizacoes|lancamentos|whats-new)(\/|$)/i },
   { kind: "noticias", re: /(^|\/)(noticias?|news|midia|na-midia)(\/|$)/i },
-  { kind: "blog", re: /(^|\/)(blog|artigos?|conteudos?|conteudo|insights|biblioteca|central-de-conteudo|academy|materiais|materiais-ricos|recursos|ebooks?|e-books?|cases?|clientes|casos-de-sucesso)(\/|$)/i },
-  { kind: "produto", re: /(^|\/)(produtos?|solucoes|solucao|plataforma|funcionalidades|servicos|features|modulos)(\/|$)/i },
+  { kind: "blog", re: /(^|\/)(blog|artigos?|articles?|conteudos?|conteudo|content|insights|biblioteca|library|central-de-conteudo|academy|materiais|materiais-ricos|recursos|resources|ebooks?|e-books?|cases?|clientes|casos-de-sucesso)(\/|$)/i },
+  { kind: "produto", re: /(^|\/)(produtos?|products?|solucoes|solucao|solutions?|plataforma|platform|funcionalidades|servicos|services|software|suites?|features|modulos|modules)(\/|$)/i },
 ];
 
 /** Caminhos comuns pra sondar quando um tipo não aparece nos links da home. */
@@ -166,6 +167,105 @@ function extractLinks(html: string, baseUrl: string): string[] {
 }
 
 /**
+ * NAVEGAÇÃO REAL: extrai âncoras <a href>TEXTO</a> same-site — o "menu" que um
+ * humano lê. É a matéria-prima do ENTENDIMENTO do site (texto do link diz o que
+ * a página É: "CYNERGY WMS Suite", "News", "Job Openings"…).
+ */
+export function extractNavEntries(
+  html: string,
+  baseUrl: string,
+  siteHost: string,
+): Array<{ path: string; text: string }> {
+  const byPath = new Map<string, string>();
+  for (const m of html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    try {
+      const abs = new URL(m[1], baseUrl);
+      if (abs.protocol !== "http:" && abs.protocol !== "https:") continue;
+      if (!isSameSite(abs.hostname, siteHost)) continue;
+      const path = abs.pathname.replace(/\/$/, "") || "/";
+      if (path === "/") continue;
+      const text = m[2].replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+      // guarda o texto mais informativo visto pra esse caminho.
+      const prev = byPath.get(path) ?? "";
+      if (text.length > prev.length && text.length <= 80) byPath.set(path, text);
+      else if (!byPath.has(path)) byPath.set(path, prev);
+    } catch {
+      // âncora inválida — ignora.
+    }
+  }
+  return [...byPath.entries()].map(([path, text]) => ({ path, text }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENTENDIMENTO DO SITE (F15) — o motor LÊ a navegação e mapeia o que vigiar.
+// Regex de caminho não pega /cynergy ou /first-processing; um leitor pega.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const UNDERSTAND_SYSTEM =
+  "Você é o mapeador de sites do Radar (inteligência de mercado B2B). Recebe a NAVEGAÇÃO REAL do site de um concorrente " +
+  "(linhas 'caminho ← texto do link') e seleciona o que vale VIGIAR. Tipos: " +
+  "'blog' (índice de blog/artigos/conteúdo), 'noticias' (índice de notícias/news), 'releases' (imprensa/comunicados/novidades), " +
+  "'produto' (páginas de PRODUTO/SOLUÇÃO/SUÍTE — o portfólio; prefira o nível de linha/suíte, não cada sub-módulo; no máximo 8, as mais importantes), " +
+  "'vagas' (vagas/carreiras/job openings). " +
+  "REGRAS: (1) use SOMENTE caminhos que estão na lista — NUNCA invente; " +
+  "(2) escolha páginas-SEÇÃO/índice, nunca um artigo individual de blog/notícia; " +
+  "(3) rotule cada página com o texto do link (limpo); " +
+  "(4) se um tipo não existe no site, não o inclua. " +
+  'Responda SÓ um array JSON: [{"path":"/x","kind":"produto","label":"Cynergy WMS Suite"}].';
+
+type UnderstoodEntry = { path: string; kind: SourceKind; label: string };
+
+const KIND_SET: ReadonlySet<string> = new Set(["blog", "noticias", "releases", "produto", "vagas"]);
+
+/**
+ * Pede ao motor pra LER a navegação e mapear as páginas vigiáveis.
+ * Defensivo: valida cada item (caminho PRECISA existir na lista — anti-invenção;
+ * kind na whitelist). Falha do motor -> [] (a descoberta segue só determinística).
+ */
+export async function understandSite(
+  entries: Array<{ path: string; text: string }>,
+): Promise<UnderstoodEntry[]> {
+  if (entries.length < 3) return [];
+  const lines = entries
+    .slice(0, 110)
+    .map((e) => `${e.path}${e.text ? ` ← ${e.text}` : ""}`)
+    .join("\n");
+  let content = "";
+  try {
+    content = await completeViaGateway({
+      system: UNDERSTAND_SYSTEM,
+      prompt: `NAVEGAÇÃO DO SITE:\n${lines}\n\nMapeie o que vigiar.`,
+    });
+  } catch (err) {
+    console.warn(`[discovery] entendimento indisponível: ${(err as Error).message}`);
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    const m = content.match(/\[[\s\S]*\]/);
+    parsed = m ? JSON.parse(m[0]) : [];
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const validPaths = new Set(entries.map((e) => e.path));
+  const out: UnderstoodEntry[] = [];
+  let produtos = 0;
+  for (const raw of parsed) {
+    const path = typeof (raw as UnderstoodEntry)?.path === "string" ? (raw as UnderstoodEntry).path.replace(/\/$/, "") : "";
+    const kind = (raw as UnderstoodEntry)?.kind;
+    const label = typeof (raw as UnderstoodEntry)?.label === "string" ? (raw as UnderstoodEntry).label.trim() : "";
+    if (!validPaths.has(path)) continue; // anti-invenção: só o que existe
+    if (typeof kind !== "string" || !KIND_SET.has(kind)) continue;
+    if (kind === "produto" && ++produtos > 8) continue;
+    out.push({ path, kind: kind as SourceKind, label: label.slice(0, 60) });
+  }
+  return out;
+}
+
+/**
  * Classifica uma URL num tipo de fonte (ou null se não parece fonte).
  * Devolve também a URL "canônica" do candidato: se o tipo veio do SUBDOMÍNIO
  * (blog.x.com), o candidato é a RAIZ do subdomínio — não a categoria linkada.
@@ -214,17 +314,33 @@ export async function discoverSources(siteInput: string): Promise<DiscoveryResul
   const siteUrl = normalizeSiteUrl(siteInput);
   const siteHost = new URL(siteUrl).hostname;
 
-  // 1. Links da home: fetch simples -> fallback Firecrawl.
+  // 1. Links da home: fetch simples -> fallback Firecrawl. Também extrai a
+  //    NAVEGAÇÃO (link ← texto) — a matéria-prima do entendimento (F15).
   let links: string[] = [];
+  let navEntries: Array<{ path: string; text: string }> = [];
   let viaFirecrawl = false;
   const home = await fetchHtml(siteUrl);
-  if (home) links = extractLinks(home.html, home.finalUrl);
+  if (home) {
+    links = extractLinks(home.html, home.finalUrl);
+    navEntries = extractNavEntries(home.html, home.finalUrl, siteHost);
+  }
   if (links.filter((l) => isSameSite(new URL(l).hostname, siteHost)).length < 5) {
     try {
       const scraped = await scrape(siteUrl, { formats: ["links"], onlyMainContent: false });
       if (scraped.links.length > 0) {
         links = scraped.links;
         viaFirecrawl = true;
+        // sem HTML das âncoras aqui: o entendimento lê só os caminhos (slugs).
+        navEntries = links
+          .filter((l) => {
+            try {
+              return isSameSite(new URL(l).hostname, siteHost);
+            } catch {
+              return false;
+            }
+          })
+          .map((l) => ({ path: new URL(l).pathname.replace(/\/$/, "") || "/", text: "" }))
+          .filter((e) => e.path !== "/");
       }
     } catch (err) {
       console.warn(`[discovery] Firecrawl também falhou em ${siteUrl}: ${(err as Error).message}`);
@@ -277,15 +393,35 @@ export async function discoverSources(siteInput: string): Promise<DiscoveryResul
     }
   }
 
-  // 4. Monta os candidatos com evidência honesta (nunca a home como seção).
+  // 4. ENTENDIMENTO (F15): o motor LÊ a navegação real (link ← texto) e mapeia
+  //    o que vigiar — pega o que regex de caminho não pega (/cynergy, /now-hiring).
+  const understood = navEntries.length > 0 ? await understandSite(navEntries) : [];
+
+  // 5. Junta: determinístico (1 por tipo, com evidência) + entendimento
+  //    (vários por tipo — cada suíte de produto é uma fonte). Dedupe por URL.
   const candidates: SourceCandidate[] = [];
-  for (const [kind, url] of bestByKind) {
-    if (url.pathname === "/" || url.pathname === "") continue;
+  const seenUrls = new Set<string>();
+  // chave de dedupe tolerante: ignora esquema, www. e barra final.
+  const normalized = (u: string): string => {
+    try {
+      const x = new URL(u);
+      return `${x.hostname.replace(/^www\./i, "")}${x.pathname.replace(/\/$/, "")}`;
+    } catch {
+      return u.replace(/\/$/, "");
+    }
+  };
+
+  const buildCandidate = async (
+    kind: SourceKind,
+    url: string,
+    titulo: string,
+    viaEntendimento: boolean,
+  ): Promise<SourceCandidate> => {
     const method = collectionMethod(kind);
     const coletavel = method !== null;
     let descricao: string;
     if (method === "list") {
-      const posts = await countPosts(url.toString());
+      const posts = await countPosts(url);
       if (posts !== null && posts >= 2) {
         descricao = `Página com ≈${posts} artigos detectados — o Radar varre daqui.`;
       } else if (posts !== null) {
@@ -297,18 +433,38 @@ export async function discoverSources(siteInput: string): Promise<DiscoveryResul
       descricao =
         kind === "vagas"
           ? "Página de vagas — vigiada por MUDANÇA: quando abrir/fechar vaga, vira sinal."
-          : "Página de produtos/soluções — vigiada por MUDANÇA: quando mudar, vira sinal.";
+          : "Página de produto/solução — vigiada por MUDANÇA: quando mudar, vira sinal.";
     } else {
       descricao = "Página registrada — a vigilância desse tipo entra numa fase futura.";
     }
-    candidates.push({
-      kind,
-      url: url.toString(),
-      titulo: KIND_LABEL[kind],
-      descricao,
-      preChecked: coletavel,
-      coletavel,
-    });
+    if (viaEntendimento) descricao = `Mapeada lendo a navegação do site. ${descricao}`;
+    return { kind, url, titulo, descricao, preChecked: coletavel, coletavel };
+  };
+
+  for (const [kind, url] of bestByKind) {
+    if (url.pathname === "/" || url.pathname === "") continue;
+    const key = normalized(url.toString());
+    if (seenUrls.has(key)) continue;
+    seenUrls.add(key);
+    candidates.push(await buildCandidate(kind, url.toString(), KIND_LABEL[kind], false));
+  }
+
+  const origin = new URL(siteUrl).origin;
+  let produtosMarcados = candidates.filter((c) => c.kind === "produto").length;
+  for (const entry of understood) {
+    const url = `${origin}${entry.path}`;
+    const key = normalized(url);
+    if (seenUrls.has(key)) continue;
+    seenUrls.add(key);
+    const candidate = await buildCandidate(
+      entry.kind,
+      url,
+      entry.label || KIND_LABEL[entry.kind],
+      true,
+    );
+    // produto demais pré-marcado vira spam: pré-marca só as 4 primeiras páginas.
+    if (candidate.kind === "produto" && ++produtosMarcados > 4) candidate.preChecked = false;
+    candidates.push(candidate);
   }
 
   // ordena: coletáveis primeiro, depois pela ordem dos tipos.

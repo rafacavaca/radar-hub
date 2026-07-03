@@ -21,6 +21,7 @@ import { forgetCompetitorVisual } from "@/lib/visual";
 import {
   addClient,
   addCompetitor,
+  addSourcesToCompetitor,
   readWatchlist,
   removeClient,
   removeCompetitor,
@@ -119,6 +120,32 @@ export async function POST(req: Request) {
           payload.enabled,
         );
         return NextResponse.json({ data });
+      }
+
+      // F15 — "Achar mais fontes": adiciona fontes novas a um concorrente existente.
+      case "add-sources": {
+        if (!isString(payload.clientName) || !isString(payload.competitorId)) {
+          return badRequest("Envie clientName e competitorId como texto.");
+        }
+        if (!Array.isArray(payload.sources)) {
+          return badRequest("Envie sources como lista de {kind, url}.");
+        }
+        const sources: Array<{ kind: string; url: string }> = [];
+        for (const s of payload.sources) {
+          const kind = (s as Record<string, unknown>)?.kind;
+          const url = (s as Record<string, unknown>)?.url;
+          if (!isString(kind) || !isString(url)) {
+            return badRequest("Cada fonte precisa de kind e url como texto.");
+          }
+          sources.push({ kind, url });
+        }
+        // a lib valida kind/url em runtime com mensagens amigáveis.
+        const result = addSourcesToCompetitor(
+          payload.clientName,
+          payload.competitorId,
+          sources as Parameters<typeof addSourcesToCompetitor>[2],
+        );
+        return NextResponse.json({ data: result.watchlist, added: result.added });
       }
 
       // F7 — multi-cliente

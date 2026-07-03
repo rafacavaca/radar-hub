@@ -42,6 +42,12 @@ type WatchlistAction =
     }
   | { action: "remove"; clientName: string; competitorId: string }
   | { action: "toggle"; clientName: string; competitorId: string; enabled: boolean }
+  | {
+      action: "add-sources";
+      clientName: string;
+      competitorId: string;
+      sources: Array<{ kind: SourceKind; url: string }>;
+    }
   | { action: "add-client"; clientName: string }
   | { action: "remove-client"; clientName: string };
 
@@ -515,6 +521,158 @@ function AddClientBlock({ existing }: { existing: string[] }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// "Achar mais fontes" (F15): re-roda a descoberta profunda (com o entendimento
+// do site) num concorrente EXISTENTE e oferece só as fontes NOVAS pra confirmar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function FindMoreSources({
+  clientName,
+  competitor,
+}: {
+  clientName: string;
+  competitor: Competitor;
+}) {
+  const router = useRouter();
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [state, setState] = useState<"idle" | "searching" | "adding">("idle");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!competitor.siteUrl) return null; // sem site não há o que farejar
+
+  async function search() {
+    if (state !== "idle") return;
+    setState("searching");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/discover-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteUrl: competitor.siteUrl }),
+      });
+      const payload = (await res.json().catch(() => null)) as {
+        data?: { candidates: SourceCandidate[] };
+        error?: string;
+      } | null;
+      if (!res.ok || !payload?.data) {
+        setError(payload?.error ?? "Não foi possível investigar o site.");
+        return;
+      }
+      // só o que ainda NÃO está registrado neste concorrente.
+      const registered = new Set(competitor.sources.map((s) => s.url.replace(/\/$/, "")));
+      const fresh = payload.data.candidates
+        .filter((c) => !registered.has(c.url.replace(/\/$/, "")))
+        .map((c) => ({ ...c, checked: c.preChecked }));
+      setCandidates(fresh);
+      if (fresh.length === 0) setNotice("Nada novo — as fontes conhecidas já estão registradas.");
+    } catch {
+      setError("Falha de conexão ao investigar o site.");
+    } finally {
+      setState("idle");
+    }
+  }
+
+  async function add() {
+    if (state !== "idle") return;
+    const chosen = (candidates ?? [])
+      .filter((c) => c.checked)
+      .map((c) => ({ kind: c.kind, url: c.url }));
+    if (chosen.length === 0) return;
+    setState("adding");
+    setError(null);
+    const result = await postWatchlist({
+      action: "add-sources",
+      clientName,
+      competitorId: competitor.id,
+      sources: chosen,
+    });
+    if (!result.ok) {
+      setError(result.error);
+      setState("idle");
+      return;
+    }
+    setCandidates(null);
+    setNotice(`✓ ${chosen.length} fonte(s) adicionada(s)`);
+    router.refresh();
+    setState("idle");
+  }
+
+  return (
+    <div className="mt-2">
+      {candidates === null ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-testid="find-more-sources"
+            onClick={search}
+            disabled={state !== "idle"}
+            className="text-xs font-medium text-stone-400 underline-offset-2 hover:text-stone-700 hover:underline disabled:opacity-60"
+          >
+            {state === "searching" ? "Investigando o site (lendo a navegação)…" : "Achar mais fontes →"}
+          </button>
+          {notice ? <span className="text-xs text-emerald-700">{notice}</span> : null}
+          {error ? <span className="text-xs text-red-600">{error}</span> : null}
+        </div>
+      ) : candidates.length === 0 ? (
+        <p className="text-xs text-stone-400">{notice}</p>
+      ) : (
+        <div className="mt-1 rounded-xl border border-stone-200 bg-stone-50/60 p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+            Fontes novas encontradas — confirme
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {candidates.map((c, index) => (
+              <li key={c.url}>
+                <label className="flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={c.checked}
+                    onChange={() =>
+                      setCandidates((prev) =>
+                        (prev ?? []).map((p, i) => (i === index ? { ...p, checked: !p.checked } : p)),
+                      )
+                    }
+                    className="mt-0.5 h-4 w-4 accent-stone-900"
+                  />
+                  <span className="min-w-0 text-xs">
+                    <span className="font-medium text-stone-800">{c.titulo}</span>{" "}
+                    <span className="rounded-full bg-stone-200/70 px-1.5 py-0.5 text-stone-600">
+                      {KIND_CHIP[c.kind]}
+                    </span>
+                    <span className="mt-0.5 block truncate text-stone-400">{c.url}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
+          <div className="mt-2.5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={add}
+              disabled={state !== "idle" || !candidates.some((c) => c.checked)}
+              className="inline-flex min-h-[36px] items-center rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+            >
+              {state === "adding"
+                ? "Adicionando…"
+                : `Adicionar ${candidates.filter((c) => c.checked).length} fonte(s)`}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCandidates(null)}
+              className="text-xs text-stone-400 hover:text-stone-600"
+            >
+              cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Linha de concorrente: nome, fontes registradas, pausar/reativar, remover
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -607,6 +765,8 @@ function CompetitorRow({
           ) : null}
         </div>
         {error ? <p className="mt-1.5 text-sm text-red-600">{error}</p> : null}
+
+        <FindMoreSources clientName={clientName} competitor={competitor} />
       </div>
 
       <div className="flex flex-none items-center gap-1">
