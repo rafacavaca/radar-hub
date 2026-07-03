@@ -17,7 +17,9 @@
     "analyze": "tsx scripts/analyze.mts",
     "smoke:f7": "tsx scripts/test-radar-f7.mts",
     "smoke:f8": "tsx scripts/test-radar-f8.mts",
-    "smoke:f9": "tsx scripts/test-radar-f9.mts"
+    "smoke:f9": "tsx scripts/test-radar-f9.mts",
+    "smoke:f10": "tsx scripts/test-radar-f10.mts",
+    "schedules:run": "tsx scripts/run-schedules.mts"
   },
   "dependencies": {
     "next": "16.2.7",

@@ -11,14 +11,17 @@
  */
 
 import { listReports } from "@/lib/reports";
+import { listSchedules } from "@/lib/schedules";
 import { readWatchlist } from "@/lib/watchlist";
 
 import { ReportsView } from "@/components/reports-view";
+import { SchedulesManager } from "@/components/schedules-manager";
 
 export const dynamic = "force-dynamic";
 
 export default function RelatoriosPage() {
   const reports = listReports();
+  const schedules = listSchedules();
   const clients = readWatchlist().clients.map((c) => c.name);
 
   return (
@@ -34,7 +37,8 @@ export default function RelatoriosPage() {
         </p>
       </header>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
+        <SchedulesManager schedules={schedules} clients={clients} />
         <ReportsView reports={reports} clients={clients} />
       </div>
     </section>

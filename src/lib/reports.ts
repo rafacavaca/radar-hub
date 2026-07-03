@@ -24,7 +24,7 @@ import { buildMaterialBlock, collectRecentItems, type AskSource } from "@/lib/as
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
 
-export type ReportKind = "chat" | "sob-medida";
+export type ReportKind = "chat" | "sob-medida" | "agendado";
 
 export type Report = {
   id: string;
