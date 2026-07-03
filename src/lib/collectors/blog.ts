@@ -92,7 +92,12 @@ function segmentsAfterBase(pathname: string, basePath: string): string[] {
 }
 
 /**
- * Uma URL parece POST real deste blog? (ver heurística no topo do arquivo)
+ * Uma URL parece POST/artigo real? Robusta a estruturas fora do padrão:
+ * - mesmo host, nenhum segmento de SEÇÃO (autor, tag, categoria…);
+ * - o ÚLTIMO segmento é um SLUG (>= 8 chars e com hífen — títulos viram slugs);
+ * - e a URL está SOB a listagem (ex.: /blog/cat/slug) OU tem um "container"
+ *   (>= 2 segmentos, ex.: /noticia/38/slug — o padrão do Agrosys), pra pegar
+ *   artigos que ficam fora do caminho /blog.
  * Exportada: a DESCOBERTA de fontes usa isso pra contar artigos num candidato.
  */
 export function isLikelyPostUrl(rawUrl: string, blogHost: string, basePath: string): boolean {
@@ -104,12 +109,16 @@ export function isLikelyPostUrl(rawUrl: string, blogHost: string, basePath: stri
   }
   if (parsed.hostname !== blogHost) return false;
 
-  const segments = segmentsAfterBase(parsed.pathname, basePath);
+  const segments = parsed.pathname.split("/").filter((s) => s.length > 0);
   if (segments.length === 0) return false;
   if (segments.some((segment) => SECTION_SEGMENTS.has(segment.toLowerCase()))) return false;
 
   const lastSegment = segments[segments.length - 1];
-  return lastSegment.length >= 8 && lastSegment.includes("-");
+  const isSlug = lastSegment.length >= 8 && lastSegment.includes("-");
+  if (!isSlug) return false;
+
+  const underBase = parsed.pathname.startsWith(basePath);
+  return underBase || segments.length >= 2;
 }
 
 /** Forma canónica pra dedupe/id: sem query, sem hash, sem barra final. */
@@ -179,16 +188,49 @@ function selectPostUrls(
   };
 
   const seen = new Set<string>();
-  const urls: string[] = [];
+  const candidates: string[] = [];
   for (const raw of links) {
     if (!isLikelyPostUrl(raw, blogHost, basePath)) continue;
     const url = normalizeUrl(raw);
     if (seen.has(url)) continue;
     if (isParentOfAnother(new URL(url).pathname)) continue;
     seen.add(url);
-    urls.push(url);
+    candidates.push(url);
   }
-  return urls.slice(0, limit);
+
+  return dominantContentCluster(candidates).slice(0, limit);
+}
+
+/**
+ * CLUSTER DOMINANTE: numa listagem, os artigos são o maior grupo de um mesmo
+ * "container" (1º segmento do caminho). Isso separa /noticia/38/slug (artigos)
+ * de /segmento/12/x e /solucao/1/y (nav). Preferimos containers de CONTEÚDO
+ * (noticia, artigo, blog, post, news…) quando existirem; senão, o maior grupo.
+ * Função pura — testável sem rede.
+ */
+export function dominantContentCluster(candidates: string[]): string[] {
+  const container = (url: string): string => {
+    try {
+      return new URL(url).pathname.split("/").filter(Boolean)[0] ?? "";
+    } catch {
+      return "";
+    }
+  };
+  const groups = new Map<string, string[]>();
+  for (const url of candidates) {
+    const key = container(url);
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(url);
+    else groups.set(key, [url]);
+  }
+  if (groups.size <= 1) return candidates;
+
+  const CONTENT_RE = /^(noticias?|artigos?|posts?|blog|news|conteudos?|materiais|releases?|imprensa|novidades|cases?)$/i;
+  const entries = [...groups.entries()];
+  const contentGroups = entries.filter(([k]) => CONTENT_RE.test(k));
+  const pool = contentGroups.length > 0 ? contentGroups : entries;
+  pool.sort((a, b) => b[1].length - a[1].length);
+  return pool[0][1];
 }
 
 /**

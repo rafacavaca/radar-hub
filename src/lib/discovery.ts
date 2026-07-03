@@ -35,26 +35,42 @@ const USER_AGENT =
 /** Hosts de plataformas de vagas (candidato externo aceito SÓ pra `vagas`). */
 const JOB_BOARD_HOSTS = /(\.|^)(gupy\.io|kenoby\.com|greenhouse\.io|lever\.co|solides\.com\.br|abler\.com\.br|recrut\.ai)$/i;
 
-/** Padrões de caminho/subdomínio por tipo (ordem = especificidade). */
+/** Padrões de caminho/subdomínio por tipo (ordem = especificidade). Vocabulário
+ * PT-BR ampliado — muitos sites BR usam esses termos. */
 const KIND_PATTERNS: Array<{ kind: SourceKind; re: RegExp }> = [
-  { kind: "vagas", re: /(^|\/)(vagas?|carreiras?|careers?|jobs|trabalhe(-conosco)?)(\/|$)/i },
-  { kind: "releases", re: /(^|\/)(releases?|imprensa|press(-room)?|novidades|changelog|atualizacoes|lancamentos|whats-new)(\/|$)/i },
-  { kind: "noticias", re: /(^|\/)(noticias?|news)(\/|$)/i },
-  { kind: "blog", re: /(^|\/)(blog|artigos?|conteudos?|insights|biblioteca|central-de-conteudo|academy)(\/|$)/i },
-  { kind: "produto", re: /(^|\/)(produtos?|solucoes|plataforma|funcionalidades|servicos|recursos|features)(\/|$)/i },
+  { kind: "vagas", re: /(^|\/)(vagas?|carreiras?|careers?|jobs|trabalhe(-conosco)?|oportunidades)(\/|$)/i },
+  { kind: "releases", re: /(^|\/)(releases?|imprensa|sala-de-imprensa|press(-room)?|comunicados?|novidades|changelog|atualizacoes|lancamentos|whats-new)(\/|$)/i },
+  { kind: "noticias", re: /(^|\/)(noticias?|news|midia|na-midia)(\/|$)/i },
+  { kind: "blog", re: /(^|\/)(blog|artigos?|conteudos?|conteudo|insights|biblioteca|central-de-conteudo|academy|materiais|materiais-ricos|recursos|ebooks?|e-books?|cases?|clientes|casos-de-sucesso)(\/|$)/i },
+  { kind: "produto", re: /(^|\/)(produtos?|solucoes|solucao|plataforma|funcionalidades|servicos|features|modulos)(\/|$)/i },
 ];
 
 /** Caminhos comuns pra sondar quando um tipo não aparece nos links da home. */
 const PROBE_PATHS: Array<{ kind: SourceKind; path: string }> = [
   { kind: "blog", path: "/blog/" },
+  { kind: "blog", path: "/conteudo/" },
   { kind: "noticias", path: "/noticias/" },
   { kind: "releases", path: "/imprensa/" },
+  { kind: "releases", path: "/sala-de-imprensa/" },
   { kind: "releases", path: "/novidades/" },
   { kind: "produto", path: "/solucoes/" },
   { kind: "produto", path: "/produtos/" },
   { kind: "vagas", path: "/vagas/" },
   { kind: "vagas", path: "/carreiras/" },
+  { kind: "vagas", path: "/trabalhe-conosco/" },
 ];
+
+/**
+ * A URL é um ARTIGO-FOLHA (não uma seção-índice)? Uma seção é curta (/blog,
+ * /solucoes, /use-cases); um artigo é fundo (/noticia/38/slug) ou tem slug
+ * bem longo (título). Rejeitamos folhas como candidatas a fonte.
+ */
+function isLeafArticle(pathname: string): boolean {
+  const segments = pathname.split("/").filter((s) => s.length > 0);
+  if (segments.length >= 3) return true; // /noticia/38/slug, /blog/cat/post
+  const last = segments[segments.length - 1] ?? "";
+  return last.length >= 25; // slug longo = título de artigo
+}
 
 const KIND_LABEL: Record<SourceKind, string> = {
   blog: "Blog / artigos",
@@ -235,6 +251,8 @@ export async function discoverSources(siteInput: string): Promise<DiscoveryResul
     const hit = classify(url, siteHost);
     if (!hit) continue;
     const candidate = hit.candidate;
+    // artigo-folha (ex.: /noticia/38/slug) não é a SEÇÃO — ignora como candidato.
+    if (isLeafArticle(candidate.pathname)) continue;
     candidate.search = "";
     const current = bestByKind.get(hit.kind);
     if (!current || candidate.pathname.length < current.pathname.length) {
@@ -249,15 +267,20 @@ export async function discoverSources(siteInput: string): Promise<DiscoveryResul
     probes++;
     const probeUrl = new URL(path, siteUrl).toString();
     const page = await fetchHtml(probeUrl);
-    // redirecionou pra home = seção não existe.
-    if (page && new URL(page.finalUrl).pathname !== "/") {
+    if (!page) continue;
+    const finalPath = new URL(page.finalUrl).pathname;
+    const firstProbeSeg = path.split("/").filter(Boolean)[0] ?? "";
+    // aceita só se a seção EXISTE de fato: não voltou pra home nem foi reescrita
+    // pra outro caminho (soft-404 de SPA que devolve 200 em qualquer URL).
+    if (finalPath !== "/" && finalPath.toLowerCase().includes(firstProbeSeg.toLowerCase())) {
       bestByKind.set(kind, new URL(page.finalUrl));
     }
   }
 
-  // 4. Monta os candidatos com evidência honesta.
+  // 4. Monta os candidatos com evidência honesta (nunca a home como seção).
   const candidates: SourceCandidate[] = [];
   for (const [kind, url] of bestByKind) {
+    if (url.pathname === "/" || url.pathname === "") continue;
     const method = collectionMethod(kind);
     const coletavel = method !== null;
     let descricao: string;
