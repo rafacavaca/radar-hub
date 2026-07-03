@@ -84,7 +84,7 @@ export function GerarNoFormareButton({ itemId }: { itemId: string }) {
         data-testid="gerar-no-formare"
         onClick={send}
         disabled={sending}
-        className="inline-flex items-center rounded-full bg-stone-900 px-3.5 py-1.5 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex items-center rounded-md border border-stone-300 bg-white px-3.5 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {sending ? "Criando…" : "Gerar no Formare"}
       </button>

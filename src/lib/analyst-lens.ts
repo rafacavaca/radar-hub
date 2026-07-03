@@ -164,6 +164,8 @@ export async function analyzeLens(
       fonte: { url: event.url, titulo: event.title },
       concorrente: event.competitorName,
       eventIds: [event.id],
+      publishedAt: event.publishedAt,
+      collectedAt: event.collectedAt,
       createdAt,
     });
   }

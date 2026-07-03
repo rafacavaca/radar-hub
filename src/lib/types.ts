@@ -59,6 +59,10 @@ export type LensReading = {
   fonte: Fonte;
   concorrente?: string;
   eventIds: string[];
+  /** data de PUBLICAÇÃO da fonte (do evento) — datas são cidadãs de 1ª classe. */
+  publishedAt?: string | null;
+  /** quando o Radar COLETOU o sinal (do evento). */
+  collectedAt?: string;
   createdAt: string;
 };
 
@@ -86,6 +90,10 @@ export type IntelligenceItem = {
   brainRefs?: string[];
   /** de qual(is) RawEvent este item nasceu. */
   eventIds?: string[];
+  /** data de PUBLICAÇÃO da fonte (do evento). */
+  publishedAt?: string | null;
+  /** quando o Radar COLETOU o sinal (do evento). */
+  collectedAt?: string;
   /** F6: quais lentes leram este sinal (o item Geral agrega as leituras). */
   lentes?: Array<"comercial" | "produto" | "marketing">;
   createdAt: string;

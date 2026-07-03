@@ -29,6 +29,7 @@ import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { LensReadingCard, RoadmapNoteRow } from "@/components/lens-reading-card";
 import { RodarAgora } from "@/components/rodar-agora";
 import { FonteLink, ScoreBadge } from "@/components/score-badge";
+import { attenuated, RecencyStamp, SourceRef } from "@/components/signal-meta";
 
 export const dynamic = "force-dynamic";
 
@@ -167,7 +168,7 @@ export default async function BriefingPage({
         {error ? (
           <ErrorState message={error} />
         ) : lente === "geral" ? (
-          <GeralView items={geral} />
+          <GeralView items={geral} now={result.ranAt || new Date().toISOString()} />
         ) : lente === "cruzamento" ? (
           <CrossView insights={crossInsights} />
         ) : !lensConfig?.enabled ? (
@@ -184,65 +185,71 @@ export default async function BriefingPage({
 // Visão GERAL — os itens mais fortes across as lentes (a visão do Rafael)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GeralView({ items }: { items: IntelligenceItem[] }) {
+function GeralView({ items, now }: { items: IntelligenceItem[]; now: string }) {
   if (items.length === 0) return <EmptyState />;
+  // coluna editorial de leitura (o "ar de jornal" vem da medida, não da serifa).
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-[680px] space-y-5">
       {items.map((item) => (
-        <BriefingCard key={item.id} item={item} />
+        <BriefingCard key={item.id} item={item} now={now} />
       ))}
     </div>
   );
 }
 
-function BriefingCard({ item }: { item: IntelligenceItem }) {
+function BriefingCard({ item, now }: { item: IntelligenceItem; now: string }) {
+  const velho = attenuated(item.publishedAt, item.collectedAt ?? item.createdAt, now);
   return (
     <article
       data-testid="intel-item"
-      className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6"
+      className={
+        "rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7 " +
+        (velho ? "opacity-70" : "")
+      }
     >
-      <div className="flex items-start gap-4">
-        <ScoreBadge score={item.score} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            {item.concorrente ? (
-              <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-                {item.concorrente}
-              </p>
-            ) : null}
-            {(item.lentes ?? []).map((lens) => (
-              <span
-                key={lens}
-                className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500"
-              >
-                {LENS_LABEL[lens]}
-              </span>
-            ))}
-          </div>
-          <h2 className="text-lg font-semibold leading-snug tracking-tight text-stone-900">
-            {item.sinal}
-          </h2>
-          <FonteLink fonte={item.fonte} className="mt-1 max-w-full text-sm" />
-        </div>
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="text-[22px] font-bold leading-[1.18] tracking-[-0.01em] text-stone-900 sm:text-[26px]">
+          {item.sinal}
+        </h2>
+        <span className="inline-flex min-w-[30px] items-center justify-center rounded-md border border-stone-200 bg-stone-100 px-2 py-1.5 text-[13px] font-semibold text-stone-900">
+          {item.score}
+        </span>
       </div>
 
-      <div className="mt-5 space-y-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-            Por que importa
-          </p>
-          <p className="mt-1 leading-relaxed text-stone-700">{item.porQueImporta}</p>
-        </div>
-
-        <div className="rounded-xl border-l-2 border-emerald-400 bg-emerald-50/60 py-3 pl-4 pr-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            Ação recomendada
-          </p>
-          <p className="mt-1 leading-relaxed text-stone-800">{item.acao}</p>
-        </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+        {(item.lentes ?? []).map((lens) => (
+          <span
+            key={lens}
+            className="rounded-full bg-stone-100 px-2.5 py-0.5 text-[11px] font-semibold text-stone-500"
+          >
+            {LENS_LABEL[lens]}
+          </span>
+        ))}
+        <SourceRef url={item.fonte.url} titulo={item.fonte.titulo} />
       </div>
 
-      <div className="mt-5 flex items-center justify-end border-t border-stone-100 pt-4">
+      <RecencyStamp
+        publishedAt={item.publishedAt}
+        collectedAt={item.collectedAt ?? item.createdAt}
+        now={now}
+        className="mt-2"
+      />
+
+      <div className="mt-5 border-t border-stone-200 pt-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
+          Por que importa
+        </p>
+        <p className="mt-1.5 text-[15px] leading-[1.6] text-stone-700">{item.porQueImporta}</p>
+      </div>
+
+      <div className="mt-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
+          Ação recomendada
+        </p>
+        <p className="mt-1.5 text-[15px] leading-[1.6] text-stone-800">{item.acao}</p>
+      </div>
+
+      <div className="mt-5">
         <GerarNoFormareButton itemId={item.id} />
       </div>
     </article>

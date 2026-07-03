@@ -11,6 +11,7 @@ import { runRadarLoop, type ClientEvent, type RadarLoopResult } from "@/lib/loop
 import { readWatchlist } from "@/lib/watchlist";
 
 import { RodarAgora } from "@/components/rodar-agora";
+import { attenuated, RecencyStamp, SourceRef } from "@/components/signal-meta";
 
 export const dynamic = "force-dynamic";
 
@@ -68,12 +69,12 @@ export default async function FeedPage({
         ) : events.length === 0 ? (
           <EmptyState hasItems={result.items.length > 0} />
         ) : (
-          <ul className="divide-y divide-stone-200 overflow-hidden rounded-2xl border border-stone-200 bg-white">
+          <ul className="divide-y divide-stone-200 overflow-hidden rounded-lg border border-stone-200 bg-white">
             {events.map((event) => (
               <FeedRow
                 key={`${event.clientName}-${event.id}`}
                 event={event}
-                showClient={new Set(events.map((e) => e.clientName)).size > 1}
+                now={result.ranAt || new Date().toISOString()}
               />
             ))}
           </ul>
@@ -83,15 +84,11 @@ export default async function FeedPage({
   );
 }
 
-function FeedRow({ event, showClient }: { event: ClientEvent; showClient: boolean }) {
+function FeedRow({ event, now }: { event: ClientEvent; now: string }) {
+  const velho = attenuated(event.publishedAt, event.collectedAt, now);
   return (
-    <li data-testid="feed-item" className="px-4 py-4 sm:px-5">
+    <li data-testid="feed-item" className={"px-4 py-3.5 sm:px-5 " + (velho ? "opacity-70" : "")}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        {showClient ? (
-          <span className="rounded-full border border-stone-200 px-2 py-0.5 text-xs font-medium text-stone-500">
-            {event.clientName}
-          </span>
-        ) : null}
         <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
           {event.competitorName}
         </span>
@@ -102,15 +99,14 @@ function FeedRow({ event, showClient }: { event: ClientEvent; showClient: boolea
         href={event.url}
         target="_blank"
         rel="noreferrer"
-        className="mt-1 block font-medium leading-snug text-stone-900 underline-offset-2 hover:underline"
+        className="mt-1 block font-semibold leading-snug text-stone-900 underline-offset-2 hover:underline"
       >
         {event.title}
       </a>
-      {event.description || event.excerpt ? (
-        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-stone-600">
-          {event.description || event.excerpt}
-        </p>
-      ) : null}
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <SourceRef url={event.url} titulo={event.title} />
+        <RecencyStamp publishedAt={event.publishedAt} collectedAt={event.collectedAt} now={now} />
+      </div>
     </li>
   );
 }

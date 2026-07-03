@@ -154,7 +154,7 @@ export function AskRadar({ clients }: { clients: string[] }) {
             type="submit"
             data-testid="ask-send"
             disabled={pending || !draft.trim()}
-            className="min-h-[40px] flex-none rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+            className="min-h-[40px] flex-none rounded-md bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 active:bg-red-700 disabled:opacity-50"
           >
             {pending ? "Perguntando…" : "Perguntar"}
           </button>

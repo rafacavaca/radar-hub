@@ -166,6 +166,8 @@ export function buildGeneralItems(readings: LensReading[]): IntelligenceItem[] {
       concorrente: best.concorrente,
       score: best.score,
       eventIds: best.eventIds,
+      publishedAt: best.publishedAt,
+      collectedAt: best.collectedAt,
       lentes,
       createdAt: best.createdAt,
     });

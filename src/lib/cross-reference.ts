@@ -45,6 +45,8 @@ export type CrossInsight = {
   fonte: Fonte;
   concorrente?: string;
   eventIds: string[];
+  publishedAt?: string | null;
+  collectedAt?: string;
   createdAt: string;
 };
 
@@ -176,6 +178,8 @@ export async function crossReference(
       fonte: { url: event.url, titulo: event.title },
       concorrente: event.competitorName,
       eventIds: [event.id],
+      publishedAt: event.publishedAt,
+      collectedAt: event.collectedAt,
       createdAt,
     });
   }
