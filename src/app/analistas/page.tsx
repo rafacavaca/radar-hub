@@ -8,19 +8,35 @@
  */
 
 import { readLenses } from "@/lib/lenses";
+import { readWatchlist } from "@/lib/watchlist";
 
 import { LensConfigEditor } from "@/components/lens-config-editor";
 
 export const dynamic = "force-dynamic";
 
-export default function AnalistasPage() {
+export default async function AnalistasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cliente?: string }>;
+}) {
+  const params = await searchParams;
+  const allClients = readWatchlist().clients.map((c) => c.name);
+  const cliente =
+    params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
+
+  // escopado ao cliente: as lentes DELE (o CRM mostra tudo dentro da conta).
   const file = readLenses();
+  const scoped = cliente
+    ? { clients: file.clients.filter((c) => c.clientName === cliente) }
+    : file;
 
   return (
-    <section className="mx-auto max-w-3xl px-5 py-8 sm:px-6 sm:py-10">
+    <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-widest text-stone-400">Analistas</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
+          Ajustes · analistas
+        </p>
+        <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">
           Como cada lente pensa
         </h1>
         <p className="mt-1.5 text-sm text-stone-500">
@@ -30,7 +46,7 @@ export default function AnalistasPage() {
       </header>
 
       <div className="mt-8">
-        <LensConfigEditor initial={file} />
+        <LensConfigEditor initial={scoped} />
       </div>
     </section>
   );

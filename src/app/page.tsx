@@ -111,24 +111,23 @@ export default async function BriefingPage({
         : `Radar ${LENS_LABEL[lente as LensId]}`;
 
   return (
-    <section className="mx-auto max-w-3xl px-5 py-8 sm:px-6 sm:py-10">
+    <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-stone-400">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
             Briefing do dia
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">{title}</h1>
+          <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">{title}</h1>
           <p className="mt-1.5 text-sm text-stone-500">
-            Cliente <span className="font-medium text-stone-700">{cliente || "—"}</span>
-            {result.ranAt ? <> · atualizado em {formatDateTimePtBR(result.ranAt)}</> : null}
+            {result.ranAt ? <>atualizado em {formatDateTimePtBR(result.ranAt)}</> : "ainda não rodou"}
             {brain ? <> · {brain}</> : null}
           </p>
         </div>
         <RodarAgora testId="rodar-agora" cliente={cliente || undefined} />
       </header>
 
-      {/* Seletor de lente (+ cliente, quando houver mais de um). */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      {/* Seletor de LENTE (a troca de cliente é pela sidebar). */}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-stone-200">
         <nav className="flex flex-wrap items-center gap-1" aria-label="Lentes">
           {LENS_TABS.map((tab) => {
             const active = tab.id === lente;
@@ -139,10 +138,10 @@ export default async function BriefingPage({
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={
-                  "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors " +
+                  "border-b-2 px-3 py-2 text-sm font-medium transition-colors " +
                   (active
-                    ? "bg-stone-900 text-stone-50"
-                    : "text-stone-600 hover:bg-stone-200/70 hover:text-stone-900")
+                    ? "border-stone-900 text-stone-900"
+                    : "border-transparent text-stone-500 hover:text-stone-900")
                 }
               >
                 {tab.label}
@@ -151,31 +150,12 @@ export default async function BriefingPage({
           })}
         </nav>
 
-        <div className="flex items-center gap-2">
-          {clients.length > 1 ? (
-            <nav className="flex flex-wrap items-center gap-1" aria-label="Clientes">
-              {clients.map((name) => (
-                <Link
-                  key={name}
-                  href={`/?lente=${lente}&cliente=${encodeURIComponent(name)}`}
-                  className={
-                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
-                    (name === cliente
-                      ? "border-stone-900 bg-stone-900 text-stone-50"
-                      : "border-stone-300 text-stone-600 hover:bg-stone-100")
-                  }
-                >
-                  {name}
-                </Link>
-              ))}
-            </nav>
-          ) : null}
-
+        <div className="flex items-center gap-2 pb-1">
           {lente !== "geral" && lente !== "cruzamento" ? (
             <Link
               href={`/apresentar?lente=${lente}&cliente=${encodeURIComponent(cliente)}`}
               target="_blank"
-              className="rounded-full border border-stone-300 bg-white px-3.5 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100"
+              className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100"
             >
               Apresentar ↗
             </Link>

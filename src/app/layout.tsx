@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Archivo } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
-import { SiteNav } from "@/components/site-nav";
+import { AppShell } from "@/components/app-shell";
+import { readWatchlist } from "@/lib/watchlist";
 
 // UMA família em toda a interface — hierarquia por tamanho, peso e cor.
 const archivo = Archivo({
@@ -22,11 +24,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // CLIENTE é a unidade primária: a sidebar lista as contas (a watchlist).
+  const clients = readWatchlist().clients.map((c) => c.name);
+
   return (
     <html lang="pt-BR" className={`${archivo.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col bg-stone-50 text-stone-900">
-        <SiteNav />
-        <main className="w-full flex-1">{children}</main>
+      <body className="min-h-full bg-stone-50 text-stone-900">
+        <Suspense>
+          <AppShell clients={clients}>{children}</AppShell>
+        </Suspense>
       </body>
     </html>
   );

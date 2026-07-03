@@ -8,6 +8,7 @@
 
 import { formatDateTimePtBR } from "@/lib/format";
 import { runRadarLoop, type ClientEvent, type RadarLoopResult } from "@/lib/loop";
+import { readWatchlist } from "@/lib/watchlist";
 
 import { RodarAgora } from "@/components/rodar-agora";
 
@@ -21,7 +22,16 @@ const KIND_LABEL: Record<string, string> = {
   material: "material",
 };
 
-export default async function FeedPage() {
+export default async function FeedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cliente?: string }>;
+}) {
+  const params = await searchParams;
+  const clientNames = readWatchlist().clients.map((c) => c.name);
+  const cliente =
+    params.cliente && clientNames.includes(params.cliente) ? params.cliente : (clientNames[0] ?? "");
+
   let result: RadarLoopResult = { items: [], ranAt: "" };
   let error: string | null = null;
   try {
@@ -30,14 +40,17 @@ export default async function FeedPage() {
     error = err instanceof Error ? err.message : "Não foi possível rodar o Radar.";
   }
 
-  const events = result.events ?? [];
+  // escopado ao cliente selecionado (CRM: tudo dentro da conta).
+  const events = (result.events ?? []).filter((e) => !cliente || e.clientName === cliente);
 
   return (
-    <section className="mx-auto max-w-3xl px-5 py-8 sm:px-6 sm:py-10">
+    <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-stone-400">Feed</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
+            Feed
+          </p>
+          <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">
             Sinais crus coletados
           </h1>
           <p className="mt-1.5 text-sm text-stone-500">
@@ -46,7 +59,7 @@ export default async function FeedPage() {
             leituras por time estão no Briefing
           </p>
         </div>
-        <RodarAgora testId="rodar-agora" />
+        <RodarAgora testId="rodar-agora" cliente={cliente || undefined} />
       </header>
 
       <div className="mt-8">

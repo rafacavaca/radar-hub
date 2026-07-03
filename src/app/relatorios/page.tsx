@@ -19,16 +19,30 @@ import { SchedulesManager } from "@/components/schedules-manager";
 
 export const dynamic = "force-dynamic";
 
-export default function RelatoriosPage() {
-  const reports = listReports();
-  const schedules = listSchedules();
-  const clients = readWatchlist().clients.map((c) => c.name);
+export default async function RelatoriosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cliente?: string }>;
+}) {
+  const params = await searchParams;
+  const allClients = readWatchlist().clients.map((c) => c.name);
+  const cliente =
+    params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
+
+  // escopado ao cliente da conta (relatórios e agendamentos dele).
+  const reports = listReports(cliente || undefined);
+  const schedules = cliente
+    ? listSchedules().filter((s) => s.clientName === cliente)
+    : listSchedules();
+  const clients = cliente ? [cliente] : allClients;
 
   return (
-    <section className="mx-auto max-w-3xl px-5 py-8 sm:px-6 sm:py-10">
+    <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-widest text-stone-400">Relatórios</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
+          Relatórios
+        </p>
+        <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">
           Relatórios do Radar
         </h1>
         <p className="mt-1.5 text-sm text-stone-500">

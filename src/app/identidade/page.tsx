@@ -18,8 +18,16 @@ import { IdentidadeView } from "@/components/identidade-view";
 
 export const dynamic = "force-dynamic";
 
-export default function IdentidadePage() {
+export default async function IdentidadePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cliente?: string }>;
+}) {
+  const params = await searchParams;
   const watchlist = readWatchlist();
+  const allClients = watchlist.clients.map((c) => c.name);
+  const cliente =
+    params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
 
   const competitors: Array<{
     competitorId: string;
@@ -30,8 +38,9 @@ export default function IdentidadePage() {
   const initialReports: Record<string, VisualReport> = {};
   let semSite = 0;
 
+  // escopado ao cliente selecionado (a sidebar troca de conta).
   for (const client of watchlist.clients) {
-    // Map -> objeto simples (serializável pro client).
+    if (cliente && client.name !== cliente) continue;
     for (const [competitorId, report] of latestByCompetitor(client.name)) {
       initialReports[competitorId] = report;
     }
@@ -49,14 +58,29 @@ export default function IdentidadePage() {
     }
   }
 
+  const q = cliente ? `?cliente=${encodeURIComponent(cliente)}` : "";
+
   return (
-    <section className="mx-auto max-w-3xl px-5 py-8 sm:px-6 sm:py-10">
-      <header>
-        <p className="text-xs font-medium uppercase tracking-widest text-stone-400">Identidade</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
-          Identidade dos concorrentes
-        </h1>
-        <p className="mt-1.5 text-sm text-stone-500">
+    <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
+        Concorrentes
+      </p>
+
+      {/* sub-nav: fontes (Vigiar) · monitor visual (Identidade) */}
+      <div className="mt-2 flex gap-1 border-b border-stone-200">
+        <Link
+          href={`/vigiar${q}`}
+          className="border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900"
+        >
+          Vigiar
+        </Link>
+        <span className="border-b-2 border-stone-900 px-3 py-2 text-sm font-medium text-stone-900">
+          Identidade
+        </span>
+      </div>
+
+      <header className="mt-4">
+        <p className="text-sm text-stone-500">
           O Radar olha a página pública de cada concorrente e detecta se mudaram as cores, o visual
           ou o discurso — sinais de rebranding.
         </p>
@@ -66,8 +90,8 @@ export default function IdentidadePage() {
             {semSite === 1
               ? "concorrente sem site cadastrado não aparece aqui"
               : "concorrentes sem site cadastrado não aparecem aqui"}{" "}
-            — adicione o site na tela{" "}
-            <Link href="/vigiar" className="underline underline-offset-2 hover:text-stone-600">
+            — adicione o site em{" "}
+            <Link href={`/vigiar${q}`} className="underline underline-offset-2 hover:text-stone-600">
               Vigiar
             </Link>
             .
@@ -75,7 +99,7 @@ export default function IdentidadePage() {
         ) : null}
       </header>
 
-      <div className="mt-8">
+      <div className="mt-6">
         {competitors.length > 0 ? (
           <IdentidadeView competitors={competitors} initialReports={initialReports} />
         ) : (
