@@ -65,7 +65,7 @@ export default async function EntrarPage({
           </label>
           <button
             type="submit"
-            className="mt-1 inline-flex min-h-[44px] w-full items-center justify-center rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700"
+            className="mt-1 inline-flex min-h-[44px] w-full items-center justify-center rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700"
           >
             Entrar no Radar
           </button>

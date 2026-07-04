@@ -17,10 +17,21 @@ export const dynamic = "force-dynamic";
 
 const COOKIE_MAX_AGE_S = 60 * 60 * 24 * 30; // 30 dias
 
+/**
+ * Redirect RELATIVO (303) — o `Location` relativo é resolvido pelo NAVEGADOR
+ * contra a URL que ele pediu (ex.: radar.formare.tech), não contra o host
+ * interno. Necessário atrás do túnel: o `req.url` do route handler aponta pra
+ * localhost:3200 (quirk do Next), e um redirect ABSOLUTO mandava o usuário
+ * logado pra localhost — quebrando o acesso de quem entra pela URL pública.
+ */
+function seeOther(location: string): NextResponse {
+  return new NextResponse(null, { status: 303, headers: { Location: location } });
+}
+
 export async function POST(req: NextRequest) {
   if (getAuthUsers().length === 0) {
     // fechadura desligada (dev) — só volta pra home.
-    return NextResponse.redirect(new URL("/", req.url), 303);
+    return seeOther("/");
   }
 
   const form = await req.formData().catch(() => null);
@@ -29,10 +40,10 @@ export async function POST(req: NextRequest) {
 
   const user = findAuthUser(email, senha);
   if (!user) {
-    return NextResponse.redirect(new URL("/entrar?erro=1", req.url), 303);
+    return seeOther("/entrar?erro=1");
   }
 
-  const res = NextResponse.redirect(new URL("/", req.url), 303);
+  const res = seeOther("/");
   res.cookies.set(
     "radar_auth",
     createHash("sha256").update(`${user.email}:${user.password}`).digest("hex"),
