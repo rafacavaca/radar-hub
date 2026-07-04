@@ -98,3 +98,34 @@ export type IntelligenceItem = {
   lentes?: Array<"comercial" | "produto" | "marketing">;
   createdAt: string;
 };
+
+/**
+ * LEITURA DE VENDA (2º template — modo "carteira"): um sinal PÚBLICO de um
+ * hospital-cliente lido pela lente "vendedor", casado com uma LINHA de produto
+ * do cliente do Radar. É o "produto" do Radar no modo carteira — a ficha por
+ * hospital e o feed de gatilhos consomem isto. 1 sinal -> 0..N leituras.
+ */
+export type SalesReading = {
+  id: string;
+  clientName: string;
+  /** o sinal (o que aconteceu no hospital, 1 frase). */
+  sinal: string;
+  /** o hospital (subject) de onde o sinal veio. */
+  hospital: string;
+  /** a linha de produto do cliente que o sinal aciona (ex.: "Coronária"). */
+  linha: string;
+  /** o gatilho de compra — por que isto é oportunidade agora. */
+  gatilho: string;
+  /** o ângulo de abordagem / objeção a preparar. */
+  angulo: string;
+  /** valor/urgência da oportunidade pro vendedor (0-100). */
+  score: number;
+  fonte: Fonte;
+  /** de qual(is) RawEvent este item nasceu. */
+  eventIds: string[];
+  /** data de PUBLICAÇÃO da fonte (do evento). */
+  publishedAt?: string | null;
+  /** quando o Radar COLETOU o sinal (do evento). */
+  collectedAt?: string;
+  createdAt: string;
+};

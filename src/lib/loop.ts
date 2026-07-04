@@ -24,6 +24,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { analyzeLens } from "@/lib/analyst-lens";
+import { analyzeVendedor } from "@/lib/analyst-vendedor";
 import { fetchClientBrain } from "@/lib/brain";
 import { collectBlog } from "@/lib/collectors/blog";
 import { collectByDiff } from "@/lib/collectors/content-diff";
@@ -31,7 +32,7 @@ import { crossReference, type CrossInsight } from "@/lib/cross-reference";
 import { activeLensesFor } from "@/lib/lenses";
 import { recordSourceRun } from "@/lib/source-status";
 import { collectionMethod, planCollection, readWatchlist } from "@/lib/watchlist";
-import type { IntelligenceItem, LensReading, RawEvent } from "@/lib/types";
+import type { IntelligenceItem, LensReading, RawEvent, SalesReading } from "@/lib/types";
 
 const CACHE_DIR = join(process.cwd(), ".cache");
 const DEFAULT_LIMIT = 5;
@@ -55,6 +56,8 @@ export type RadarLoopResult = {
   readings?: LensReading[];
   /** F9: cruzamentos interno×externo (a aba "Interno × Externo"). */
   crossInsights?: CrossInsight[];
+  /** 2º template (modo carteira): leituras de venda por hospital (ficha/gatilhos). */
+  salesReadings?: SalesReading[];
   /** sinais crus coletados (o Feed mostra isto, sem lente). */
   events?: ClientEvent[];
   /** ISO de quando o loop de fato rodou (não muda ao reler do cache). */
@@ -193,6 +196,8 @@ type FreshPatch = {
   events: ClientEvent[];
   readings: LensReading[];
   crossInsights: CrossInsight[];
+  /** só no modo carteira — ausente nos patches de concorrente. */
+  salesReadings?: SalesReading[];
   brainSource: BrainSourceNote;
   failures: string[];
 };
@@ -216,13 +221,20 @@ export function mergeLoopResult(
   const inScopeReading = (r: { clientName: string; concorrente?: string }): boolean =>
     r.clientName === scope.clientName &&
     (!scope.competitorName || r.concorrente === scope.competitorName);
+  const inScopeSales = (r: { clientName: string; hospital?: string }): boolean =>
+    r.clientName === scope.clientName &&
+    (!scope.competitorName || r.hospital === scope.competitorName);
 
   const baseEvents = base?.events ?? [];
   const baseReadings = base?.readings ?? [];
   const baseCross = base?.crossInsights ?? [];
+  const baseSales = base?.salesReadings ?? [];
 
   const nothingNew =
-    fresh.events.length === 0 && fresh.readings.length === 0 && fresh.failures.length === 0;
+    fresh.events.length === 0 &&
+    fresh.readings.length === 0 &&
+    (fresh.salesReadings?.length ?? 0) === 0 &&
+    fresh.failures.length === 0;
 
   const events = nothingNew
     ? baseEvents
@@ -233,6 +245,9 @@ export function mergeLoopResult(
   const crossInsights = nothingNew
     ? baseCross
     : [...baseCross.filter((c) => !inScopeReading(c)), ...fresh.crossInsights];
+  const salesReadings = nothingNew
+    ? baseSales
+    : [...baseSales.filter((r) => !inScopeSales(r)), ...(fresh.salesReadings ?? [])];
 
   const brainSources = [
     ...(base?.brainSources ?? []).filter((b) => b.clientName !== scope.clientName),
@@ -243,6 +258,7 @@ export function mergeLoopResult(
     items: buildGeneralItems(readings),
     readings: byScoreDesc(readings),
     crossInsights: byScoreDesc(crossInsights),
+    salesReadings: salesReadings.length > 0 ? byScoreDesc(salesReadings) : undefined,
     events,
     ranAt: new Date().toISOString(),
     brainSources,
@@ -314,30 +330,42 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
     nodeCount: brain.mode === "live" ? brain.nodeCount : undefined,
   };
 
+  const mode = client.mode ?? "concorrentes";
   const readings: LensReading[] = [];
   const crossInsights: CrossInsight[] = [];
+  const salesReadings: SalesReading[] = [];
   if (freshEvents.length > 0) {
-    for (const lens of activeLensesFor(scope.clientName)) {
-      const out = await withGatewayRetry(
-        `lente ${lens.id} (${scope.clientName})`,
-        () => analyzeLens(lens, freshEvents, scope.clientName, brain.context),
+    if (mode === "carteira") {
+      // modo carteira: a lente "vendedor" casa sinal→linha→gatilho; sem lentes nem cruzamento.
+      const sales = await withGatewayRetry(
+        `vendedor (${scope.clientName})`,
+        () => analyzeVendedor(freshEvents, scope.clientName, brain.context),
         failures,
       );
-      if (out) readings.push(...out);
+      if (sales) salesReadings.push(...sales);
+    } else {
+      for (const lens of activeLensesFor(scope.clientName)) {
+        const out = await withGatewayRetry(
+          `lente ${lens.id} (${scope.clientName})`,
+          () => analyzeLens(lens, freshEvents, scope.clientName, brain.context),
+          failures,
+        );
+        if (out) readings.push(...out);
+      }
+      const cross = await withGatewayRetry(
+        `cruzamento (${scope.clientName})`,
+        () => crossReference(freshEvents, scope.clientName, brain.context),
+        failures,
+      );
+      if (cross) crossInsights.push(...cross);
     }
-    const cross = await withGatewayRetry(
-      `cruzamento (${scope.clientName})`,
-      () => crossReference(freshEvents, scope.clientName, brain.context),
-      failures,
-    );
-    if (cross) crossInsights.push(...cross);
   }
 
   // 3) MERGE no resultado do dia e persiste.
   const merged = mergeLoopResult(
     readLoopCache(),
     { clientName: scope.clientName, competitorId: scope.competitorId, competitorName },
-    { events: freshEvents, readings, crossInsights, brainSource, failures },
+    { events: freshEvents, readings, crossInsights, salesReadings, brainSource, failures },
   );
   writeLoopCache(merged);
 
@@ -414,6 +442,7 @@ export async function runRadarLoop(
   //    o cruzamento interno×externo roda uma vez por cliente.
   const readings: LensReading[] = [];
   const crossInsights: CrossInsight[] = [];
+  const salesReadings: SalesReading[] = [];
   const brainSources: BrainSourceNote[] = [];
   const allEvents: ClientEvent[] = [];
 
@@ -427,6 +456,20 @@ export async function runRadarLoop(
       mode: brain.mode,
       nodeCount: brain.mode === "live" ? brain.nodeCount : undefined,
     });
+
+    const clientMode =
+      watchlist.clients.find((c) => c.name === clientName)?.mode ?? "concorrentes";
+    if (clientMode === "carteira") {
+      // modo carteira (2º template): a lente "vendedor" casa sinal→linha→gatilho;
+      // sem as 3 lentes de concorrente nem o cruzamento interno×externo.
+      const sales = await withGatewayRetry(
+        `vendedor (${clientName})`,
+        () => analyzeVendedor(events, clientName, brain.context),
+        failures,
+      );
+      if (sales) salesReadings.push(...sales);
+      continue;
+    }
 
     for (const lens of activeLensesFor(clientName)) {
       const out = await withGatewayRetry(
@@ -450,6 +493,7 @@ export async function runRadarLoop(
     items: buildGeneralItems(readings),
     readings: byScoreDesc(readings),
     crossInsights: byScoreDesc(crossInsights),
+    salesReadings: salesReadings.length > 0 ? byScoreDesc(salesReadings) : undefined,
     events: allEvents,
     ranAt: new Date().toISOString(),
     brainSources,

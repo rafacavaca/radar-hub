@@ -25,13 +25,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // CLIENTE é a unidade primária: a sidebar lista as contas (a watchlist).
-  const clients = readWatchlist().clients.map((c) => c.name);
+  const clientList = readWatchlist().clients;
+  const clients = clientList.map((c) => c.name);
+  const modes = Object.fromEntries(clientList.map((c) => [c.name, c.mode ?? "concorrentes"]));
 
   return (
     <html lang="pt-BR" className={`${archivo.variable} h-full antialiased`}>
       <body className="min-h-full bg-stone-50 text-stone-900">
         <Suspense>
-          <AppShell clients={clients}>{children}</AppShell>
+          <AppShell clients={clients} modes={modes}>
+            {children}
+          </AppShell>
         </Suspense>
       </body>
     </html>

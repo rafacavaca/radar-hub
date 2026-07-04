@@ -24,6 +24,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { GEMMINI } from "@/lib/clients/gemmini";
 import { MOOVEFY } from "@/lib/clients/moovefy";
 import { slugify } from "@/lib/watchlist";
 
@@ -132,6 +133,14 @@ function fallbackFor(clientName: string): BrainContext {
       context:
         `(Contexto LOCAL — a porta de leitura do Brain estava indisponível nesta rodada.)\n` +
         MOOVEFY.brainContext,
+    };
+  }
+  if (clientName === GEMMINI.clientName) {
+    return {
+      mode: "fixture",
+      context:
+        `(Base da carteira Gemmini — as 5 linhas + a matriz linha↔hospital, seedadas localmente.)\n` +
+        GEMMINI.brainContext,
     };
   }
   return {

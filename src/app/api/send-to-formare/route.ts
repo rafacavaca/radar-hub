@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "itemId obrigatório" }, { status: 400 });
     }
 
-    // Recupera pelo id: item da visão Geral OU leitura de lente (F6).
-    const { items, readings } = await runRadarLoop();
+    // Recupera pelo id: item da visão Geral OU leitura de lente (F6) OU leitura de venda (carteira).
+    const { items, readings, salesReadings } = await runRadarLoop();
     let item = items.find((it) => it.id === itemId);
     if (!item) {
       const reading = (readings ?? []).find((r) => r.id === itemId);
@@ -50,6 +50,25 @@ export async function POST(req: NextRequest) {
           score: reading.score,
           eventIds: reading.eventIds,
           createdAt: reading.createdAt,
+        };
+      }
+    }
+    if (!item) {
+      // 2º template (carteira): leitura de venda vira card — o gatilho é o "porquê",
+      // o ângulo é a ação; o hospital ocupa o campo de "concorrente" (o subject).
+      const sale = (salesReadings ?? []).find((s) => s.id === itemId);
+      if (sale) {
+        item = {
+          id: sale.id,
+          clientName: sale.clientName,
+          sinal: sale.sinal,
+          porQueImporta: `${sale.gatilho} (linha: ${sale.linha})`,
+          acao: sale.angulo,
+          fonte: sale.fonte,
+          concorrente: sale.hospital,
+          score: sale.score,
+          eventIds: sale.eventIds,
+          createdAt: sale.createdAt,
         };
       }
     }

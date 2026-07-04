@@ -20,19 +20,41 @@ import { useEffect, useState } from "react";
 
 import { NewClientButton } from "@/components/new-client-dialog";
 
-const SECTIONS = [
-  { label: "Visão", href: "/visao", match: (p: string) => p.startsWith("/visao") },
-  { label: "Briefing", href: "/", match: (p: string) => p === "/" },
-  { label: "Feed", href: "/feed", match: (p: string) => p.startsWith("/feed") },
-  { label: "Conhecimento", href: "/perguntar", match: (p: string) => p.startsWith("/perguntar") },
+type Section = { label: string; href: string; match: (p: string) => boolean };
+
+/** Seções do modo CONCORRENTES (padrão). */
+const CONCORRENTES_SECTIONS: Section[] = [
+  { label: "Visão", href: "/visao", match: (p) => p.startsWith("/visao") },
+  { label: "Briefing", href: "/", match: (p) => p === "/" },
+  { label: "Feed", href: "/feed", match: (p) => p.startsWith("/feed") },
+  { label: "Conhecimento", href: "/perguntar", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Concorrentes",
     href: "/vigiar",
-    match: (p: string) => p.startsWith("/vigiar") || p.startsWith("/identidade"),
+    match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade"),
   },
-  { label: "Relatórios", href: "/relatorios", match: (p: string) => p.startsWith("/relatorios") },
-  { label: "Ajustes", href: "/analistas", match: (p: string) => p.startsWith("/analistas") },
-] as const;
+  { label: "Relatórios", href: "/relatorios", match: (p) => p.startsWith("/relatorios") },
+  { label: "Ajustes", href: "/analistas", match: (p) => p.startsWith("/analistas") },
+];
+
+/** Seções do modo CARTEIRA (2º template) — a Ficha no lugar de Visão/Briefing. */
+const CARTEIRA_SECTIONS: Section[] = [
+  { label: "Carteira", href: "/carteira", match: (p) => p.startsWith("/carteira") },
+  { label: "Feed", href: "/feed", match: (p) => p.startsWith("/feed") },
+  { label: "Conhecimento", href: "/perguntar", match: (p) => p.startsWith("/perguntar") },
+  {
+    label: "Hospitais",
+    href: "/vigiar",
+    match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade"),
+  },
+  { label: "Relatórios", href: "/relatorios", match: (p) => p.startsWith("/relatorios") },
+  { label: "Ajustes", href: "/analistas", match: (p) => p.startsWith("/analistas") },
+];
+
+/** Home de cada cliente conforme o modo. */
+function homeFor(mode: string | undefined): string {
+  return mode === "carteira" ? "/carteira" : "/visao";
+}
 
 const SIDEBAR_KEY = "radar:sidebar-collapsed";
 
@@ -70,9 +92,12 @@ function ChevronLeftIcon() {
 
 export function AppShell({
   clients,
+  modes,
   children,
 }: {
   clients: string[];
+  /** modo por cliente (nome → "concorrentes" | "carteira"); ausente ⇒ concorrentes. */
+  modes?: Record<string, string>;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -107,6 +132,8 @@ export function AppShell({
     params.get("cliente") && clients.includes(params.get("cliente") as string)
       ? (params.get("cliente") as string)
       : (clients[0] ?? "");
+  const sections =
+    (modes?.[cliente] ?? "concorrentes") === "carteira" ? CARTEIRA_SECTIONS : CONCORRENTES_SECTIONS;
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-stone-50">
@@ -163,7 +190,7 @@ export function AppShell({
               return (
                 <li key={name}>
                   <Link
-                    href={withClient("/visao", name)}
+                    href={withClient(homeFor(modes?.[name]), name)}
                     aria-current={active ? "true" : undefined}
                     title={collapsed ? name : undefined}
                     className={
@@ -244,7 +271,7 @@ export function AppShell({
 
           {/* tabs de seção */}
           <nav className="flex gap-1 overflow-x-auto px-4 md:px-6" aria-label="Seções">
-            {SECTIONS.map((s) => {
+            {sections.map((s) => {
               const active = s.match(pathname);
               return (
                 <Link

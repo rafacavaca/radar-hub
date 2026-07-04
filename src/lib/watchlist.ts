@@ -47,7 +47,30 @@ export type WatchSource = {
   label?: string;
 };
 
-/** Um concorrente vigiado — com uma ou mais fontes públicas. */
+/** MODO do cliente do Radar: vigiar CONCORRENTES (padrão) ou a CARTEIRA de
+ *  clientes-alvo (sales-enablement — os "subjects" são clientes, ex.: hospitais). */
+export type ClientMode = "concorrentes" | "carteira";
+
+/** Nível de aderência de um subject a uma linha de produto do cliente do Radar. */
+export type FitLevel = "forte" | "sim" | "confirmar" | "nao";
+
+/** Perfil de um subject no modo CARTEIRA (ex.: um hospital-cliente). Genérico:
+ *  as "linhas" são as linhas de produto do cliente do Radar (chaves livres). */
+export type SubjectProfile = {
+  /** tipo do subject (ex.: "público/ensino (SUS)"). */
+  tipo?: string;
+  /** como o subject compra (ex.: "licitacao" | "relacionamento" | "operadora"). */
+  modoCompra?: string;
+  /** região/cidade. */
+  regiao?: string;
+  /** fit por linha de produto: linha → nível. */
+  fitPorLinha?: Record<string, FitLevel>;
+  /** notas livres (seed / observação). */
+  notas?: string;
+};
+
+/** Um concorrente vigiado — com uma ou mais fontes públicas. No modo CARTEIRA
+ *  o MESMO tipo representa um SUBJECT (cliente-alvo, ex.: hospital) + `profile`. */
 export type Competitor = {
   /** id estável (slug do nome) — usado como `source` dos eventos coletados. */
   id: string;
@@ -58,7 +81,12 @@ export type Competitor = {
   enabled: boolean;
   /** páginas públicas registradas (blog, notícias, releases, produto, vagas). */
   sources: WatchSource[];
+  /** SÓ no modo carteira: perfil do subject (tipo, modo de compra, fit por linha). */
+  profile?: SubjectProfile;
 };
+
+/** Alias de vocabulário: no modo carteira, um `Competitor` é um SUBJECT. */
+export type Subject = Competitor;
 
 /** Formato ANTIGO (F2 inicial): uma única blogUrl por concorrente. Ainda é
  * aceito na leitura e migrado automaticamente para `sources`. */
@@ -73,6 +101,8 @@ type LegacyCompetitor = {
 export type WatchClient = {
   /** nome do cliente do Radar (== workspaces.name no Formare, ex.: "Moovefy"). */
   name: string;
+  /** modo do cliente. Ausente ⇒ "concorrentes" (comportamento legado). */
+  mode?: ClientMode;
   competitors: Competitor[];
 };
 

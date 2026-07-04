@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { buildBriefing } from "@/lib/briefing";
 import { formatDateTimePtBR } from "@/lib/format";
@@ -82,9 +83,14 @@ export default async function BriefingPage({
 }) {
   const params = await searchParams;
 
-  const clients = readWatchlist().clients.map((c) => c.name);
+  const watchlistClients = readWatchlist().clients;
+  const clients = watchlistClients.map((c) => c.name);
   const cliente =
     params.cliente && clients.includes(params.cliente) ? params.cliente : (clients[0] ?? "");
+  // cliente do modo carteira não tem Briefing de lentes — vai pra a Ficha.
+  if (watchlistClients.find((c) => c.name === cliente)?.mode === "carteira") {
+    redirect(`/carteira?cliente=${encodeURIComponent(cliente)}`);
+  }
   const lente = (LENS_TABS.some((t) => t.id === params.lente) ? params.lente : "geral") as TabId;
 
   let result: RadarLoopResult = { items: [], ranAt: "" };

@@ -26,7 +26,9 @@
     "smoke:f14": "tsx scripts/test-radar-f14.mts",
     "smoke:f15": "tsx scripts/test-radar-f15.mts",
     "smoke:f16": "tsx scripts/test-radar-f16.mts",
-    "smoke:f17": "tsx scripts/test-radar-f17.mts"
+    "smoke:f17": "tsx scripts/test-radar-f17.mts",
+    "seed:gemmini": "tsx scripts/seed-gemmini.mts",
+    "smoke:gemmini": "tsx scripts/test-radar-gemmini.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",
