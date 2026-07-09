@@ -33,7 +33,16 @@ export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   // /api/ingest é aberta no proxy (a extensão POSTa por fora da página); ela tem
   // o próprio portão por segredo compartilhado (RADAR_INGEST_SECRET).
-  if (pathname === "/entrar" || pathname === "/api/entrar" || pathname === "/api/ingest") {
+  // /r/<token> e /api/reports/shared-export são links COMPARTILHÁVEIS de relatório
+  // (G): a capability é o token (sha1 de 24 chars, imprevisível) — quem tem o
+  // link vê/baixa o snapshot, sem senha do Radar (como um "anyone with link").
+  if (
+    pathname === "/entrar" ||
+    pathname === "/api/entrar" ||
+    pathname === "/api/ingest" ||
+    pathname.startsWith("/r/") ||
+    pathname === "/api/reports/shared-export"
+  ) {
     return NextResponse.next();
   }
 

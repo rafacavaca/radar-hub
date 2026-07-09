@@ -17,7 +17,10 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 
-type ReportKind = "chat" | "sob-medida" | "agendado" | "conta";
+import type { ChartSpec } from "@/lib/diagnostico/report-charts";
+import { ReportCharts } from "@/components/charts/report-charts";
+
+type ReportKind = "chat" | "sob-medida" | "agendado" | "conta" | "diagnostico";
 type Fonte = { titulo: string; url: string; concorrente?: string };
 type Report = {
   id: string;
@@ -26,6 +29,8 @@ type Report = {
   titulo: string;
   corpo: string;
   fontes: Fonte[];
+  charts?: ChartSpec[];
+  shareToken?: string;
   origem?: string;
   createdAt: string;
 };
@@ -36,8 +41,79 @@ const INPUT_CLASS =
 export function ReportsView({ reports, clients }: { reports: Report[]; clients: string[] }) {
   return (
     <div className="space-y-6">
+      <DiagnosticoComposer clients={clients} />
       <Composer clients={clients} />
       <ReportsList reports={reports} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Compositor de DIAGNÓSTICO (G) — 1 clique: gráficos do diagnóstico + narrativa
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DiagnosticoComposer({ clients }: { clients: string[] }) {
+  const router = useRouter();
+  const [client, setClient] = useState(clients[0] ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function gerar() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "compose-diagnostico", clientName: client }),
+      });
+      const payload = (await res.json().catch(() => null)) as { data?: Report; error?: string } | null;
+      if (!res.ok || !payload?.data) {
+        setError(payload?.error ?? "Não foi possível gerar o relatório de diagnóstico.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Falha de conexão. Tente de novo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-red-500" />
+        <h2 className="text-[17px] font-semibold tracking-tight text-stone-900">Relatório de diagnóstico competitivo</h2>
+      </div>
+      <p className="mt-1 text-sm text-stone-500">
+        Um relatório com <span className="font-medium text-stone-700">gráficos</span> — maturidade, canais,
+        reputação, mix de mercado e evolução — montados do diagnóstico salvo, com fonte e data em cada um.
+        Pronto pra exportar em PDF/PPTX ou compartilhar por link.
+      </p>
+      {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {clients.length > 1 ? (
+          <select
+            value={client}
+            onChange={(e) => setClient(e.target.value)}
+            className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-stone-500 focus:outline-none"
+          >
+            {clients.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        ) : null}
+        <button
+          type="button"
+          onClick={gerar}
+          disabled={busy}
+          className="min-h-[40px] rounded-md bg-stone-900 px-5 py-2 text-sm font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
+        >
+          {busy ? "Montando com gráficos…" : "Gerar relatório de diagnóstico"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -225,7 +301,9 @@ function ReportCard({ report }: { report: Report }) {
         ? "agendado"
         : report.kind === "conta"
           ? "da conta"
-          : "sob medida";
+          : report.kind === "diagnostico"
+            ? "diagnóstico"
+            : "sob medida";
   const date = new Date(report.createdAt).toLocaleDateString("pt-BR");
 
   return (
@@ -243,6 +321,12 @@ function ReportCard({ report }: { report: Report }) {
           <span>{date}</span>
         </p>
       </div>
+
+      {report.charts && report.charts.length > 0 ? (
+        <div className="border-b border-stone-100 px-4 py-4 sm:px-5">
+          <ReportCharts charts={report.charts} />
+        </div>
+      ) : null}
 
       <div className="px-4 py-4 sm:px-5">
         <div className={"relative " + (collapsed ? "max-h-44 overflow-hidden" : "")}>
@@ -293,9 +377,50 @@ function ReportCard({ report }: { report: Report }) {
 
 function ReportActions({ report }: { report: Report }) {
   const router = useRouter();
-  const [busy, setBusy] = useState<null | "formare" | "delete">(null);
+  const [busy, setBusy] = useState<null | "formare" | "delete" | "share">(null);
   const [sent, setSent] = useState<null | { url?: string }>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(report.shareToken ? `/r/${report.shareToken}` : null);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function share() {
+    if (busy) return;
+    // já tem token → só copia
+    if (shareUrl) {
+      await copiar(shareUrl);
+      return;
+    }
+    setBusy("share");
+    setError(null);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "share", reportId: report.id }),
+      });
+      const payload = (await res.json().catch(() => null)) as { data?: { path?: string }; error?: string } | null;
+      if (!res.ok || !payload?.data?.path) {
+        setError(payload?.error ?? "Não deu pra gerar o link.");
+        return;
+      }
+      setShareUrl(payload.data.path);
+      await copiar(payload.data.path);
+    } catch {
+      setError("Falha de conexão. Tente de novo.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function copiar(path: string) {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard pode falhar sem https/permite; o link fica visível de qualquer forma */
+    }
+  }
 
   async function toFormare() {
     if (busy) return;
@@ -373,6 +498,28 @@ function ReportActions({ report }: { report: Report }) {
         </button>
       )}
 
+      {/* Exportar — download direto do binário gerado na hora */}
+      <a
+        href={`/api/reports/export?id=${encodeURIComponent(report.id)}&format=pdf`}
+        className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100"
+      >
+        PDF
+      </a>
+      <a
+        href={`/api/reports/export?id=${encodeURIComponent(report.id)}&format=pptx`}
+        className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100"
+      >
+        PPTX
+      </a>
+      <button
+        type="button"
+        onClick={share}
+        disabled={busy !== null}
+        className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+      >
+        {busy === "share" ? "Gerando…" : copied ? "✓ link copiado" : shareUrl ? "Copiar link" : "Link compartilhável"}
+      </button>
+
       <button
         type="button"
         data-testid="report-delete"
@@ -383,6 +530,11 @@ function ReportActions({ report }: { report: Report }) {
         {busy === "delete" ? "Apagando…" : "Apagar"}
       </button>
 
+      {shareUrl ? (
+        <a href={shareUrl} target="_blank" rel="noreferrer" className="text-xs text-stone-400 underline-offset-2 hover:underline">
+          abrir link ↗
+        </a>
+      ) : null}
       {error ? <span className="text-xs text-red-600">{error}</span> : null}
     </div>
   );

@@ -23,9 +23,11 @@ import { join } from "node:path";
 import { buildMaterialBlock, collectRecentItems, type AskSource } from "@/lib/ask";
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
+import { buildDiagnosticoCharts, chartsToMaterial, type ChartSpec } from "@/lib/diagnostico/report-charts";
+import { listDiagnosticos } from "@/lib/diagnostico/store";
 import type { RelationshipPlay } from "@/lib/types";
 
-export type ReportKind = "chat" | "sob-medida" | "agendado" | "conta";
+export type ReportKind = "chat" | "sob-medida" | "agendado" | "conta" | "diagnostico";
 
 export type Report = {
   id: string;
@@ -35,6 +37,10 @@ export type Report = {
   /** o documento em markdown. */
   corpo: string;
   fontes: AskSource[];
+  /** G — gráficos estruturados (relatório de diagnóstico). */
+  charts?: ChartSpec[];
+  /** token público do link compartilhável (gerado sob demanda). */
+  shareToken?: string;
   /** o pedido/pergunta que originou (transparência). */
   origem?: string;
   createdAt: string;
@@ -93,6 +99,7 @@ export type SaveReportInput = {
   corpo: string;
   titulo?: string;
   fontes?: AskSource[];
+  charts?: ChartSpec[];
   origem?: string;
 };
 
@@ -115,12 +122,31 @@ export function saveReport(input: SaveReportInput): Report {
     titulo: (input.titulo?.trim() || deriveTitle(corpo)).slice(0, 200),
     corpo,
     fontes: input.fontes ?? [],
+    charts: input.charts,
     origem: input.origem?.trim() || undefined,
     createdAt: new Date().toISOString(),
   };
   file.reports.push(report);
   writeFile(file);
   return report;
+}
+
+/** Garante (e persiste) um token público pro link compartilhável. */
+export function ensureShareToken(id: string): Report {
+  const file = readFile();
+  const r = file.reports.find((x) => x.id === id);
+  if (!r) throw new Error("Relatório não encontrado.");
+  if (!r.shareToken) {
+    r.shareToken = createHash("sha1").update(`share:${id}:${r.createdAt}`).digest("hex").slice(0, 24);
+    writeFile(file);
+  }
+  return r;
+}
+
+export function getReportByShareToken(token: string): Report | null {
+  const t = token.trim();
+  if (!t) return null;
+  return readFile().reports.find((r) => r.shareToken === t) ?? null;
 }
 
 /** Apaga um relatório. Lança com mensagem amigável se não existe. */
@@ -255,6 +281,62 @@ ${request}`;
   const { titulo, corpo } = parseReportOutput(content);
   const fontes = fontesFromBody(corpo, items);
   return { titulo, corpo, fontes };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// G — Relatório de DIAGNÓSTICO COMPETITIVO: gráficos DETERMINÍSTICOS (do
+// diagnóstico salvo) + narrativa do LLM sobre o MESMO dado. Base do PDF/PPTX.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DIAG_REPORT_SYSTEM =
+  "Você é o RADAR, redigindo o texto de um RELATÓRIO DE DIAGNÓSTICO COMPETITIVO para o dono da agência Formare. " +
+  "Você recebe um RESUMO ESTRUTURADO dos gráficos (maturidade, canais, reputação, preço, movimentos) já calculados a partir dos diagnósticos. " +
+  "Escreva SÓ o texto que acompanha os gráficos, em MARKDOWN PURO (sem JSON, sem ```). " +
+  "A 1ª linha é o título nível 1 (ex.: '# Diagnóstico competitivo — <cliente>'). Depois: resumo executivo (2-3 linhas), '## Leitura do mercado' (o que os números mostram), '## Destaques por concorrente' e '## Recomendações'. " +
+  "REGRAS: (1) HONESTIDADE — só afirme o que está no resumo; distinga FATO de OPINIÃO (a maturidade é opinião do Radar; canais/reputação/preço são fato); se algo não foi coletado, diga; NÃO invente número; " +
+  "(2) seja CONCISO — no máximo ~450 palavras; (3) tom de consultor, direto.";
+
+/**
+ * Compõe o relatório de diagnóstico de UM cliente: monta os gráficos do
+ * diagnóstico salvo e pede ao LLM só a narrativa em cima deles. NÃO salva —
+ * devolve rascunho + charts; a rota decide guardar. Lança se não há diagnóstico.
+ */
+export async function composeDiagnosticoReport(
+  clientName: string,
+): Promise<{ titulo: string; corpo: string; fontes: AskSource[]; charts: ChartSpec[] }> {
+  const diags = listDiagnosticos(clientName);
+  if (diags.length === 0) {
+    throw new Error(`${clientName} ainda não tem diagnósticos — gere ao menos um concorrente em Diagnóstico primeiro.`);
+  }
+  const charts = buildDiagnosticoCharts(diags);
+  const material = chartsToMaterial(charts);
+
+  const prompt = `CLIENTE: ${clientName}
+CONCORRENTES DIAGNOSTICADOS: ${diags.map((d) => d.concorrente_nome).join(", ")}
+
+RESUMO ESTRUTURADO DOS GRÁFICOS (já calculado — escreva o texto sobre ISTO):
+${material}
+
+Redija o texto do relatório de diagnóstico competitivo de ${clientName}.`;
+
+  let content = "";
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      content = await completeViaGateway({ system: DIAG_REPORT_SYSTEM, prompt });
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err as Error;
+      console.warn(`[reports] composeDiagnosticoReport tentativa ${attempt} falhou: ${lastErr.message}`);
+    }
+  }
+  if (lastErr) throw lastErr;
+
+  const { titulo, corpo } = parseReportOutput(content);
+  // fontes = sites dos concorrentes diagnosticados (proveniência do relatório)
+  const fontes: AskSource[] = diags.map((d) => ({ titulo: `Diagnóstico ${d.concorrente_nome}`, url: d.site_url, concorrente: d.concorrente_nome }));
+  return { titulo, corpo, fontes, charts };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

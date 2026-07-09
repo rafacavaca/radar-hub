@@ -20,8 +20,10 @@ import { sendReportToFormare } from "@/lib/formare-door";
 import { runRadarLoop } from "@/lib/loop";
 import {
   composeContaReport,
+  composeDiagnosticoReport,
   composeReport,
   deleteReport,
+  ensureShareToken,
   getReport,
   listReports,
   saveReport,
@@ -96,6 +98,28 @@ export async function POST(req: NextRequest) {
         origem: request,
       });
       return NextResponse.json({ data: report });
+    }
+
+    if (action === "compose-diagnostico") {
+      if (!clientName) return badRequest("Escolha o cliente do relatório.");
+      const draft = await composeDiagnosticoReport(clientName);
+      const report = saveReport({
+        clientName,
+        kind: "diagnostico",
+        titulo: draft.titulo,
+        corpo: draft.corpo,
+        fontes: draft.fontes,
+        charts: draft.charts,
+        origem: "Relatório de diagnóstico competitivo",
+      });
+      return NextResponse.json({ data: report });
+    }
+
+    if (action === "share") {
+      const reportId = typeof body.reportId === "string" ? body.reportId.trim() : "";
+      if (!reportId) return badRequest("reportId obrigatório");
+      const report = ensureShareToken(reportId);
+      return NextResponse.json({ data: { shareToken: report.shareToken, path: `/r/${report.shareToken}` } });
     }
 
     if (action === "compose-conta") {
