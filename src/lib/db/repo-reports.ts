@@ -11,11 +11,13 @@
 import { supabaseRouteClient, currentOrgId } from "@/lib/db/session";
 import type { Report } from "@/lib/reports";
 
-/** Relatórios da org da sessão (opcionalmente de um cliente), novos primeiro. */
+/** Relatórios da org do contexto (opcionalmente de um cliente), novos primeiro. */
 export async function sbListReports(clientName?: string): Promise<Report[]> {
   try {
+    const orgId = await currentOrgId();
+    if (!orgId) return [];
     const sb = await supabaseRouteClient();
-    let q = sb.from("reports").select("data").order("created_at", { ascending: false });
+    let q = sb.from("reports").select("data").eq("org_id", orgId).order("created_at", { ascending: false });
     if (clientName) q = q.eq("client_id", clientName);
     const { data, error } = await q;
     if (error || !data) return [];
@@ -25,11 +27,18 @@ export async function sbListReports(clientName?: string): Promise<Report[]> {
   }
 }
 
-/** Um relatório por id, na org da sessão. */
+/** Um relatório por id, na org do contexto. */
 export async function sbGetReport(id: string): Promise<Report | null> {
   try {
+    const orgId = await currentOrgId();
+    if (!orgId) return null;
     const sb = await supabaseRouteClient();
-    const { data, error } = await sb.from("reports").select("data").eq("id", id).maybeSingle();
+    const { data, error } = await sb
+      .from("reports")
+      .select("data")
+      .eq("org_id", orgId)
+      .eq("id", id)
+      .maybeSingle();
     if (error || !data) return null;
     return (data as { data: Report }).data ?? null;
   } catch {
@@ -58,10 +67,12 @@ export async function sbSaveReport(report: Report): Promise<Report> {
   return report;
 }
 
-/** Apaga um relatório da org da sessão. Lança se não existe (na org). */
+/** Apaga um relatório da org do contexto. Lança se não existe (na org). */
 export async function sbDeleteReport(id: string): Promise<void> {
+  const orgId = await currentOrgId();
+  if (!orgId) throw new Error("Sem org no contexto — não há onde apagar o relatório.");
   const sb = await supabaseRouteClient();
-  const { data, error } = await sb.from("reports").delete().eq("id", id).select("id");
+  const { data, error } = await sb.from("reports").delete().eq("org_id", orgId).eq("id", id).select("id");
   if (error) throw new Error(`relatório: falha ao apagar: ${error.message}`);
   if (!data || data.length === 0) throw new Error("Relatório não encontrado.");
 }

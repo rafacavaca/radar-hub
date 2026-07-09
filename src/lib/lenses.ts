@@ -282,6 +282,11 @@ export async function loadLensesFor(clientName: string): Promise<LensConfig[]> {
   return saved ? comLentesCompletas(saved) : defaultLensesFor(clientName).lenses;
 }
 
+/** Só as lentes ATIVAS de um cliente, org-scoped (o que o loop roda). */
+export async function loadActiveLensesFor(clientName: string): Promise<LensConfig[]> {
+  return (await loadLensesFor(clientName)).filter((l) => l.enabled);
+}
+
 /** A config completa (todos os clientes da org), semeando defaults em memória. */
 export async function loadLenses(): Promise<LensesFile> {
   if (!supabaseEnabled()) return readLenses();

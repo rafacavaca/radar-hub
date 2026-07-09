@@ -11,10 +11,19 @@
 import { supabaseRouteClient, currentOrgId } from "@/lib/db/session";
 import type { Watchlist, WatchClient } from "@/lib/watchlist";
 
-/** Lê a watchlist da org da sessão (RLS). Vazio => { clients: [] }. */
+/**
+ * Lê a watchlist da org do contexto (RLS na sessão; filtro explícito no
+ * coletor). Vazio => { clients: [] }.
+ */
 export async function sbReadWatchlist(): Promise<Watchlist> {
+  const orgId = await currentOrgId();
+  if (!orgId) return { clients: [] };
   const sb = await supabaseRouteClient();
-  const { data, error } = await sb.from("clients").select("data").order("name", { ascending: true });
+  const { data, error } = await sb
+    .from("clients")
+    .select("data")
+    .eq("org_id", orgId)
+    .order("name", { ascending: true });
   if (error || !data) return { clients: [] };
   return { clients: data.map((r) => (r as { data: WatchClient }).data).filter(Boolean) };
 }

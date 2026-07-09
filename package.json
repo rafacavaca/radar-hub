@@ -52,7 +52,8 @@
     "demo:custo": "tsx scripts/demo-custo-moovefy.mts",
     "test:isolation": "tsx scripts/test-isolation.mts",
     "migrate:supabase": "tsx scripts/migrate-to-supabase.mts",
-    "admin:setup": "tsx scripts/admin-setup.mts"
+    "admin:setup": "tsx scripts/admin-setup.mts",
+    "smoke:org-loop": "tsx scripts/test-org-loop.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

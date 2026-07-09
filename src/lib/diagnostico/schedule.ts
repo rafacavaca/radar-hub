@@ -83,12 +83,16 @@ export function setDiagSchedule(clientName: string, input: { enabled: boolean; w
   return getDiagSchedule(clientName);
 }
 
-/** A varredura do cliente está VENCIDA agora? (ligada, no dia certo, ainda não hoje) */
-export function isDiagDue(clientName: string, now: Date): boolean {
-  const cfg = getDiagSchedule(clientName);
+/** A config está VENCIDA agora? (ligada, no dia certo, ainda não hoje) — puro. */
+function dueNow(cfg: DiagScheduleClient, now: Date): boolean {
   if (!cfg.enabled) return false;
   if (cfg.lastRunDay === localDayKey(now)) return false;
   return localWeekday(now) === cfg.weekday;
+}
+
+/** A varredura do cliente está VENCIDA agora? (JSON síncrono). */
+export function isDiagDue(clientName: string, now: Date): boolean {
+  return dueNow(getDiagSchedule(clientName), now);
 }
 
 function markRan(clientName: string, now: Date): void {
@@ -96,6 +100,17 @@ function markRan(clientName: string, now: Date): void {
   const atual = file.clients[clientName] ?? { ...DIAG_SCHEDULE_DEFAULT };
   file.clients[clientName] = { ...DIAG_SCHEDULE_DEFAULT, ...atual, lastRunDay: localDayKey(now), lastRunAt: now.toISOString() };
   writeFileSafe(file);
+}
+
+/** Marca a varredura do cliente como rodada hoje, na org do contexto (ou JSON). */
+async function persistDiagRan(clientName: string, cfg: DiagScheduleClient, now: Date): Promise<void> {
+  if (!supabaseEnabled()) return markRan(clientName, now);
+  await sbSetDoc(DOC_KIND, clientName, {
+    ...DIAG_SCHEDULE_DEFAULT,
+    ...cfg,
+    lastRunDay: localDayKey(now),
+    lastRunAt: now.toISOString(),
+  });
 }
 
 /** Os alvos da varredura dado o estado (puro — serve o caminho sync e o org-scoped). */
@@ -135,13 +150,16 @@ type Runner = (input: { clientName: string; competitorId: string; name: string; 
 /**
  * Roda as varreduras VENCIDAS. Sequencial de propósito (gentil com
  * gateway/Firecrawl). `runner` é injetável só p/ teste; em produção é o real.
+ *
+ * ORG-AWARE: config, alvos e a marca de "rodou hoje" vêm dos dispatchers — no
+ * cron roda dentro de runAsOrgCollector (tudo da org do contexto).
  */
 export async function runDueDiagnosticos(
   now: Date,
   opts: { runner?: Runner; clients?: string[] } = {},
 ): Promise<DiagScheduleRunResult> {
   const runner = opts.runner ?? runDiagnosticoReal;
-  const nomes = opts.clients ?? readWatchlist().clients.map((c) => c.name);
+  const nomes = opts.clients ?? (await loadWatchlist()).clients.map((c) => c.name);
   const result: DiagScheduleRunResult = {
     clientesRodados: 0,
     concorrentesVarridos: 0,
@@ -151,10 +169,11 @@ export async function runDueDiagnosticos(
   };
 
   for (const clientName of nomes) {
-    if (!isDiagDue(clientName, now)) continue;
-    const alvos = alvosDaVarredura(clientName);
+    const cfg = await loadDiagSchedule(clientName);
+    if (!dueNow(cfg, now)) continue;
+    const alvos = await loadAlvosDaVarredura(clientName);
     if (alvos.length === 0) {
-      markRan(clientName, now); // marca mesmo sem alvo (não fica "vencido" o dia todo)
+      await persistDiagRan(clientName, cfg, now); // marca mesmo sem alvo (não fica "vencido" o dia todo)
       continue;
     }
     result.clientesRodados++;
@@ -169,7 +188,7 @@ export async function runDueDiagnosticos(
         result.erros.push({ clientName, competitorId: alvo.competitorId, error: (err as Error).message });
       }
     }
-    markRan(clientName, now);
+    await persistDiagRan(clientName, cfg, now);
   }
 
   return result;

@@ -23,7 +23,7 @@ import { join } from "node:path";
 
 import { supabaseEnabled } from "@/lib/db/supabase";
 import { sbDeleteDoc, sbGetDoc, sbListDocs, sbSetDoc } from "@/lib/db/repo-org-docs";
-import { composeReport, saveReport } from "@/lib/reports";
+import { composeReport, persistReport } from "@/lib/reports";
 import { runRadarLoop } from "@/lib/loop";
 
 const TZ = "America/Sao_Paulo";
@@ -210,7 +210,7 @@ export function isDue(schedule: Schedule, now: Date): boolean {
   return localWeekday(now) === schedule.cadence.weekday;
 }
 
-/** Marca um agendamento como executado hoje (persistindo). */
+/** Marca um agendamento como executado hoje (JSON). */
 function markRan(id: string, now: Date): void {
   const file = readFileSafe();
   const s = file.schedules.find((x) => x.id === id);
@@ -218,6 +218,16 @@ function markRan(id: string, now: Date): void {
   s.lastRunDay = localDayKey(now);
   s.lastRunAt = now.toISOString();
   writeFileSafe(file);
+}
+
+/** Marca como executado hoje, na org do contexto (ou JSON). */
+async function persistScheduleRan(schedule: Schedule, now: Date): Promise<void> {
+  if (!supabaseEnabled()) return markRan(schedule.id, now);
+  await sbSetDoc(DOC_KIND, schedule.id, {
+    ...schedule,
+    lastRunDay: localDayKey(now),
+    lastRunAt: now.toISOString(),
+  });
 }
 
 export type RunSchedulesResult = {
@@ -231,9 +241,13 @@ export type RunSchedulesResult = {
  * Roda os agendamentos VENCIDOS agora. Garante o material do dia (loop cacheado),
  * compõe cada relatório e o guarda (kind="agendado"). Marca cada um como rodado
  * pra não repetir no mesmo dia. Uma falha isolada não derruba os outros.
+ *
+ * ORG-AWARE: usa os dispatchers (loadSchedules/persistReport/persistScheduleRan);
+ * no cron roda dentro de runAsOrgCollector — os agendamentos, o material do loop
+ * e os relatórios são TODOS da org do contexto.
  */
 export async function runDueSchedules(now: Date): Promise<RunSchedulesResult> {
-  const all = listSchedules();
+  const all = await loadSchedules();
   const due = all.filter((s) => isDue(s, now));
   const result: RunSchedulesResult = {
     ran: 0,
@@ -253,7 +267,7 @@ export async function runDueSchedules(now: Date): Promise<RunSchedulesResult> {
   for (const schedule of due) {
     try {
       const draft = await composeReport(schedule.clientName, schedule.request);
-      const report = saveReport({
+      const report = await persistReport({
         clientName: schedule.clientName,
         kind: "agendado",
         titulo: draft.titulo,
@@ -261,7 +275,7 @@ export async function runDueSchedules(now: Date): Promise<RunSchedulesResult> {
         fontes: draft.fontes,
         origem: schedule.request,
       });
-      markRan(schedule.id, now);
+      await persistScheduleRan(schedule, now);
       result.ran++;
       result.reports.push({ scheduleId: schedule.id, reportId: report.id, titulo: report.titulo });
     } catch (err) {

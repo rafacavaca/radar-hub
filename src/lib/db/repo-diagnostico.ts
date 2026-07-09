@@ -8,11 +8,17 @@
 import { supabaseRouteClient, currentOrgId } from "@/lib/db/session";
 import type { DiagnosticoConcorrente } from "@/lib/diagnostico/schema";
 
-/** Diagnósticos de um cliente, na org da sessão (RLS). Nunca lança. */
+/** Diagnósticos de um cliente, na org do contexto (RLS + filtro explícito). Nunca lança. */
 export async function sbListDiagnosticos(clientName: string): Promise<DiagnosticoConcorrente[]> {
   try {
+    const orgId = await currentOrgId();
+    if (!orgId) return [];
     const sb = await supabaseRouteClient();
-    const { data, error } = await sb.from("diagnostics").select("data").eq("client_id", clientName);
+    const { data, error } = await sb
+      .from("diagnostics")
+      .select("data")
+      .eq("org_id", orgId)
+      .eq("client_id", clientName);
     if (error || !data) return [];
     return data.map((r) => (r as { data: DiagnosticoConcorrente }).data).filter(Boolean);
   } catch {
@@ -20,16 +26,19 @@ export async function sbListDiagnosticos(clientName: string): Promise<Diagnostic
   }
 }
 
-/** O diagnóstico de um concorrente, na org da sessão (RLS). Nunca lança. */
+/** O diagnóstico de um concorrente, na org do contexto (RLS + filtro explícito). Nunca lança. */
 export async function sbGetDiagnostico(
   clientName: string,
   concorrenteId: string,
 ): Promise<DiagnosticoConcorrente | null> {
   try {
+    const orgId = await currentOrgId();
+    if (!orgId) return null;
     const sb = await supabaseRouteClient();
     const { data, error } = await sb
       .from("diagnostics")
       .select("data")
+      .eq("org_id", orgId)
       .eq("client_id", clientName)
       .eq("competitor_id", concorrenteId)
       .maybeSingle();

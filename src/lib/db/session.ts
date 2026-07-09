@@ -9,13 +9,21 @@
  *    os cookies do request, e devolve também o response onde os cookies
  *    REFRESCADOS são regravados (o @supabase/ssr rotaciona o token expirado).
  *
- * Tudo com a ANON key (RLS aplica). Nunca service_role aqui — isto é o caminho
- * do usuário. Ativo só quando supabaseEnabled().
+ * Tudo com a ANON key (RLS aplica) — no caminho do USUÁRIO nunca service_role.
+ * Ativo só quando supabaseEnabled().
+ *
+ * EXCEÇÃO ÚNICA E ESCOPADA (rework do loop): dentro de `runAsOrgCollector`
+ * (cron, contexto admin comprovado), o cliente vira o admin e `currentOrgId()`
+ * devolve a org do coletor — assim os MESMOS repos servem sessão e cron. Como o
+ * admin ignora a RLS, todo repo lê com filtro explícito `.eq("org_id", …)`.
  */
 
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { adminClient } from "@/lib/db/admin-client";
+import { collectorOrgId } from "@/lib/db/collector-org";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -30,8 +38,12 @@ function anon(): string {
   return k;
 }
 
-/** Cliente ligado aos cookies do request (route handler / server component). */
+/**
+ * Cliente do CONTEXTO DE EXECUÇÃO: sessão (cookies, RLS) no caminho do usuário;
+ * admin escopado à org do coletor dentro de runAsOrgCollector (cron).
+ */
 export async function supabaseRouteClient(): Promise<SupabaseClient> {
+  if (collectorOrgId()) return adminClient(); // cron: org explícita + filtros nos repos
   const store = await cookies();
   return createServerClient(url(), anon(), {
     cookies: {
@@ -76,10 +88,13 @@ export async function isSuperAdmin(): Promise<boolean> {
 }
 
 /**
- * A org ATIVA da sessão (id) — a 1ª membership do usuário (RLS só devolve as
- * dele). Para escrever, é a org onde grava. null se não logado/sem org.
+ * A org ATIVA do contexto: a do COLETOR (dentro de runAsOrgCollector) ou a 1ª
+ * membership da sessão (RLS só devolve as dele). Para escrever, é a org onde
+ * grava. null se não logado/sem org.
  */
 export async function currentOrgId(): Promise<string | null> {
+  const collector = collectorOrgId();
+  if (collector) return collector;
   try {
     const sb = await supabaseRouteClient();
     const { data } = await sb

@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path";
 
 import { supabaseEnabled } from "@/lib/db/supabase";
-import { sbDeleteDoc, sbListDocs } from "@/lib/db/repo-org-docs";
+import { sbDeleteDoc, sbGetDoc, sbListDocs, sbSetDoc } from "@/lib/db/repo-org-docs";
 
 export type SourceStatus = {
   lastRunAt: string;
@@ -96,10 +96,33 @@ export function forgetCompetitorStatus(competitorId: string): void {
 
 // ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
 // Um doc por CONCORRENTE (kind `source-status`, key = competitorId, data =
-// Record<sourceId, SourceStatus>). A ESCRITA (recordSourceRun) é do loop de
-// coleta — vira por-org no rework do loop.
+// Record<sourceId, SourceStatus>).
 
 const DOC_KIND = "source-status";
+
+/**
+ * Registra o resultado de uma rodada para UMA fonte, na org do contexto
+ * (sessão OU coletor) — ou no JSON em modo clássico. Nunca lança (status é
+ * transparência, não pode derrubar a coleta).
+ */
+export async function persistSourceRun(
+  competitorId: string,
+  sourceId: string,
+  outcome: { eventos: number; erro?: string },
+): Promise<void> {
+  if (!supabaseEnabled()) return recordSourceRun(competitorId, sourceId, outcome);
+  try {
+    const atual = await sbGetDoc<Record<string, SourceStatus>>(DOC_KIND, competitorId, {});
+    atual[sourceId] = {
+      lastRunAt: new Date().toISOString(),
+      eventos: Math.max(0, Math.floor(outcome.eventos)),
+      erro: outcome.erro?.slice(0, 160),
+    };
+    await sbSetDoc(DOC_KIND, competitorId, atual);
+  } catch {
+    // transparência não derruba a coleta.
+  }
+}
 
 /** Todos os status da org da sessão (ou JSON), achatados por `${cid}:${sid}`. */
 export async function loadSourceStatus(): Promise<Record<string, SourceStatus>> {

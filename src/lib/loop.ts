@@ -31,15 +31,19 @@ import { collectBlog } from "@/lib/collectors/blog";
 import { collectByDiff } from "@/lib/collectors/content-diff";
 import { collectMarket } from "@/lib/collectors/market";
 import { crossReference, type CrossInsight } from "@/lib/cross-reference";
-import { activeLensesFor } from "@/lib/lenses";
+import { sbGetDoc, sbSetDoc } from "@/lib/db/repo-org-docs";
+import { persistSignals } from "@/lib/db/repo-signals";
+import { currentOrgId } from "@/lib/db/session";
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { loadActiveLensesFor } from "@/lib/lenses";
 import { collectLinkedIn } from "@/lib/linkedin";
-import { recordSourceRun } from "@/lib/source-status";
+import { persistSourceRun } from "@/lib/source-status";
 import { runWithUsage } from "@/lib/usage/context";
 import {
   collectionMethod,
+  loadWatchlist,
   pillarOf,
   planCollection,
-  readWatchlist,
   type WatchClient,
 } from "@/lib/watchlist";
 import type {
@@ -134,7 +138,7 @@ function cachePathForToday(): string {
   return join(CACHE_DIR, `loop-${todayStamp()}.json`);
 }
 
-/** Lê o cache do dia; null se não existe, está ilegível ou malformado. */
+/** Lê o cache do dia (disco); null se não existe, está ilegível ou malformado. */
 function readLoopCache(): RadarLoopResult | null {
   const path = cachePathForToday();
   if (!existsSync(path)) return null;
@@ -152,6 +156,43 @@ function readLoopCache(): RadarLoopResult | null {
 function writeLoopCache(result: RadarLoopResult): void {
   mkdirSync(CACHE_DIR, { recursive: true });
   writeFileSync(cachePathForToday(), JSON.stringify(result, null, 2), "utf8");
+}
+
+// ─── MULTI-TENANT (item 2 — rework do loop): cache do dia POR ORG. ─────────
+// Em modo org o resultado do dia é DADO da org (leituras/eventos dela) e vive
+// em org_docs (kind `loop-cache`, key = dia) — sessão E cron enxergam o mesmo
+// doc da org do contexto. Em modo clássico, o arquivo em disco de sempre.
+
+const CACHE_KIND = "loop-cache";
+
+async function loadLoopCache(): Promise<RadarLoopResult | null> {
+  if (!supabaseEnabled()) return readLoopCache();
+  const parsed = await sbGetDoc<RadarLoopResult | null>(CACHE_KIND, todayStamp(), null);
+  if (!parsed || !Array.isArray(parsed.items) || typeof parsed.ranAt !== "string") return null;
+  return parsed;
+}
+
+async function persistLoopCache(result: RadarLoopResult): Promise<void> {
+  if (!supabaseEnabled()) return writeLoopCache(result);
+  try {
+    await sbSetDoc(CACHE_KIND, todayStamp(), result);
+  } catch (err) {
+    // sem org no contexto (ou falha de rede): a rodada vale, só não fica cacheada.
+    console.warn(`[loop] cache do dia não gravado: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Ingestão LinkedIn (extensão "Enviar ao Radar"): a porta é um segredo ÚNICO,
+ * então no modo org só a org DESIGNADA (RADAR_INGEST_ORG_ID) lê o arquivo — as
+ * demais ficam vazias, honesto. Ingestão por-org (token por org) é passo futuro.
+ */
+async function linkedInIngestFor(clientName: string): Promise<ReturnType<typeof collectLinkedIn>> {
+  if (!supabaseEnabled()) return collectLinkedIn(clientName);
+  const designada = process.env.RADAR_INGEST_ORG_ID;
+  if (!designada) return { concorrente: [], conta: [] };
+  const orgId = await currentOrgId();
+  return orgId === designada ? collectLinkedIn(clientName) : { concorrente: [], conta: [] };
 }
 
 /** Ordena por impacto (score DESC) sem mutar o array de entrada. */
@@ -340,7 +381,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
     falhas: string[];
   };
 }> {
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   const client = watchlist.clients.find((c) => c.name === scope.clientName);
   if (!client) throw new Error(`Cliente não encontrado: ${scope.clientName}`);
 
@@ -376,7 +417,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
           ? collectByDiff(target.competitor, target.source)
           : collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT }),
       );
-      recordSourceRun(target.competitor.id, target.source.id, { eventos: events.length });
+      await persistSourceRun(target.competitor.id, target.source.id, { eventos: events.length });
       for (const event of events) {
         if (seen.has(event.id)) continue;
         seen.add(event.id);
@@ -384,7 +425,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
       }
     } catch (err) {
       const message = (err as Error).message;
-      recordSourceRun(target.competitor.id, target.source.id, { eventos: 0, erro: message });
+      await persistSourceRun(target.competitor.id, target.source.id, { eventos: 0, erro: message });
       failures.push(`coleta ${target.competitor.name} (${target.source.kind}): ${message}`);
       console.warn(`[loop:parcial] coleta falhou: ${message}`);
     }
@@ -419,7 +460,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
 
       // LinkedIn ingerido — só na rodada do CLIENTE inteiro (não numa fonte/entidade só).
       if (!scope.competitorId) {
-        const li = collectLinkedIn(scope.clientName);
+        const li = await linkedInIngestFor(scope.clientName);
         const stamp = (e: RawEvent): ClientEvent => ({ ...e, clientName: scope.clientName });
         concorrenteEvents.push(...li.concorrente.map(stamp));
         contaEvents.push(...li.conta.map(stamp));
@@ -428,7 +469,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
       }
 
       if (concorrenteEvents.length > 0) {
-        for (const lens of activeLensesFor(scope.clientName)) {
+        for (const lens of await loadActiveLensesFor(scope.clientName)) {
           const out = await withGatewayRetry(
             `lente ${lens.id} (${scope.clientName})`,
             () => runWithUsage({ clientName: scope.clientName, feature: "briefing", etapa: lens.id }, () => analyzeLens(lens, concorrenteEvents, scope.clientName, brain.context)),
@@ -447,7 +488,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
         // F2 — contexto de concorrente pra urgência: os frescos deste escopo +
         // os movimentos de concorrente já coletados hoje (cache), deduplicados.
         // Assim "Rodar" só a conta ainda enxerga o que os concorrentes fizeram.
-        const cachedComp = (readLoopCache()?.events ?? []).filter(
+        const cachedComp = ((await loadLoopCache())?.events ?? []).filter(
           (e) => e.clientName === scope.clientName && !contaIds.has(e.source),
         );
         const seen = new Set<string>();
@@ -478,13 +519,17 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
     }
   }
 
-  // 3) MERGE no resultado do dia e persiste.
+  // 3) SINAIS duráveis (modo org) + MERGE no resultado do dia e persiste.
+  if (supabaseEnabled()) {
+    const sigFail = await persistSignals(freshEvents);
+    if (sigFail) failures.push(sigFail);
+  }
   const merged = mergeLoopResult(
-    readLoopCache(),
+    await loadLoopCache(),
     { clientName: scope.clientName, competitorId: scope.competitorId, competitorName },
     { events: freshEvents, readings, crossInsights, salesReadings, relationshipPlays, brainSource, failures },
   );
-  writeLoopCache(merged);
+  await persistLoopCache(merged);
 
   return {
     result: merged,
@@ -509,14 +554,14 @@ export async function runRadarLoop(
   const force = opts.force ?? false;
 
   if (!force) {
-    const cached = readLoopCache();
+    const cached = await loadLoopCache();
     if (cached) {
       // preserva TUDO do cache (readings/events/brainSources), só reordenando.
       return { ...cached, items: byScoreDesc(cached.items) };
     }
   }
 
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   const targets = planCollection(watchlist);
 
   // 1) COLETA por (cliente, concorrente, fonte), tolerando falha individual.
@@ -535,7 +580,7 @@ export async function runRadarLoop(
           ? collectByDiff(target.competitor, target.source)
           : collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT }),
       );
-      recordSourceRun(target.competitor.id, target.source.id, { eventos: events.length });
+      await persistSourceRun(target.competitor.id, target.source.id, { eventos: events.length });
       const bucket = eventsByClient.get(target.clientName) ?? [];
       const seen = new Set(bucket.map((e) => e.id));
       for (const event of events) {
@@ -547,7 +592,7 @@ export async function runRadarLoop(
       eventsByClient.set(target.clientName, bucket);
     } catch (err) {
       const message = (err as Error).message;
-      recordSourceRun(target.competitor.id, target.source.id, { eventos: 0, erro: message });
+      await persistSourceRun(target.competitor.id, target.source.id, { eventos: 0, erro: message });
       failures.push(`coleta ${target.competitor.name} (${target.source.kind}): ${message}`);
       console.warn(
         `[loop] coleta de ${target.competitor.name}/${target.source.kind} falhou: ${message}`,
@@ -597,7 +642,7 @@ export async function runRadarLoop(
     const { concorrenteEvents, contaEvents } = splitByPillar(events, contaChaveIds(client));
 
     // LinkedIn ingerido (captura assistida) entra pelos DOIS pilares, por papel.
-    const li = collectLinkedIn(clientName);
+    const li = await linkedInIngestFor(clientName);
     concorrenteEvents.push(...li.concorrente);
     contaEvents.push(...li.conta);
     // e no FEED (sinais crus) — pra TUDO que foi enviado ficar visível, mesmo
@@ -608,7 +653,7 @@ export async function runRadarLoop(
     );
 
     if (concorrenteEvents.length > 0) {
-      for (const lens of activeLensesFor(clientName)) {
+      for (const lens of await loadActiveLensesFor(clientName)) {
         const out = await withGatewayRetry(
           `lente ${lens.id} (${clientName})`,
           () => runWithUsage({ clientName, feature: "briefing", etapa: lens.id }, () => analyzeLens(lens, concorrenteEvents, clientName, brain.context)),
@@ -644,6 +689,12 @@ export async function runRadarLoop(
     }
   }
 
+  // SINAIS duráveis por org (modo org): a história crua vai pra tabela signals.
+  if (supabaseEnabled()) {
+    const sigFail = await persistSignals(allEvents);
+    if (sigFail) failures.push(sigFail);
+  }
+
   const result: RadarLoopResult = {
     items: buildGeneralItems(readings),
     readings: byScoreDesc(readings),
@@ -657,6 +708,6 @@ export async function runRadarLoop(
     failures: failures.length > 0 ? failures : undefined,
   };
 
-  writeLoopCache(result);
+  await persistLoopCache(result);
   return result;
 }
