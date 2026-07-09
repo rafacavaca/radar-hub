@@ -104,6 +104,12 @@ export function aplicarMovimentos(novo: DiagnosticoConcorrente): DiagnosticoConc
     );
   }
 
-  // battlecard é DERIVADO sob demanda — re-varrer não pode apagar o existente
-  return { ...novo, historico, movimentos, battlecard: novo.battlecard ?? anterior?.battlecard ?? null };
+  // battlecard/swot são DERIVADOS sob demanda — re-varrer não pode apagar o existente
+  return {
+    ...novo,
+    historico,
+    movimentos,
+    battlecard: novo.battlecard ?? anterior?.battlecard ?? null,
+    swot: novo.swot ?? anterior?.swot ?? null,
+  };
 }

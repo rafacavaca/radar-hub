@@ -18,6 +18,7 @@ import { buildMapaPosicionamento } from "@/lib/diagnostico/report-charts";
 
 import { AlertasDiagnostico } from "@/components/alertas-diagnostico";
 import { BattlecardCard } from "@/components/battlecard-card";
+import { SwotCard } from "@/components/swot-card";
 import { ReportChart } from "@/components/charts/report-charts";
 import { DiagConfigEditor } from "@/components/diag-config-editor";
 import { DiagnosticoRunButton } from "@/components/diagnostico-run-button";
@@ -129,6 +130,12 @@ export default async function DiagnosticoPage({
                 {diag ? (
                   <>
                     <FichaDiagnostico diag={diag} now={now} />
+                    <SwotCard
+                      clientName={cliente}
+                      competitorId={c.id}
+                      concorrenteNome={c.name}
+                      swot={diag.swot ?? null}
+                    />
                     <BattlecardCard
                       clientName={cliente}
                       competitorId={c.id}

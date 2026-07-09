@@ -291,6 +291,31 @@ export function newsNaoEncontrado(dataColeta: string, observacao?: string): Bloc
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ONDA 3 / F — SWOT VIVO por concorrente. Forças/Fraquezas = citadas (fato
+// evidenciado). Oportunidades/Ameaças = síntese estratégica RASCUNHADA (o
+// estrategista decide). Gerado sob demanda do diagnóstico salvo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type SwotItem = {
+  texto: string;
+  /** fonte da evidência (forças/fraquezas). Ausente em oport/ameaças (síntese). */
+  fonte_url?: string;
+};
+
+export type Swot = {
+  /** internas, ANCORADAS em evidência coletada. */
+  forcas: SwotItem[];
+  fraquezas: SwotItem[];
+  /** externas — SÍNTESE (rascunho); podem citar movimento/notícia quando houver. */
+  oportunidades: SwotItem[];
+  ameacas: SwotItem[];
+  /** origem do contexto do nosso cliente (Brain) usado na leitura externa. */
+  brain_mode: "live" | "fixture" | "none";
+  gerado_em: string;
+  tipo: "derivado";
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ONDA 1 / F1a — MOVIMENTO + ALERTA (versionamento + diff + regras).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -390,6 +415,8 @@ export type DiagnosticoConcorrente = {
   reputacao?: BlocoReputacao;
   /** F1d — battlecard (derivado citado; gerado sob demanda do diag salvo). */
   battlecard?: Battlecard | null;
+  /** Onda 3 F — SWOT vivo (derivado; gerado sob demanda). */
+  swot?: Swot | null;
   /** D — campos customizados extraídos (definidos pelo usuário). */
   campos_custom?: CampoCustom[];
   /** D — temas que o usuário quer vigiar neste concorrente (guiam a extração). */
