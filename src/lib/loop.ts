@@ -183,6 +183,14 @@ async function persistLoopCache(result: RadarLoopResult): Promise<void> {
 }
 
 /**
+ * O resultado do dia SÓ SE JÁ EXISTE (cache-only — nunca dispara coleta/LLM).
+ * O ritual (digest) usa isto: material pronto entra; ausente é ausente, honesto.
+ */
+export async function peekLoopResult(): Promise<RadarLoopResult | null> {
+  return loadLoopCache();
+}
+
+/**
  * Ingestão LinkedIn (extensão "Enviar ao Radar"): a porta é um segredo ÚNICO,
  * então no modo org só a org DESIGNADA (RADAR_INGEST_ORG_ID) lê o arquivo — as
  * demais ficam vazias, honesto. Ingestão por-org (token por org) é passo futuro.
