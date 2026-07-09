@@ -11,7 +11,7 @@ import { redirect } from "next/navigation";
 import { getRegras, listDisparos } from "@/lib/diagnostico/alertas-store";
 import { getDiagConfig } from "@/lib/diagnostico/config";
 import { alvosDaVarredura, getDiagSchedule } from "@/lib/diagnostico/schedule";
-import { listDiagnosticos } from "@/lib/diagnostico/store";
+import { loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { getCobertura } from "@/lib/diagnostico/cobertura";
@@ -46,7 +46,7 @@ export default async function DiagnosticoPage({
   if (client.mode === "carteira") redirect(`/carteira?cliente=${encodeURIComponent(cliente)}`);
 
   const concorrentes = client.competitors.filter((c) => pillarOf(c, client.mode) === "concorrente");
-  const diagnosticos = listDiagnosticos(cliente);
+  const diagnosticos = await loadDiagnosticos(cliente);
   const byId = new Map(diagnosticos.map((d) => [d.concorrente_id, d]));
   const mapa = buildMapaPosicionamento(diagnosticos);
   const now = new Date().toISOString();

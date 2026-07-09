@@ -5,7 +5,7 @@
 
 import { type NextRequest } from "next/server";
 
-import { getReport } from "@/lib/reports";
+import { loadReport } from "@/lib/reports";
 import { reportToPdf, reportToPptx } from "@/lib/reports-export";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ function slug(s: string): string {
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id")?.trim() ?? "";
   const format = (req.nextUrl.searchParams.get("format") ?? "pdf").toLowerCase();
-  const report = id ? getReport(id) : null;
+  const report = id ? await loadReport(id) : null;
   if (!report) return new Response(JSON.stringify({ error: "relatório não encontrado" }), { status: 404, headers: { "Content-Type": "application/json" } });
 
   const nome = `${slug(report.clientName)}-${slug(report.titulo)}`;

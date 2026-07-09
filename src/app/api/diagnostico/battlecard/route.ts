@@ -12,7 +12,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { gerarAbordagem, gerarBattlecard } from "@/lib/diagnostico/battlecard";
-import { getDiagnostico, saveDiagnostico } from "@/lib/diagnostico/store";
+import { loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
 import { sendTaskToFormare } from "@/lib/formare-door";
 import type { IntelligenceItem } from "@/lib/types";
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Envie clientName e competitorId." }, { status: 400 });
   }
 
-  const diag = getDiagnostico(clientName, competitorId);
+  const diag = await loadDiagnostico(clientName, competitorId);
   if (!diag) {
     return NextResponse.json({ error: "Gere o diagnóstico antes do battlecard." }, { status: 404 });
   }
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     if (acao === "gerar") {
       diag.battlecard = await gerarBattlecard(diag);
-      saveDiagnostico(diag);
+      await persistDiagnostico(diag);
       return NextResponse.json({ data: { battlecard: diag.battlecard } });
     }
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       }
       const texto = await gerarAbordagem(diag);
       diag.battlecard.abordagem = { texto, gerado_em: new Date().toISOString() };
-      saveDiagnostico(diag);
+      await persistDiagnostico(diag);
       return NextResponse.json({ data: { abordagem: diag.battlecard.abordagem } });
     }
 

@@ -8,7 +8,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { analisarCobertura, getCobertura, saveCobertura } from "@/lib/diagnostico/cobertura";
-import { listDiagnosticos } from "@/lib/diagnostico/store";
+import { loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (!clientName) return NextResponse.json({ error: "clientName obrigatório" }, { status: 400 });
 
   try {
-    const cobertura = await analisarCobertura(clientName, listDiagnosticos(clientName));
+    const cobertura = await analisarCobertura(clientName, await loadDiagnosticos(clientName));
     return NextResponse.json({ data: { cobertura: saveCobertura(cobertura) } });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Falha na cobertura." }, { status: 400 });

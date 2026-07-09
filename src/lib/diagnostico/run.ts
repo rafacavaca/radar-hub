@@ -18,7 +18,7 @@ import { runLenteVagas } from "@/lib/diagnostico/lente-vagas";
 import { runLenteNews } from "@/lib/diagnostico/lente-news";
 import { getDiagConfig } from "@/lib/diagnostico/config";
 import { runEstrategia } from "@/lib/diagnostico/estrategia";
-import { getDiagnostico, listDiagnosticos, saveDiagnostico } from "@/lib/diagnostico/store";
+import { getDiagnostico, loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
 import { appendDisparos, getRegras } from "@/lib/diagnostico/alertas-store";
 import { avaliarRegras, diffSnapshots, toSnapshot } from "@/lib/diagnostico/movimento";
 import { runWithUsage } from "@/lib/usage/context";
@@ -57,7 +57,7 @@ export async function runDiagnostico(input: {
       const news = await runWithUsage({ etapa: "news" }, () => runLenteNews(name, siteUrl));
       // Opinião + rascunho (F3) por último. Maturidade é RELATIVA: passa os pares
       // (perfil de prova dos outros concorrentes já diagnosticados do cliente).
-      const peers: PerfilProva[] = listDiagnosticos(clientName)
+      const peers: PerfilProva[] = (await loadDiagnosticos(clientName))
         .filter((d) => d.concorrente_id !== competitorId)
         .map((d) => perfilProvaDe(d.concorrente_nome, d.posicionamento));
       const maturidade = await runWithUsage({ feature: "lente_4" }, () => runLente4(name, posicionamento, peers));
@@ -82,7 +82,10 @@ export async function runDiagnostico(input: {
         maturidade,
         estrategia,
       };
-      return saveDiagnostico(aplicarMovimentos(diag));
+      // anterior pré-carregado (org-scoped em modo Supabase) — mantém
+      // aplicarMovimentos pura/síncrona (os smokes a testam direto).
+      const anterior = await loadDiagnostico(clientName, competitorId);
+      return persistDiagnostico(aplicarMovimentos(diag, anterior));
     },
   );
 }
@@ -94,7 +97,7 @@ export async function runDiagnostico(input: {
  * antiga julgava no vácuo. Nunca lança pelo LLM (cada falha vira nao_avaliado).
  */
 export async function reavaliarMaturidadeCliente(clientName: string): Promise<Array<{ nome: string; nivel: string | null; score: number | null; status: string }>> {
-  const diags = listDiagnosticos(clientName);
+  const diags = await loadDiagnosticos(clientName);
   const out: Array<{ nome: string; nivel: string | null; score: number | null; status: string }> = [];
   for (const d of diags) {
     const peers: PerfilProva[] = diags
@@ -106,7 +109,7 @@ export async function reavaliarMaturidadeCliente(clientName: string): Promise<Ar
     );
     d.maturidade = maturidade;
     if (d.historico && d.historico.length > 0) d.historico[d.historico.length - 1].posicionamento = d.posicionamento;
-    saveDiagnostico(d);
+    await persistDiagnostico(d);
     out.push({ nome: d.concorrente_nome, nivel: maturidade.nivel, score: maturidade.score, status: maturidade.status });
   }
   return out;
@@ -116,9 +119,14 @@ export async function reavaliarMaturidadeCliente(clientName: string): Promise<Ar
  * F1a (puro, testável): anexa histórico + movimentos ao diagnóstico novo,
  * diffando contra a última varredura salva. Diagnósticos antigos (pré-F1a, sem
  * historico) contam como baseline real — o diff usa a projeção deles.
+ *
+ * `anterior` é INJETÁVEL (multi-tenant: o chamador passa a versão org-scoped);
+ * ausente, cai no JSON síncrono — os smokes seguem chamando com 1 argumento.
  */
-export function aplicarMovimentos(novo: DiagnosticoConcorrente): DiagnosticoConcorrente {
-  const anterior = getDiagnostico(novo.clientName, novo.concorrente_id);
+export function aplicarMovimentos(
+  novo: DiagnosticoConcorrente,
+  anterior: DiagnosticoConcorrente | null = getDiagnostico(novo.clientName, novo.concorrente_id),
+): DiagnosticoConcorrente {
   const snapshotNovo = toSnapshot(novo);
 
   const historicoAnterior: Snapshot[] = anterior

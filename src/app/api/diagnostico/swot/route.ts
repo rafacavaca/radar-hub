@@ -6,7 +6,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { gerarSwot } from "@/lib/diagnostico/swot";
-import { getDiagnostico, saveDiagnostico } from "@/lib/diagnostico/store";
+import { loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
 
 export const dynamic = "force-dynamic";
 
@@ -16,12 +16,12 @@ export async function POST(req: NextRequest) {
   const competitorId = typeof body?.competitorId === "string" ? body.competitorId.trim() : "";
   if (!clientName || !competitorId) return NextResponse.json({ error: "Envie clientName e competitorId." }, { status: 400 });
 
-  const diag = getDiagnostico(clientName, competitorId);
+  const diag = await loadDiagnostico(clientName, competitorId);
   if (!diag) return NextResponse.json({ error: "Gere o diagnóstico antes do SWOT." }, { status: 404 });
 
   try {
     diag.swot = await gerarSwot(diag);
-    saveDiagnostico(diag);
+    await persistDiagnostico(diag);
     return NextResponse.json({ data: { swot: diag.swot } });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Falha no SWOT." }, { status: 500 });

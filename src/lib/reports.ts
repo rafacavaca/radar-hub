@@ -25,7 +25,9 @@ import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
 import { runWithUsage } from "@/lib/usage/context";
 import { buildDiagnosticoCharts, buildMovimentosCharts, chartsToMaterial, type ChartSpec } from "@/lib/diagnostico/report-charts";
-import { listDiagnosticos } from "@/lib/diagnostico/store";
+import { loadDiagnosticos } from "@/lib/diagnostico/store";
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbDeleteReport, sbGetReport, sbGetReportByShareToken, sbListReports, sbSaveReport } from "@/lib/db/repo-reports";
 import type { RelationshipPlay } from "@/lib/types";
 
 export type ReportKind = "chat" | "sob-medida" | "agendado" | "conta" | "diagnostico" | "movimentos";
@@ -104,19 +106,15 @@ export type SaveReportInput = {
   origem?: string;
 };
 
-/** Guarda um relatório e devolve-o. id estável por (cliente, kind, corpo). */
-export function saveReport(input: SaveReportInput): Report {
+/** Monta o Report (validação + id estável por (cliente, kind, corpo)). */
+function buildReport(input: SaveReportInput): Report {
   const clientName = input.clientName.trim();
   const corpo = input.corpo.trim();
   if (!clientName) throw new Error("Diga a qual cliente este relatório pertence.");
   if (corpo.length < 20) throw new Error("O relatório ficou curto demais para guardar.");
 
   const id = createHash("sha1").update(`${clientName}:${input.kind}:${corpo}`).digest("hex").slice(0, 16);
-  const file = readFile();
-  const existing = file.reports.find((r) => r.id === id);
-  if (existing) return existing; // não duplica.
-
-  const report: Report = {
+  return {
     id,
     clientName,
     kind: input.kind,
@@ -127,9 +125,57 @@ export function saveReport(input: SaveReportInput): Report {
     origem: input.origem?.trim() || undefined,
     createdAt: new Date().toISOString(),
   };
+}
+
+/** Guarda um relatório e devolve-o (JSON síncrono). id estável (não duplica). */
+export function saveReport(input: SaveReportInput): Report {
+  const report = buildReport(input);
+  const file = readFile();
+  const existing = file.reports.find((r) => r.id === report.id);
+  if (existing) return existing; // não duplica.
   file.reports.push(report);
   writeFile(file);
   return report;
+}
+
+// ─── MULTI-TENANT (item 2 — cutover, aditivo): API ORG-SCOPED dos relatórios. ──
+
+/** Guarda o relatório na org da sessão (Supabase/RLS) ou o JSON. */
+export async function persistReport(input: SaveReportInput): Promise<Report> {
+  return supabaseEnabled() ? sbSaveReport(buildReport(input)) : saveReport(input);
+}
+
+/** Relatórios da org da sessão (ou JSON), novos primeiro. */
+export async function loadReports(clientName?: string): Promise<Report[]> {
+  return supabaseEnabled() ? sbListReports(clientName) : listReports(clientName);
+}
+
+/** Um relatório por id, na org da sessão (ou JSON). */
+export async function loadReport(id: string): Promise<Report | null> {
+  return supabaseEnabled() ? sbGetReport(id) : getReport(id);
+}
+
+/** Apaga o relatório na org da sessão (ou JSON). */
+export async function removeReport(id: string): Promise<void> {
+  if (supabaseEnabled()) return sbDeleteReport(id);
+  deleteReport(id);
+}
+
+/** Leitura PÚBLICA por share-token (capability). Supabase(RPC) ou JSON. */
+export async function loadReportByShareToken(token: string): Promise<Report | null> {
+  return supabaseEnabled() ? sbGetReportByShareToken(token) : getReportByShareToken(token);
+}
+
+/** Garante o token público do link, na org da sessão (ou JSON). */
+export async function ensureShareTokenAsync(id: string): Promise<Report> {
+  if (!supabaseEnabled()) return ensureShareToken(id);
+  const r = await sbGetReport(id);
+  if (!r) throw new Error("Relatório não encontrado.");
+  if (!r.shareToken) {
+    r.shareToken = createHash("sha1").update(`share:${id}:${r.createdAt}`).digest("hex").slice(0, 24);
+    await sbSaveReport(r);
+  }
+  return r;
 }
 
 /** Garante (e persiste) um token público pro link compartilhável. */
@@ -305,7 +351,7 @@ const DIAG_REPORT_SYSTEM =
 export async function composeDiagnosticoReport(
   clientName: string,
 ): Promise<{ titulo: string; corpo: string; fontes: AskSource[]; charts: ChartSpec[] }> {
-  const diags = listDiagnosticos(clientName);
+  const diags = await loadDiagnosticos(clientName);
   if (diags.length === 0) {
     throw new Error(`${clientName} ainda não tem diagnósticos — gere ao menos um concorrente em Diagnóstico primeiro.`);
   }
@@ -362,7 +408,7 @@ export async function composeMovimentosReport(
   clientName: string,
   dias: number,
 ): Promise<{ titulo: string; corpo: string; fontes: AskSource[]; charts: ChartSpec[] }> {
-  const diags = listDiagnosticos(clientName);
+  const diags = await loadDiagnosticos(clientName);
   if (diags.length === 0) {
     throw new Error(`${clientName} ainda não tem diagnósticos — gere ao menos um concorrente primeiro.`);
   }

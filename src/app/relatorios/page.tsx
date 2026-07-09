@@ -10,7 +10,7 @@
  * o "montar sob medida" bate na API, que reúne o material coletado + o Brain.
  */
 
-import { listReports } from "@/lib/reports";
+import { loadReports } from "@/lib/reports";
 import { listSchedules } from "@/lib/schedules";
 import { loadWatchlist } from "@/lib/watchlist";
 
@@ -30,7 +30,7 @@ export default async function RelatoriosPage({
     params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
 
   // escopado ao cliente da conta (relatórios e agendamentos dele).
-  const reports = listReports(cliente || undefined);
+  const reports = await loadReports(cliente || undefined);
   const schedules = cliente
     ? listSchedules().filter((s) => s.clientName === cliente)
     : listSchedules();

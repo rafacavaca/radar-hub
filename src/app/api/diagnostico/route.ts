@@ -11,7 +11,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { runDiagnostico } from "@/lib/diagnostico/run";
-import { listDiagnosticos } from "@/lib/diagnostico/store";
+import { loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const cliente = req.nextUrl.searchParams.get("cliente")?.trim() || "";
   if (!cliente) return NextResponse.json({ error: "cliente obrigatório" }, { status: 400 });
-  return NextResponse.json({ data: { diagnosticos: listDiagnosticos(cliente) } });
+  return NextResponse.json({ data: { diagnosticos: await loadDiagnosticos(cliente) } });
 }
 
 export async function POST(req: NextRequest) {

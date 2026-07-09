@@ -8,7 +8,7 @@
 
 import { notFound } from "next/navigation";
 
-import { getReportByShareToken } from "@/lib/reports";
+import { loadReportByShareToken } from "@/lib/reports";
 import { formatDateTimePtBR } from "@/lib/format";
 
 import { ReportCharts } from "@/components/charts/report-charts";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SharedReportPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const report = getReportByShareToken(token);
+  const report = await loadReportByShareToken(token);
   if (!report) notFound();
 
   return (

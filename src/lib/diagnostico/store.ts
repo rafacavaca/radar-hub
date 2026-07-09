@@ -6,6 +6,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbGetDiagnostico, sbListDiagnosticos, sbSaveDiagnostico } from "@/lib/db/repo-diagnostico";
 import type { DiagnosticoConcorrente } from "@/lib/diagnostico/schema";
 
 type DiagFile = { diagnosticos: DiagnosticoConcorrente[] };
@@ -64,4 +66,29 @@ export function saveDiagnostico(diag: DiagnosticoConcorrente): DiagnosticoConcor
   else file.diagnosticos.push(diag);
   writeFile(file);
   return diag;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MULTI-TENANT (item 2 — cutover, aditivo). API ORG-SCOPED: em modo Supabase
+// lê/grava do banco (RLS escopa pela org da sessão); senão cai no JSON síncrono.
+// As superfícies user-facing migram get/list/save → load/persist uma a uma;
+// os smokes e o cron seguem no caminho síncrono até o trilho do coletor.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Diagnósticos de um cliente, escopados pela org da sessão (ou JSON). */
+export async function loadDiagnosticos(clientName: string): Promise<DiagnosticoConcorrente[]> {
+  return supabaseEnabled() ? sbListDiagnosticos(clientName) : listDiagnosticos(clientName);
+}
+
+/** O diagnóstico de um concorrente, escopado pela org da sessão (ou JSON). */
+export async function loadDiagnostico(
+  clientName: string,
+  concorrenteId: string,
+): Promise<DiagnosticoConcorrente | null> {
+  return supabaseEnabled() ? sbGetDiagnostico(clientName, concorrenteId) : getDiagnostico(clientName, concorrenteId);
+}
+
+/** Salva o diagnóstico na org da sessão (ou JSON). */
+export async function persistDiagnostico(diag: DiagnosticoConcorrente): Promise<DiagnosticoConcorrente> {
+  return supabaseEnabled() ? sbSaveDiagnostico(diag) : saveDiagnostico(diag);
 }

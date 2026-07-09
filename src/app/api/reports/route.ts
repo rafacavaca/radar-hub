@@ -23,11 +23,11 @@ import {
   composeDiagnosticoReport,
   composeMovimentosReport,
   composeReport,
-  deleteReport,
-  ensureShareToken,
-  getReport,
-  listReports,
-  saveReport,
+  removeReport,
+  ensureShareTokenAsync,
+  loadReport,
+  loadReports,
+  persistReport,
   type Report,
 } from "@/lib/reports";
 import type { AskSource } from "@/lib/ask";
@@ -59,7 +59,7 @@ function cleanFontes(raw: unknown): AskSource[] {
 
 export async function GET(req: NextRequest) {
   const cliente = req.nextUrl.searchParams.get("cliente")?.trim() || undefined;
-  return NextResponse.json({ data: { reports: listReports(cliente) } });
+  return NextResponse.json({ data: { reports: await loadReports(cliente) } });
 }
 
 export async function POST(req: NextRequest) {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       const question = typeof body.question === "string" ? body.question : "";
       if (!clientName) return badRequest("Diga a qual cliente guardar o relatório.");
       if (!answer.trim()) return badRequest("Não há resposta para guardar.");
-      const report = saveReport({
+      const report = await persistReport({
         clientName,
         kind: "chat",
         corpo: answer,
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       if (!clientName) return badRequest("Escolha o cliente do relatório.");
       if (request.length < 5) return badRequest("Descreva o que o relatório deve cobrir.");
       const draft = await composeReport(clientName, request);
-      const report = saveReport({
+      const report = await persistReport({
         clientName,
         kind: "sob-medida",
         titulo: draft.titulo,
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     if (action === "compose-diagnostico") {
       if (!clientName) return badRequest("Escolha o cliente do relatório.");
       const draft = await composeDiagnosticoReport(clientName);
-      const report = saveReport({
+      const report = await persistReport({
         clientName,
         kind: "diagnostico",
         titulo: draft.titulo,
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       const diasRaw = Number(body.dias);
       const dias = Number.isInteger(diasRaw) && diasRaw > 0 && diasRaw <= 365 ? diasRaw : 90;
       const draft = await composeMovimentosReport(clientName, dias);
-      const report = saveReport({
+      const report = await persistReport({
         clientName,
         kind: "movimentos",
         titulo: draft.titulo,
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     if (action === "share") {
       const reportId = typeof body.reportId === "string" ? body.reportId.trim() : "";
       if (!reportId) return badRequest("reportId obrigatório");
-      const report = ensureShareToken(reportId);
+      const report = await ensureShareTokenAsync(reportId);
       return NextResponse.json({ data: { shareToken: report.shareToken, path: `/r/${report.shareToken}` } });
     }
 
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       );
       const brain = await fetchClientBrain(clientName);
       const draft = await composeContaReport(clientName, conta, plays, brain.context);
-      const report = saveReport({
+      const report = await persistReport({
         clientName,
         kind: "conta",
         titulo: draft.titulo,
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
 
     if (action === "to-formare") {
       const reportId = typeof body.reportId === "string" ? body.reportId.trim() : "";
-      const report: Report | null = reportId ? getReport(reportId) : null;
+      const report: Report | null = reportId ? await loadReport(reportId) : null;
       if (!report) return NextResponse.json({ error: "relatório não encontrado" }, { status: 404 });
       const result = await sendReportToFormare({
         clientName: report.clientName,
@@ -185,7 +185,7 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id")?.trim() ?? "";
   if (!id) return badRequest("id obrigatório");
   try {
-    deleteReport(id);
+    await removeReport(id);
     return NextResponse.json({ data: { deleted: id } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "falha ao apagar";
