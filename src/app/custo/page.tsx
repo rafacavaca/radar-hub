@@ -12,6 +12,7 @@
  */
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import {
   custoMarginalEntidade,
@@ -27,6 +28,8 @@ import {
 } from "@/lib/usage/aggregate";
 import { getPrecos } from "@/lib/usage/precos";
 import { readUsageEvents } from "@/lib/usage/store";
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { isSuperAdmin } from "@/lib/db/session";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +100,10 @@ function Tabela({ titulo, nota, buckets, total, mostrarTokens = true }: { titulo
 }
 
 export default async function CustoPage({ searchParams }: { searchParams: Promise<{ dias?: string; cliente?: string }> }) {
+  // Em modo Supabase o gate de admin é por PAPEL (super_admin), não pelo cookie
+  // do usuário principal (que só existe no modo clássico). Sem papel → home.
+  if (supabaseEnabled() && !(await isSuperAdmin())) redirect("/");
+
   const sp = await searchParams;
   const diasSel = sp.dias === "tudo" ? null : sp.dias ? Number(sp.dias) : 30;
   const clienteSel = sp.cliente?.trim() || undefined;

@@ -128,7 +128,12 @@ export function AppShell({
 
   // Telas sem chrome: login, o modo apresentação (export limpo) e o painel
   // admin de custo (standalone, fora do escopo de um cliente).
-  if (pathname === "/entrar" || pathname.startsWith("/apresentar") || pathname === "/custo") {
+  if (
+    pathname === "/entrar" ||
+    pathname.startsWith("/apresentar") ||
+    pathname === "/custo" ||
+    pathname === "/admin"
+  ) {
     return <>{children}</>;
   }
 

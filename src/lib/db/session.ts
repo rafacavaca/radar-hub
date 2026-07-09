@@ -59,6 +59,23 @@ export async function currentUser(): Promise<{ id: string; email?: string } | nu
 }
 
 /**
+ * O usuário logado é super_admin? Usa a FUNÇÃO do banco `is_super_admin()`, que
+ * checa `user_id = auth.uid() AND role='super_admin'`. NÃO dá pra consultar
+ * `memberships` direto: a RLS deixa um membro VER os co-membros da própria org,
+ * então "existe alguma linha super_admin visível" seria true pra qualquer um —
+ * o furo. A RPC olha só o PRÓPRIO papel. Nunca lança.
+ */
+export async function isSuperAdmin(): Promise<boolean> {
+  try {
+    const sb = await supabaseRouteClient();
+    const { data, error } = await sb.rpc("is_super_admin");
+    return !error && data === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * A org ATIVA da sessão (id) — a 1ª membership do usuário (RLS só devolve as
  * dele). Para escrever, é a org onde grava. null se não logado/sem org.
  */

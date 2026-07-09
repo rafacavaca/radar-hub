@@ -9,7 +9,7 @@
  * auditável, com org_id obrigatório (a função no banco recusa org nulo).
  */
 
-import { adminClient } from "@/lib/db/supabase";
+import { adminClient } from "@/lib/db/admin-client";
 
 export type CollectorSignal = {
   id: string;

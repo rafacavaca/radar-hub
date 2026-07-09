@@ -49,25 +49,6 @@ export function userClient(accessToken?: string): SupabaseClient {
   });
 }
 
-/**
- * Cliente service_role (RLS-bypass). SÓ cron/coletor e admin server actions,
- * NUNCA no caminho do usuário. Recusa criar sem o selo RADAR_ADMIN_CONTEXT=1,
- * que só os scripts/ações de admin põem — a guarda contra vazar a god-key.
- */
-export function adminClient(): SupabaseClient {
-  if (process.env.RADAR_ADMIN_CONTEXT !== "1") {
-    throw new Error(
-      "adminClient() (service_role) fora de contexto admin. Ele IGNORA a RLS — " +
-        "nunca no fluxo do usuário. Rode em cron/script/ação de admin com RADAR_ADMIN_CONTEXT=1.",
-    );
-  }
-  const u = url();
-  const k = serviceKey();
-  if (!u || !k) throw new Error("Supabase admin não configurado (URL / SUPABASE_SERVICE_ROLE_KEY).");
-  return createClient(u, k, { auth: { persistSession: false, autoRefreshToken: false } });
-}
-
-/** Marca o processo atual como contexto de admin (scripts/cron/ações de admin). */
-export function markAdminContext(): void {
-  process.env.RADAR_ADMIN_CONTEXT = "1";
-}
+// O cliente service_role (a god-key) mora em `@/lib/db/admin-client` (server-
+// only, isolado deste módulo edge-safe pra não puxar node:async_hooks pro
+// proxy). Importe adminClient/runAsAdmin de lá. NUNCA no caminho do usuário.
