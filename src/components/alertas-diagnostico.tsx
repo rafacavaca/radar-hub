@@ -155,7 +155,7 @@ export function AlertasDiagnostico({
                   />
                   {REGRA_LABEL[r.tipo]}
                 </label>
-                {r.tipo === "anuncios_variacao" || r.tipo === "nota_caiu" ? (
+                {r.tipo === "anuncios_variacao" || r.tipo === "nota_caiu" || r.tipo === "vagas_variacao" ? (
                   <span className="inline-flex items-center gap-1 text-xs text-stone-500">
                     limiar
                     <input

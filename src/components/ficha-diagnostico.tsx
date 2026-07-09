@@ -359,6 +359,65 @@ export function FichaDiagnostico({ diag, now }: { diag: DiagnosticoConcorrente; 
         </div>
       ) : null}
 
+      {/* Vagas (C2) — contratação = expansão/roadmap. */}
+      {diag.vagas ? (
+        <div className="border-t border-stone-100 px-4 py-4 sm:px-5">
+          <p className="mb-2 flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-stone-400">
+            Vagas &amp; contratação
+            {diag.vagas.status === "encontrado" && diag.vagas.total !== null ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{diag.vagas.total} aberta(s)</span>
+            ) : null}
+          </p>
+          {diag.vagas.status === "encontrado" ? (
+            <>
+              {diag.vagas.areas.length ? (
+                <p className="text-sm text-stone-700">
+                  <span className="text-stone-400">Contratando em:</span> {diag.vagas.areas.join(" · ")}
+                </p>
+              ) : null}
+              {diag.vagas.exemplos.length ? (
+                <ul className="mt-1 space-y-0.5">
+                  {diag.vagas.exemplos.slice(0, 5).map((v, i) => (
+                    <li key={i} className="text-xs text-stone-500">· {v.titulo}{v.area ? ` — ${v.area}` : ""}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="mt-2 flex flex-wrap items-center gap-x-2.5 text-xs text-stone-400">
+                {diag.vagas.fonte_url ? <SourceRef url={diag.vagas.fonte_url} titulo="página de vagas" /> : null}
+                <RecencyStamp collectedAt={diag.vagas.data_coleta} now={now} />
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-stone-400">— {diag.vagas.observacao ?? "não encontrado"}</p>
+          )}
+        </div>
+      ) : null}
+
+      {/* Notícias/releases (C4) — o que saiu de novo. */}
+      {diag.news ? (
+        <div className="border-t border-stone-100 px-4 py-4 sm:px-5">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-400">Notícias &amp; releases</p>
+          {diag.news.status === "encontrado" ? (
+            <>
+              <ul className="space-y-1.5">
+                {diag.news.itens.slice(0, 6).map((it, i) => (
+                  <li key={i} className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-sm text-stone-800">{it.titulo}</span>
+                    {it.data_publicacao ? <span className="text-[11px] text-stone-400">{it.data_publicacao.slice(0, 10)}</span> : null}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 flex flex-wrap items-center gap-x-2.5 text-xs text-stone-400">
+                {diag.news.fonte_url ? <SourceRef url={diag.news.fonte_url} titulo="página de notícias" /> : null}
+                <RecencyStamp collectedAt={diag.news.data_coleta} now={now} />
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-stone-400">— {diag.news.observacao ?? "não encontrado"}</p>
+          )}
+        </div>
+      ) : null}
+
       {/* Maturidade (Lente 4, F3) — OPINIÃO, visualmente distinta do fato. */}
       {diag.maturidade?.status === "avaliado" ? (
         <div className="border-t border-stone-100 bg-amber-50/40 px-4 py-4 sm:px-5">

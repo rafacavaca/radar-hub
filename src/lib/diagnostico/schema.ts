@@ -247,6 +247,50 @@ export type Battlecard = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ONDA 2 / C2 — VAGAS (contratação = sinal de expansão/roadmap). C4 — RELEASES/
+// NOTÍCIAS. Ambos alimentam o motor de movimento. FATO com fonte+data; o que
+// não for coletável vira nao_encontrado (nunca inventa vaga/notícia).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type VagaItem = { titulo: string; area: string | null };
+
+export type BlocoVagas = {
+  status: "encontrado" | "nao_encontrado";
+  /** total de vagas abertas, se explícito na página; senão null. */
+  total: number | null;
+  /** áreas em que contrata (ex.: Engenharia, Vendas) — sinal de para onde cresce. */
+  areas: string[];
+  exemplos: VagaItem[];
+  fonte_url?: string;
+  data_coleta: string;
+  observacao?: string | null;
+};
+
+export function vagasNaoEncontrado(dataColeta: string, observacao?: string): BlocoVagas {
+  return { status: "nao_encontrado", total: null, areas: [], exemplos: [], data_coleta: dataColeta, observacao: observacao ?? null };
+}
+
+export type ReleaseItem = {
+  titulo: string;
+  /** data de publicação (ABSOLUTA), quando a página informa; senão null. */
+  data_publicacao: string | null;
+  fonte_url: string;
+  resumo: string | null;
+};
+
+export type BlocoNews = {
+  status: "encontrado" | "nao_encontrado";
+  itens: ReleaseItem[];
+  fonte_url?: string;
+  data_coleta: string;
+  observacao?: string | null;
+};
+
+export function newsNaoEncontrado(dataColeta: string, observacao?: string): BlocoNews {
+  return { status: "nao_encontrado", itens: [], data_coleta: dataColeta, observacao: observacao ?? null };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ONDA 1 / F1a — MOVIMENTO + ALERTA (versionamento + diff + regras).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -264,6 +308,8 @@ export type Snapshot = {
   preco?: BlocoPreco;
   reputacao?: BlocoReputacao;
   campos_custom?: CampoCustom[];
+  vagas?: BlocoVagas;
+  news?: BlocoNews;
 };
 
 export type MovimentoTipo = "mudança" | "primeira_coleta" | "novo" | "removido";
@@ -294,7 +340,9 @@ export type RegraAlertaTipo =
   | "canal_novo"
   | "cliente_novo"
   | "preco_mudou"
-  | "nota_caiu";
+  | "nota_caiu"
+  | "vagas_variacao"
+  | "release_novo";
 
 /** Regra de alerta editável (por cliente — vale pra todos os concorrentes dele). */
 export type RegraAlerta = {
@@ -346,6 +394,10 @@ export type DiagnosticoConcorrente = {
   campos_custom?: CampoCustom[];
   /** D — temas que o usuário quer vigiar neste concorrente (guiam a extração). */
   temas_vigiados?: string[];
+  /** C2 — vagas abertas (sinal de expansão/roadmap). */
+  vagas?: BlocoVagas;
+  /** C4 — releases/notícias recentes. */
+  news?: BlocoNews;
 };
 
 export function midiaNaoLocalizada(dataColeta: string): MidiaPlataforma {

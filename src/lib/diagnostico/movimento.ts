@@ -66,6 +66,8 @@ export function toSnapshot(diag: DiagnosticoConcorrente): Snapshot {
     preco: diag.preco,
     reputacao: diag.reputacao,
     campos_custom: diag.campos_custom,
+    vagas: diag.vagas,
+    news: diag.news,
   };
 }
 
@@ -427,7 +429,99 @@ export function diffSnapshots(historico: Snapshot[], novo: Snapshot, agora: stri
     diffCampo(ctx, `campo_custom.${cn.chave}`, cn.chave, ca?.resposta, cn.resposta, { permiteMudanca: true, severidadeMudanca: "média" });
   }
 
+  // C2 vagas + C4 releases/notícias
+  diffVagas(ctx, older, anterior, novo);
+  diffNews(ctx, historico, novo);
+
   return ctx.out;
+}
+
+// ─── C2: vagas ───────────────────────────────────────────────────────────────
+
+/** Diff de vagas: total (numérico, imediato) + área nova (janela). Só entre lados coletados. */
+function diffVagas(ctx: Ctx, older: Snapshot[], anterior: Snapshot, novo: Snapshot): void {
+  const a = anterior.vagas;
+  const n = novo.vagas;
+  if (n?.status !== "encontrado") return;
+  if (a?.status !== "encontrado") {
+    push(ctx, {
+      campo: "vagas",
+      campo_label: "Vagas",
+      de: null,
+      para: n.total !== null ? `${n.total} vaga(s)` : `${n.areas.length} área(s) contratando`,
+      tipo: "primeira_coleta",
+      fonte_url_para: n.fonte_url,
+      data_para: n.data_coleta,
+      severidade: "baixa",
+    });
+    return;
+  }
+  if (a.total !== null && n.total !== null && a.total !== n.total) {
+    const variacao = a.total > 0 ? Math.abs(n.total - a.total) / a.total : 1;
+    push(ctx, {
+      campo: "vagas.total",
+      campo_label: "Nº de vagas",
+      de: a.total,
+      para: n.total,
+      tipo: "mudança",
+      fonte_url_de: a.fonte_url,
+      fonte_url_para: n.fonte_url,
+      data_de: a.data_coleta,
+      data_para: n.data_coleta,
+      severidade: variacao >= 0.5 ? "alta" : "média",
+    });
+  }
+  // área nova contratando = sinal de expansão (janela anti-jitter)
+  diffLista(
+    ctx,
+    "vagas.areas",
+    "Área contratando",
+    older.filter((s) => s.vagas?.status === "encontrado").map((s) => (s.vagas!.areas).map((x) => ({ nome: x }))),
+    a.areas.map((x) => ({ nome: x })),
+    n.areas.map((x) => ({ nome: x })),
+    { novo: "média", removido: "baixa" },
+  );
+}
+
+// ─── C4: releases/notícias ───────────────────────────────────────────────────
+
+/** Um release é "novo" se a URL+título não apareceu em NENHUM snapshot anterior. */
+function diffNews(ctx: Ctx, historico: Snapshot[], novo: Snapshot): void {
+  const n = novo.news;
+  if (n?.status !== "encontrado") return;
+  const anteriores = historico.filter((s) => s.news?.status === "encontrado");
+  if (anteriores.length === 0) {
+    // baseline: registra a existência, sem alertar cada item
+    push(ctx, {
+      campo: "news",
+      campo_label: "Notícias/releases",
+      de: null,
+      para: `${n.itens.length} item(ns) monitorado(s)`,
+      tipo: "primeira_coleta",
+      fonte_url_para: n.fonte_url,
+      data_para: n.data_coleta,
+      severidade: "baixa",
+    });
+    return;
+  }
+  const vistos = new Set<string>();
+  for (const s of anteriores) for (const it of s.news!.itens) vistos.add(chaveNews(it.titulo));
+  for (const it of n.itens) {
+    if (vistos.has(chaveNews(it.titulo))) continue;
+    push(ctx, {
+      campo: "news.item",
+      campo_label: "Release/notícia",
+      de: null,
+      para: it.titulo,
+      tipo: "novo",
+      fonte_url_para: it.fonte_url,
+      data_para: it.data_publicacao ?? novo.data,
+      severidade: "média",
+    });
+  }
+}
+function chaveNews(titulo: string): string {
+  return titulo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 // ─── regras de alerta ────────────────────────────────────────────────────────
@@ -438,6 +532,8 @@ export const REGRAS_PADRAO: RegraAlerta[] = [
   { tipo: "anuncios_variacao", ativo: true, limiar: 50 },
   { tipo: "preco_mudou", ativo: true },
   { tipo: "nota_caiu", ativo: true, limiar: 0.5 },
+  { tipo: "release_novo", ativo: true },
+  { tipo: "vagas_variacao", ativo: true, limiar: 50 },
   { tipo: "canal_novo", ativo: false },
   { tipo: "cliente_novo", ativo: false },
 ];
@@ -448,6 +544,8 @@ export const REGRA_LABEL: Record<RegraAlerta["tipo"], string> = {
   anuncios_variacao: "Anúncios variaram acima do limiar",
   preco_mudou: "Preço mudou (valor, plano ou público↔sob consulta)",
   nota_caiu: "Nota de reviews caiu além do limiar",
+  release_novo: "Release/notícia nova publicada",
+  vagas_variacao: "Vagas variaram acima do limiar (expansão)",
   canal_novo: "Canal novo aberto",
   cliente_novo: "Novo cliente citado no site",
 };
@@ -478,6 +576,17 @@ function regraCasa(regra: RegraAlerta, m: Movimento): boolean {
       const para = typeof m.para === "number" ? m.para : null;
       if (de === null || para === null) return false;
       return de - para >= (regra.limiar ?? 0.5);
+    }
+    case "release_novo":
+      return (m.campo === "news.item" && m.tipo === "novo") || (m.campo === "posicionamento.produtos" && m.tipo === "novo");
+    case "vagas_variacao": {
+      if (m.campo === "vagas.areas" && m.tipo === "novo") return true; // área nova = expansão
+      if (m.campo !== "vagas.total" || m.tipo !== "mudança") return false;
+      const de = typeof m.de === "number" ? m.de : null;
+      const para = typeof m.para === "number" ? m.para : null;
+      if (de === null || para === null) return false;
+      const pct = de > 0 ? (Math.abs(para - de) / de) * 100 : 100;
+      return pct >= (regra.limiar ?? 50);
     }
   }
 }

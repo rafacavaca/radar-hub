@@ -21,6 +21,8 @@ const TIPOS: RegraAlertaTipo[] = [
   "cliente_novo",
   "preco_mudou",
   "nota_caiu",
+  "vagas_variacao",
+  "release_novo",
 ];
 
 export async function GET(req: NextRequest) {
@@ -44,7 +46,7 @@ export async function PUT(req: NextRequest) {
     regras.push({
       tipo,
       ativo: r.ativo === true,
-      ...(tipo === "anuncios_variacao"
+      ...(tipo === "anuncios_variacao" || tipo === "vagas_variacao"
         ? { limiar: Number.isFinite(limiar) && limiar > 0 ? Math.min(500, limiar) : 50 }
         : tipo === "nota_caiu"
           ? { limiar: Number.isFinite(limiar) && limiar > 0 ? Math.min(10, limiar) : 0.5 }

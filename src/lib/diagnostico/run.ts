@@ -14,6 +14,8 @@ import { runLente4 } from "@/lib/diagnostico/lente4";
 import { runLentePreco } from "@/lib/diagnostico/lente-preco";
 import { runLenteReputacao } from "@/lib/diagnostico/lente-reputacao";
 import { runCamposCustom } from "@/lib/diagnostico/campos-custom";
+import { runLenteVagas } from "@/lib/diagnostico/lente-vagas";
+import { runLenteNews } from "@/lib/diagnostico/lente-news";
 import { getDiagConfig } from "@/lib/diagnostico/config";
 import { runEstrategia } from "@/lib/diagnostico/estrategia";
 import { getDiagnostico, saveDiagnostico } from "@/lib/diagnostico/store";
@@ -44,6 +46,9 @@ export async function runDiagnostico(input: {
   const reputacao = await runLenteReputacao(name, siteUrl);
   // D — campos customizados (reusa as páginas já coletadas, sem re-scrape).
   const campos_custom = await runCamposCustom(name, pages, config.camposCustom);
+  // C2 vagas + C4 releases/notícias — alimentam o motor de movimento.
+  const vagas = await runLenteVagas(name, siteUrl);
+  const news = await runLenteNews(name, siteUrl);
   // Opinião + rascunho (F3) por último.
   const maturidade = await runLente4(name, posicionamento);
   const estrategia = await runEstrategia(clientName, name, posicionamento, maturidade);
@@ -62,6 +67,8 @@ export async function runDiagnostico(input: {
     reputacao,
     campos_custom,
     temas_vigiados: config.temas,
+    vagas,
+    news,
     maturidade,
     estrategia,
   };
