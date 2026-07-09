@@ -22,16 +22,17 @@ import { NewClientButton } from "@/components/new-client-dialog";
 
 type Section = { label: string; href: string; match: (p: string) => boolean };
 
-/** Seções do modo CONCORRENTES (padrão). */
+/** Seções do modo CONCORRENTES (padrão). "Contas" = o pilar Clientes (contas-chave). */
 const CONCORRENTES_SECTIONS: Section[] = [
   { label: "Visão", href: "/visao", match: (p) => p.startsWith("/visao") },
   { label: "Briefing", href: "/", match: (p) => p === "/" },
   { label: "Feed", href: "/feed", match: (p) => p.startsWith("/feed") },
+  { label: "Contas", href: "/contas", match: (p) => p.startsWith("/contas") },
   { label: "Conhecimento", href: "/perguntar", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Concorrentes",
     href: "/vigiar",
-    match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade"),
+    match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
   { label: "Relatórios", href: "/relatorios", match: (p) => p.startsWith("/relatorios") },
   { label: "Ajustes", href: "/analistas", match: (p) => p.startsWith("/analistas") },
@@ -45,7 +46,7 @@ const CARTEIRA_SECTIONS: Section[] = [
   {
     label: "Hospitais",
     href: "/vigiar",
-    match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade"),
+    match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
   { label: "Relatórios", href: "/relatorios", match: (p) => p.startsWith("/relatorios") },
   { label: "Ajustes", href: "/analistas", match: (p) => p.startsWith("/analistas") },
@@ -132,8 +133,8 @@ export function AppShell({
     params.get("cliente") && clients.includes(params.get("cliente") as string)
       ? (params.get("cliente") as string)
       : (clients[0] ?? "");
-  const sections =
-    (modes?.[cliente] ?? "concorrentes") === "carteira" ? CARTEIRA_SECTIONS : CONCORRENTES_SECTIONS;
+  const mode = modes?.[cliente] ?? "concorrentes";
+  const sections = mode === "carteira" ? CARTEIRA_SECTIONS : CONCORRENTES_SECTIONS;
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-stone-50">

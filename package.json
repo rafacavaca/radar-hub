@@ -28,7 +28,17 @@
     "smoke:f16": "tsx scripts/test-radar-f16.mts",
     "smoke:f17": "tsx scripts/test-radar-f17.mts",
     "seed:gemmini": "tsx scripts/seed-gemmini.mts",
-    "smoke:gemmini": "tsx scripts/test-radar-gemmini.mts"
+    "smoke:gemmini": "tsx scripts/test-radar-gemmini.mts",
+    "seed:tagat": "tsx scripts/seed-tagat-clientes.mts",
+    "smoke:clientes": "tsx scripts/test-radar-clientes.mts",
+    "smoke:linkedin": "tsx scripts/test-radar-linkedin.mts",
+    "smoke:diagnostico": "tsx scripts/test-radar-diagnostico.mts",
+    "meta:token": "tsx scripts/meta-token-exchange.mts",
+    "smoke:metaads": "tsx scripts/test-meta-ads.mts",
+    "smoke:movimentos": "tsx scripts/test-radar-diagnostico-f1a.mts",
+    "smoke:preco": "tsx scripts/test-radar-preco.mts",
+    "smoke:reputacao": "tsx scripts/test-radar-reputacao.mts",
+    "smoke:battlecard": "tsx scripts/test-radar-battlecard.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",

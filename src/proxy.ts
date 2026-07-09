@@ -31,7 +31,11 @@ export async function proxy(req: NextRequest) {
   if (users.length === 0) return NextResponse.next(); // dev local sem login configurado
 
   const { pathname } = req.nextUrl;
-  if (pathname === "/entrar" || pathname === "/api/entrar") return NextResponse.next();
+  // /api/ingest é aberta no proxy (a extensão POSTa por fora da página); ela tem
+  // o próprio portão por segredo compartilhado (RADAR_INGEST_SECRET).
+  if (pathname === "/entrar" || pathname === "/api/entrar" || pathname === "/api/ingest") {
+    return NextResponse.next();
+  }
 
   const cookie = req.cookies.get("radar_auth")?.value;
   if (cookie) {

@@ -15,8 +15,11 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { fetchClientBrain } from "@/lib/brain";
 import { sendReportToFormare } from "@/lib/formare-door";
+import { runRadarLoop } from "@/lib/loop";
 import {
+  composeContaReport,
   composeReport,
   deleteReport,
   getReport,
@@ -91,6 +94,28 @@ export async function POST(req: NextRequest) {
         corpo: draft.corpo,
         fontes: draft.fontes,
         origem: request,
+      });
+      return NextResponse.json({ data: report });
+    }
+
+    if (action === "compose-conta") {
+      const conta = typeof body.conta === "string" ? body.conta.trim() : "";
+      if (!clientName) return badRequest("Escolha o cliente.");
+      if (!conta) return badRequest("Diga qual conta-chave.");
+      // as jogadas da conta vêm do resultado do dia (cache); a oferta, do Brain.
+      const loop = await runRadarLoop();
+      const plays = (loop.relationshipPlays ?? []).filter(
+        (p) => p.clientName === clientName && p.conta === conta,
+      );
+      const brain = await fetchClientBrain(clientName);
+      const draft = await composeContaReport(clientName, conta, plays, brain.context);
+      const report = saveReport({
+        clientName,
+        kind: "conta",
+        titulo: draft.titulo,
+        corpo: draft.corpo,
+        fontes: draft.fontes,
+        origem: `Conta: ${conta}`,
       });
       return NextResponse.json({ data: report });
     }

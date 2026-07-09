@@ -66,13 +66,19 @@ function stableId(eventId: string, sinal: string): string {
   return createHash("sha1").update(`cross:${eventId}:${sinal}`).digest("hex").slice(0, 16);
 }
 
+/** Corpo curto — descrições longas somadas estouram o teto de 40s do gateway. */
+function shortBody(event: RawEvent): string {
+  return (event.description || event.excerpt || "(sem descrição)").replace(/\s+/g, " ").trim().slice(0, 160);
+}
+
+/** Mais recente primeiro (publicação, senão coleta). */
+function byRecencyDesc(a: RawEvent, b: RawEvent): number {
+  return (b.publishedAt || b.collectedAt || "").localeCompare(a.publishedAt || a.collectedAt || "");
+}
+
 function buildEventsBlock(events: RawEvent[]): string {
   return events
-    .map((event, index) => {
-      const n = index + 1;
-      const body = event.description || event.excerpt || "(sem descrição)";
-      return `${n}. [${event.competitorName}] ${event.title} — ${body}`;
-    })
+    .map((event, index) => `${index + 1}. [${event.competitorName}] ${event.title} — ${shortBody(event)}`)
     .join("\n");
 }
 
@@ -139,8 +145,8 @@ export async function crossReference(
   if (allEvents.length === 0) return [];
 
   // CAP: cruzamento com muitos eventos estoura o teto de 40s do gateway
-  // (geração longa). 12 movimentos bastam pra achar os cruzamentos do dia.
-  const events = allEvents.slice(0, 12);
+  // (geração longa). Os 12 movimentos MAIS RECENTES bastam pros cruzamentos do dia.
+  const events = [...allEvents].sort(byRecencyDesc).slice(0, 12);
 
   const content = await completeViaGateway({
     system: SYSTEM,

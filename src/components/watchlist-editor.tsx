@@ -19,7 +19,40 @@ import { useState, type FormEvent } from "react";
 
 import type { SourceCandidate } from "@/lib/discovery";
 import type { SourceStatus } from "@/lib/source-status";
-import type { Competitor, SourceKind, WatchClient, Watchlist } from "@/lib/watchlist";
+import type { Competitor, EntityPillar, SourceKind, WatchClient, Watchlist } from "@/lib/watchlist";
+
+/** Vocabulário por pilar — o MESMO fluxo, rótulos diferentes (concorrente × conta-chave). */
+const VOCAB: Record<
+  EntityPillar,
+  {
+    sing: string;
+    plural: string;
+    nomeLabel: string;
+    placeholder: string;
+    addCta: string;
+    emptyRow: string;
+    hint: string;
+  }
+> = {
+  concorrente: {
+    sing: "concorrente",
+    plural: "concorrentes",
+    nomeLabel: "Nome do concorrente",
+    placeholder: "Ex.: RD Station",
+    addCta: "Adicionar à vigilância",
+    emptyRow: "Nenhum concorrente vigiado ainda. Adicione o primeiro abaixo.",
+    hint: 'Digite nome + site e clique em "Descobrir fontes". Adicionou alguém? Vá ao Briefing e use "Rodar agora" para varrer já.',
+  },
+  "conta-chave": {
+    sing: "conta-chave",
+    plural: "contas-chave",
+    nomeLabel: "Nome da conta",
+    placeholder: "Ex.: Frigorífico Bom Gosto",
+    addCta: "Adicionar conta-chave",
+    emptyRow: "Nenhuma conta-chave vigiada ainda. Adicione a primeira abaixo.",
+    hint: 'Digite nome + site e clique em "Descobrir fontes". Adicionou? Vá em Contas → Fichas e use "Rodar" pra varrer já.',
+  },
+};
 
 /** Status por fonte (chave `${competitorId}:${sourceId}`) — F18, transparência. */
 type StatusMap = Record<string, SourceStatus>;
@@ -52,6 +85,7 @@ type WatchlistAction =
       siteUrl?: string;
       blogUrl?: string;
       sources?: Array<{ kind: SourceKind; url: string; label?: string }>;
+      pillar?: EntityPillar;
     }
   | { action: "remove"; clientName: string; competitorId: string }
   | { action: "toggle"; clientName: string; competitorId: string; enabled: boolean }
@@ -85,9 +119,12 @@ async function postWatchlist(
 export function WatchlistEditor({
   initial,
   sourceStatus = {},
+  pillar = "concorrente",
 }: {
   initial: Watchlist;
   sourceStatus?: StatusMap;
+  /** qual pilar este editor gerencia (concorrente | conta-chave). */
+  pillar?: EntityPillar;
 }) {
   if (initial.clients.length === 0) {
     return (
@@ -109,6 +146,7 @@ export function WatchlistEditor({
           client={client}
           removable={initial.clients.length > 1}
           sourceStatus={sourceStatus}
+          pillar={pillar}
         />
       ))}
     </div>
@@ -119,14 +157,20 @@ function ClientCard({
   client,
   removable,
   sourceStatus,
+  pillar,
 }: {
   client: WatchClient;
   removable: boolean;
   sourceStatus: StatusMap;
+  pillar: EntityPillar;
 }) {
   const router = useRouter();
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+
+  const vocab = VOCAB[pillar];
+  // as entidades já vêm filtradas pelo pilar no server (a página escopa por pillarOf).
+  const entities = client.competitors;
 
   async function removeClient() {
     if (removing) return;
@@ -173,9 +217,9 @@ function ClientCard({
         ) : null}
       </div>
 
-      {client.competitors.length > 0 ? (
+      {entities.length > 0 ? (
         <ul className="divide-y divide-stone-100">
-          {client.competitors.map((competitor) => (
+          {entities.map((competitor) => (
             <CompetitorRow
               key={competitor.id}
               clientName={client.name}
@@ -185,12 +229,10 @@ function ClientCard({
           ))}
         </ul>
       ) : (
-        <p className="px-4 py-6 text-sm text-stone-500 sm:px-5">
-          Nenhum concorrente vigiado ainda. Adicione o primeiro abaixo.
-        </p>
+        <p className="px-4 py-6 text-sm text-stone-500 sm:px-5">{vocab.emptyRow}</p>
       )}
 
-      <AddCompetitorFlow clientName={client.name} />
+      <AddCompetitorFlow clientName={client.name} pillar={pillar} />
     </div>
   );
 }
@@ -201,8 +243,9 @@ function ClientCard({
 
 type Candidate = SourceCandidate & { checked: boolean };
 
-function AddCompetitorFlow({ clientName }: { clientName: string }) {
+function AddCompetitorFlow({ clientName, pillar }: { clientName: string; pillar: EntityPillar }) {
   const router = useRouter();
+  const vocab = VOCAB[pillar];
 
   const [name, setName] = useState("");
   const [siteUrl, setSiteUrl] = useState("");
@@ -273,6 +316,7 @@ function AddCompetitorFlow({ clientName }: { clientName: string }) {
       siteUrl: siteUrl.trim() || undefined,
       blogUrl: manualUrl.trim() || undefined,
       sources: chosen.length > 0 ? chosen : undefined,
+      pillar,
     });
 
     if (!result.ok) {
@@ -295,15 +339,13 @@ function AddCompetitorFlow({ clientName }: { clientName: string }) {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-stone-500">
-            Nome do concorrente
-          </span>
+          <span className="mb-1 block text-xs font-medium text-stone-500">{vocab.nomeLabel}</span>
           <input
             type="text"
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Ex.: RD Station"
+            placeholder={vocab.placeholder}
             className={INPUT_CLASS}
           />
         </label>
@@ -410,14 +452,11 @@ function AddCompetitorFlow({ clientName }: { clientName: string }) {
           }
           className="inline-flex min-h-[40px] items-center rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
         >
-          {busy === "add" ? "Adicionando…" : "Adicionar à vigilância"}
+          {busy === "add" ? "Adicionando…" : vocab.addCta}
         </button>
       </div>
 
-      <p className="mt-3 text-xs text-stone-400">
-        Digite nome + site e clique em “Descobrir fontes”. Adicionou alguém? Vá ao Briefing e use
-        “Rodar agora” para varrer já.
-      </p>
+      <p className="mt-3 text-xs text-stone-400">{vocab.hint}</p>
     </form>
   );
 }
@@ -604,7 +643,7 @@ function RunCompetitor({
         { cache: "no-store" },
       );
       const payload = (await res.json().catch(() => null)) as {
-        resumo?: { eventos: number; leituras: number };
+        resumo?: { eventos: number; leituras: number; jogadas?: number };
         error?: string;
       } | null;
       if (!res.ok) {
@@ -612,9 +651,11 @@ function RunCompetitor({
         return;
       }
       const r = payload?.resumo;
+      // leituras (lentes de concorrente) + jogadas (contas-chave) = análises geradas.
+      const analises = r ? r.leituras + (r.jogadas ?? 0) : 0;
       setNote(
-        r && (r.eventos > 0 || r.leituras > 0)
-          ? `✓ ${r.eventos} sinal(is), ${r.leituras} leitura(s) — veja no Briefing`
+        r && (r.eventos > 0 || analises > 0)
+          ? `✓ ${r.eventos} sinal(is), ${analises} análise(s) — veja no Briefing/Contas`
           : "✓ rodou — nada novo desta vez",
       );
       router.refresh();

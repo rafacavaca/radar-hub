@@ -23,8 +23,9 @@ import { join } from "node:path";
 import { buildMaterialBlock, collectRecentItems, type AskSource } from "@/lib/ask";
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
+import type { RelationshipPlay } from "@/lib/types";
 
-export type ReportKind = "chat" | "sob-medida" | "agendado";
+export type ReportKind = "chat" | "sob-medida" | "agendado" | "conta";
 
 export type Report = {
   id: string;
@@ -253,5 +254,82 @@ ${request}`;
 
   const { titulo, corpo } = parseReportOutput(content);
   const fontes = fontesFromBody(corpo, items);
+  return { titulo, corpo, fontes };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Relatório POR CONTA (F3b) — um briefing de relacionamento de UMA conta-chave,
+// redigido a partir das JOGADAS já apuradas sobre ela (não dos itens de
+// concorrente). Reusa o gateway + o parser + o mapeamento de fontes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CONTA_REPORT_SYSTEM =
+  "Você é o RADAR, redigindo um BRIEFING DE RELACIONAMENTO de uma CONTA-CHAVE para o dono da agência Formare. " +
+  "A partir APENAS do MATERIAL (as jogadas já apuradas sobre a conta + a oferta da empresa), escreva um documento claro e apresentável em pt-BR. " +
+  "FORMATO: MARKDOWN PURO (NÃO use JSON, NÃO embrulhe em ```). A PRIMEIRA linha é o título nível 1, ex.: '# Briefing de relacionamento — <conta>'. " +
+  "Depois: (1) um resumo de 2-3 linhas da situação da conta; (2) '## Oportunidades' com as jogadas priorizadas (as DIRETAS primeiro, depois adjacentes, por fim as brechas/estratégicas), cada uma com o gatilho, o encaixe e a ação; (3) '## Próximos passos' — o que fazer, na ordem. " +
+  "Regras: (1) HONESTIDADE — só afirme o que está no material; NÃO invente; se a oferta não cobre algo, trate como brecha/estratégico, não force venda; " +
+  "(2) cite os sinais por [n] usando os números do material; " +
+  "(3) seja CONCISO — no máximo ~500 palavras.";
+
+/** Uma linha por jogada, com os ingredientes presentes — o material do briefing. */
+function buildPlaysBlock(plays: RelationshipPlay[]): string {
+  return plays
+    .map((p, i) => {
+      const parts = [`${i + 1}. [${p.encaixe}] ${p.sinal}`, `gatilho: ${p.gatilho}`];
+      if (p.brainRef) parts.push(`oferta: ${p.brainRef}`);
+      if (p.urgencia) parts.push(`urgência (${p.urgenciaConcorrente ?? "concorrente"}): ${p.urgencia}`);
+      if (p.reforco) parts.push(`mercado: ${p.reforco}`);
+      parts.push(`ação: ${p.acao}`);
+      return parts.join(" — ");
+    })
+    .join("\n");
+}
+
+/**
+ * Compõe um briefing de relacionamento de UMA conta a partir das jogadas dela.
+ * NÃO salva — devolve o rascunho; a rota decide guardar. Nunca lança pelo LLM
+ * (só por material vazio, com mensagem amigável). 1 retry (teto de 40s).
+ */
+export async function composeContaReport(
+  clientName: string,
+  conta: string,
+  plays: RelationshipPlay[],
+  offerContext: string,
+): Promise<{ titulo: string; corpo: string; fontes: AskSource[] }> {
+  if (plays.length === 0) {
+    throw new Error(`A conta "${conta}" ainda não tem jogadas — rode o Radar nesta conta primeiro.`);
+  }
+
+  const prompt = `EMPRESA: ${clientName}
+CONTA-CHAVE: ${conta}
+
+A OFERTA DA EMPRESA (contexto — o que ${clientName} tem a oferecer):
+${offerContext}
+
+JOGADAS APURADAS SOBRE A CONTA (cite por [n]):
+${buildPlaysBlock(plays)}
+
+Redija o briefing de relacionamento da conta ${conta} para ${clientName}.`;
+
+  let content = "";
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      content = await completeViaGateway({ system: CONTA_REPORT_SYSTEM, prompt });
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err as Error;
+      console.warn(`[reports] composeContaReport tentativa ${attempt} falhou: ${lastErr.message}`);
+    }
+  }
+  if (lastErr) throw lastErr;
+
+  const { titulo, corpo } = parseReportOutput(content);
+  const fontes = fontesFromBody(
+    corpo,
+    plays.map((p) => ({ fonte: p.fonte, concorrente: p.conta })),
+  );
   return { titulo, corpo, fontes };
 }

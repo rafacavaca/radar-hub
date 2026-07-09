@@ -9,7 +9,7 @@
 import Link from "next/link";
 
 import { listSourceStatus } from "@/lib/source-status";
-import { readWatchlist } from "@/lib/watchlist";
+import { pillarOf, readWatchlist } from "@/lib/watchlist";
 
 import { WatchlistEditor } from "@/components/watchlist-editor";
 
@@ -27,12 +27,19 @@ export default async function VigiarPage({
     params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
 
   const sourceStatus = listSourceStatus();
-  // escopa a watchlist ao cliente da conta (a sidebar troca de cliente).
-  const scoped = cliente
-    ? { clients: watchlist.clients.filter((c) => c.name === cliente) }
-    : watchlist;
   const client = watchlist.clients.find((c) => c.name === cliente);
-  const watchedCount = (client?.competitors ?? []).filter((c) => c.enabled).length;
+  // escopa ao cliente E ao pilar CONCORRENTE (contas-chave têm a própria tela em Contas → Vigiar).
+  const scoped = {
+    clients: (cliente ? watchlist.clients.filter((c) => c.name === cliente) : watchlist.clients).map(
+      (c) => ({
+        ...c,
+        competitors: c.competitors.filter((k) => pillarOf(k, c.mode) === "concorrente"),
+      }),
+    ),
+  };
+  const watchedCount = (client?.competitors ?? []).filter(
+    (c) => c.enabled && pillarOf(c, client?.mode) === "concorrente",
+  ).length;
 
   const q = cliente ? `?cliente=${encodeURIComponent(cliente)}` : "";
 
@@ -52,6 +59,12 @@ export default async function VigiarPage({
           className="border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900"
         >
           Identidade
+        </Link>
+        <Link
+          href={`/diagnostico${q}`}
+          className="border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900"
+        >
+          Diagnóstico
         </Link>
       </div>
 

@@ -48,3 +48,4 @@ next-env.d.ts
 
 # permitir o exemplo (sem segredos)
 !.env.example
+extension/linkedin/config.js

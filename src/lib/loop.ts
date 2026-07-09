@@ -24,15 +24,30 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { analyzeLens } from "@/lib/analyst-lens";
+import { analyzeRelacionamento, sortRelationshipPlays } from "@/lib/analyst-relacionamento";
 import { analyzeVendedor } from "@/lib/analyst-vendedor";
 import { fetchClientBrain } from "@/lib/brain";
 import { collectBlog } from "@/lib/collectors/blog";
 import { collectByDiff } from "@/lib/collectors/content-diff";
+import { collectMarket } from "@/lib/collectors/market";
 import { crossReference, type CrossInsight } from "@/lib/cross-reference";
 import { activeLensesFor } from "@/lib/lenses";
+import { collectLinkedIn } from "@/lib/linkedin";
 import { recordSourceRun } from "@/lib/source-status";
-import { collectionMethod, planCollection, readWatchlist } from "@/lib/watchlist";
-import type { IntelligenceItem, LensReading, RawEvent, SalesReading } from "@/lib/types";
+import {
+  collectionMethod,
+  pillarOf,
+  planCollection,
+  readWatchlist,
+  type WatchClient,
+} from "@/lib/watchlist";
+import type {
+  IntelligenceItem,
+  LensReading,
+  RawEvent,
+  RelationshipPlay,
+  SalesReading,
+} from "@/lib/types";
 
 const CACHE_DIR = join(process.cwd(), ".cache");
 const DEFAULT_LIMIT = 5;
@@ -58,6 +73,8 @@ export type RadarLoopResult = {
   crossInsights?: CrossInsight[];
   /** 2º template (modo carteira): leituras de venda por hospital (ficha/gatilhos). */
   salesReadings?: SalesReading[];
+  /** pilar Clientes: jogadas de relacionamento por conta-chave (a ficha da conta). */
+  relationshipPlays?: RelationshipPlay[];
   /** sinais crus coletados (o Feed mostra isto, sem lente). */
   events?: ClientEvent[];
   /** ISO de quando o loop de fato rodou (não muda ao reler do cache). */
@@ -178,6 +195,35 @@ export function buildGeneralItems(readings: LensReading[]): IntelligenceItem[] {
   return byScoreDesc(items);
 }
 
+/** ids das entidades no pilar "conta-chave" de um cliente (partição do loop). */
+function contaChaveIds(client: WatchClient | undefined): Set<string> {
+  const ids = new Set<string>();
+  if (!client) return ids;
+  for (const c of client.competitors) {
+    if (pillarOf(c, client.mode) === "conta-chave") ids.add(c.id);
+  }
+  return ids;
+}
+
+/**
+ * Partição por pilar: separa os eventos de um cliente entre os do pilar
+ * Concorrentes (lentes + cruzamento) e os do pilar Clientes (relacionamento).
+ * O pilar de um evento vem do `source` (== id da entidade). Só faz sentido em
+ * modo concorrentes — no modo carteira todos os subjects vão ao vendedor.
+ */
+function splitByPillar<T extends { source: string }>(
+  events: T[],
+  contaIds: Set<string>,
+): { concorrenteEvents: T[]; contaEvents: T[] } {
+  const concorrenteEvents: T[] = [];
+  const contaEvents: T[] = [];
+  for (const event of events) {
+    if (contaIds.has(event.source)) contaEvents.push(event);
+    else concorrenteEvents.push(event);
+  }
+  return { concorrenteEvents, contaEvents };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RODADA PARCIAL (F16) — por cliente ou por concorrente, com MERGE no dia.
 // Evita rodar TUDO pra ver uma novidade pontual: atualiza só o escopo pedido
@@ -198,6 +244,8 @@ type FreshPatch = {
   crossInsights: CrossInsight[];
   /** só no modo carteira — ausente nos patches de concorrente. */
   salesReadings?: SalesReading[];
+  /** pilar Clientes — jogadas das contas-chave do escopo. */
+  relationshipPlays?: RelationshipPlay[];
   brainSource: BrainSourceNote;
   failures: string[];
 };
@@ -224,16 +272,21 @@ export function mergeLoopResult(
   const inScopeSales = (r: { clientName: string; hospital?: string }): boolean =>
     r.clientName === scope.clientName &&
     (!scope.competitorName || r.hospital === scope.competitorName);
+  const inScopePlay = (p: { clientName: string; conta?: string }): boolean =>
+    p.clientName === scope.clientName &&
+    (!scope.competitorName || p.conta === scope.competitorName);
 
   const baseEvents = base?.events ?? [];
   const baseReadings = base?.readings ?? [];
   const baseCross = base?.crossInsights ?? [];
   const baseSales = base?.salesReadings ?? [];
+  const basePlays = base?.relationshipPlays ?? [];
 
   const nothingNew =
     fresh.events.length === 0 &&
     fresh.readings.length === 0 &&
     (fresh.salesReadings?.length ?? 0) === 0 &&
+    (fresh.relationshipPlays?.length ?? 0) === 0 &&
     fresh.failures.length === 0;
 
   const events = nothingNew
@@ -248,6 +301,9 @@ export function mergeLoopResult(
   const salesReadings = nothingNew
     ? baseSales
     : [...baseSales.filter((r) => !inScopeSales(r)), ...(fresh.salesReadings ?? [])];
+  const relationshipPlays = nothingNew
+    ? basePlays
+    : [...basePlays.filter((p) => !inScopePlay(p)), ...(fresh.relationshipPlays ?? [])];
 
   const brainSources = [
     ...(base?.brainSources ?? []).filter((b) => b.clientName !== scope.clientName),
@@ -259,6 +315,8 @@ export function mergeLoopResult(
     readings: byScoreDesc(readings),
     crossInsights: byScoreDesc(crossInsights),
     salesReadings: salesReadings.length > 0 ? byScoreDesc(salesReadings) : undefined,
+    relationshipPlays:
+      relationshipPlays.length > 0 ? sortRelationshipPlays(relationshipPlays) : undefined,
     events,
     ranAt: new Date().toISOString(),
     brainSources,
@@ -273,7 +331,13 @@ export function mergeLoopResult(
  */
 export async function runRadarPartial(scope: RunScope, opts: { limit?: number } = {}): Promise<{
   result: RadarLoopResult;
-  summary: { eventos: number; leituras: number; cruzamentos: number; falhas: string[] };
+  summary: {
+    eventos: number;
+    leituras: number;
+    cruzamentos: number;
+    jogadas: number;
+    falhas: string[];
+  };
 }> {
   const watchlist = readWatchlist();
   const client = watchlist.clients.find((c) => c.name === scope.clientName);
@@ -334,6 +398,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
   const readings: LensReading[] = [];
   const crossInsights: CrossInsight[] = [];
   const salesReadings: SalesReading[] = [];
+  const relationshipPlays: RelationshipPlay[] = [];
   if (freshEvents.length > 0) {
     if (mode === "carteira") {
       // modo carteira: a lente "vendedor" casa sinal→linha→gatilho; sem lentes nem cruzamento.
@@ -344,20 +409,67 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
       );
       if (sales) salesReadings.push(...sales);
     } else {
-      for (const lens of activeLensesFor(scope.clientName)) {
-        const out = await withGatewayRetry(
-          `lente ${lens.id} (${scope.clientName})`,
-          () => analyzeLens(lens, freshEvents, scope.clientName, brain.context),
+      // partição por pilar: concorrentes (lentes + cruzamento) × contas-chave (relacionamento).
+      const contaIds = contaChaveIds(client);
+      const { concorrenteEvents, contaEvents } = splitByPillar(freshEvents, contaIds);
+
+      // LinkedIn ingerido — só na rodada do CLIENTE inteiro (não numa fonte/entidade só).
+      if (!scope.competitorId) {
+        const li = collectLinkedIn(scope.clientName);
+        const stamp = (e: RawEvent): ClientEvent => ({ ...e, clientName: scope.clientName });
+        concorrenteEvents.push(...li.concorrente.map(stamp));
+        contaEvents.push(...li.conta.map(stamp));
+        // também no Feed (sinais crus) — via freshEvents, que a mescla usa como `events`.
+        freshEvents.push(...li.concorrente.map(stamp), ...li.conta.map(stamp));
+      }
+
+      if (concorrenteEvents.length > 0) {
+        for (const lens of activeLensesFor(scope.clientName)) {
+          const out = await withGatewayRetry(
+            `lente ${lens.id} (${scope.clientName})`,
+            () => analyzeLens(lens, concorrenteEvents, scope.clientName, brain.context),
+            failures,
+          );
+          if (out) readings.push(...out);
+        }
+        const cross = await withGatewayRetry(
+          `cruzamento (${scope.clientName})`,
+          () => crossReference(concorrenteEvents, scope.clientName, brain.context),
           failures,
         );
-        if (out) readings.push(...out);
+        if (cross) crossInsights.push(...cross);
       }
-      const cross = await withGatewayRetry(
-        `cruzamento (${scope.clientName})`,
-        () => crossReference(freshEvents, scope.clientName, brain.context),
-        failures,
-      );
-      if (cross) crossInsights.push(...cross);
+      if (contaEvents.length > 0) {
+        // F2 — contexto de concorrente pra urgência: os frescos deste escopo +
+        // os movimentos de concorrente já coletados hoje (cache), deduplicados.
+        // Assim "Rodar" só a conta ainda enxerga o que os concorrentes fizeram.
+        const cachedComp = (readLoopCache()?.events ?? []).filter(
+          (e) => e.clientName === scope.clientName && !contaIds.has(e.source),
+        );
+        const seen = new Set<string>();
+        const competitorContext: ClientEvent[] = [];
+        for (const e of [...concorrenteEvents, ...cachedComp]) {
+          if (seen.has(e.id)) continue;
+          seen.add(e.id);
+          competitorContext.push(e);
+        }
+        const marketEvents = client.market?.length
+          ? await collectMarket(scope.clientName, client.market)
+          : [];
+        const plays = await withGatewayRetry(
+          `relacionamento (${scope.clientName})`,
+          () =>
+            analyzeRelacionamento(
+              contaEvents,
+              scope.clientName,
+              brain.context,
+              competitorContext,
+              marketEvents,
+            ),
+          failures,
+        );
+        if (plays) relationshipPlays.push(...plays);
+      }
     }
   }
 
@@ -365,7 +477,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
   const merged = mergeLoopResult(
     readLoopCache(),
     { clientName: scope.clientName, competitorId: scope.competitorId, competitorName },
-    { events: freshEvents, readings, crossInsights, salesReadings, brainSource, failures },
+    { events: freshEvents, readings, crossInsights, salesReadings, relationshipPlays, brainSource, failures },
   );
   writeLoopCache(merged);
 
@@ -375,6 +487,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
       eventos: freshEvents.length,
       leituras: readings.length,
       cruzamentos: crossInsights.length,
+      jogadas: relationshipPlays.length,
       falhas: failures,
     },
   };
@@ -443,6 +556,7 @@ export async function runRadarLoop(
   const readings: LensReading[] = [];
   const crossInsights: CrossInsight[] = [];
   const salesReadings: SalesReading[] = [];
+  const relationshipPlays: RelationshipPlay[] = [];
   const brainSources: BrainSourceNote[] = [];
   const allEvents: ClientEvent[] = [];
 
@@ -457,8 +571,8 @@ export async function runRadarLoop(
       nodeCount: brain.mode === "live" ? brain.nodeCount : undefined,
     });
 
-    const clientMode =
-      watchlist.clients.find((c) => c.name === clientName)?.mode ?? "concorrentes";
+    const client = watchlist.clients.find((c) => c.name === clientName);
+    const clientMode = client?.mode ?? "concorrentes";
     if (clientMode === "carteira") {
       // modo carteira (2º template): a lente "vendedor" casa sinal→linha→gatilho;
       // sem as 3 lentes de concorrente nem o cruzamento interno×externo.
@@ -471,22 +585,54 @@ export async function runRadarLoop(
       continue;
     }
 
-    for (const lens of activeLensesFor(clientName)) {
-      const out = await withGatewayRetry(
-        `lente ${lens.id} (${clientName})`,
-        () => analyzeLens(lens, events, clientName, brain.context),
+    // Partição por pilar: concorrentes (lentes + cruzamento) × contas-chave (relacionamento).
+    const { concorrenteEvents, contaEvents } = splitByPillar(events, contaChaveIds(client));
+
+    // LinkedIn ingerido (captura assistida) entra pelos DOIS pilares, por papel.
+    const li = collectLinkedIn(clientName);
+    concorrenteEvents.push(...li.concorrente);
+    contaEvents.push(...li.conta);
+    // e no FEED (sinais crus) — pra TUDO que foi enviado ficar visível, mesmo
+    // que o analista não o eleja como insight forte.
+    allEvents.push(
+      ...li.concorrente.map((e) => ({ ...e, clientName })),
+      ...li.conta.map((e) => ({ ...e, clientName })),
+    );
+
+    if (concorrenteEvents.length > 0) {
+      for (const lens of activeLensesFor(clientName)) {
+        const out = await withGatewayRetry(
+          `lente ${lens.id} (${clientName})`,
+          () => analyzeLens(lens, concorrenteEvents, clientName, brain.context),
+          failures,
+        );
+        if (out) readings.push(...out);
+      }
+
+      // Cruzamento interno×externo (mesma disciplina de recuo).
+      const cross = await withGatewayRetry(
+        `cruzamento (${clientName})`,
+        () => crossReference(concorrenteEvents, clientName, brain.context),
         failures,
       );
-      if (out) readings.push(...out);
+      if (cross) crossInsights.push(...cross);
     }
 
-    // Cruzamento interno×externo (mesma disciplina de recuo).
-    const cross = await withGatewayRetry(
-      `cruzamento (${clientName})`,
-      () => crossReference(events, clientName, brain.context),
-      failures,
-    );
-    if (cross) crossInsights.push(...cross);
+    // Pilar Clientes: as contas-chave vão ao analista de relacionamento, que
+    // cruza o gatilho da conta com a oferta (Brain) + os movimentos de
+    // concorrente (F2 — urgência) + os sinais de mercado (F4 — reforço).
+    if (contaEvents.length > 0) {
+      const marketEvents = client?.market?.length
+        ? await collectMarket(clientName, client.market)
+        : [];
+      const plays = await withGatewayRetry(
+        `relacionamento (${clientName})`,
+        () =>
+          analyzeRelacionamento(contaEvents, clientName, brain.context, concorrenteEvents, marketEvents),
+        failures,
+      );
+      if (plays) relationshipPlays.push(...plays);
+    }
   }
 
   const result: RadarLoopResult = {
@@ -494,6 +640,8 @@ export async function runRadarLoop(
     readings: byScoreDesc(readings),
     crossInsights: byScoreDesc(crossInsights),
     salesReadings: salesReadings.length > 0 ? byScoreDesc(salesReadings) : undefined,
+    relationshipPlays:
+      relationshipPlays.length > 0 ? sortRelationshipPlays(relationshipPlays) : undefined,
     events: allEvents,
     ranAt: new Date().toISOString(),
     brainSources,

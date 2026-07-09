@@ -7,7 +7,7 @@
  *                 É isso que vira briefing/feed e, com aprovação, demanda no Formare.
  */
 
-export type SignalKind = "blog" | "news" | "page" | "release" | "material";
+export type SignalKind = "blog" | "news" | "page" | "release" | "material" | "market";
 
 /** Um sinal cru, como coletado — sem raciocínio ainda. */
 export type RawEvent = {
@@ -120,6 +120,68 @@ export type SalesReading = {
   angulo: string;
   /** valor/urgência da oportunidade pro vendedor (0-100). */
   score: number;
+  fonte: Fonte;
+  /** de qual(is) RawEvent este item nasceu. */
+  eventIds: string[];
+  /** data de PUBLICAÇÃO da fonte (do evento). */
+  publishedAt?: string | null;
+  /** quando o Radar COLETOU o sinal (do evento). */
+  collectedAt?: string;
+  createdAt: string;
+};
+
+/**
+ * O ENCAIXE de uma jogada de relacionamento — a OFERTA é CLASSIFICAÇÃO, não portão:
+ *  - "direto"    → a empresa TEM oferta que atende o gatilho (jogada pronta);
+ *  - "adjacente" → tem algo PERTO (esticar) OU há dúvida ("possível encaixe — confirmar no Brain");
+ *  - "brecha"    → white space: ninguém atende ainda (oportunidade estratégica, NÃO se descarta).
+ * Nenhum sinal com gatilho real é jogado fora — todos caem num dos três.
+ */
+export type Encaixe = "direto" | "adjacente" | "brecha";
+
+/**
+ * JOGADA DE RELACIONAMENTO (pilar Clientes): um sinal PÚBLICO de uma CONTA-CHAVE
+ * (o cliente do cliente do Radar) cruzado com a OFERTA da empresa (do Brain).
+ * O analista classifica o encaixe e SEMPRE registra — a ficha da conta consome isto.
+ * 1 sinal -> 0..N jogadas. É o "produto" do Radar no pilar Clientes.
+ */
+export type RelationshipPlay = {
+  id: string;
+  /** cliente do Radar dono do pilar (ex.: "TAGAT Foodtech"). */
+  clientName: string;
+  /** a conta-chave (subject) de onde o sinal veio — derivada do evento, nunca do LLM. */
+  conta: string;
+  /** o sinal (o que a conta fez, 1 frase). */
+  sinal: string;
+  /** o gatilho — a necessidade nova que o sinal revela. */
+  gatilho: string;
+  /** o encaixe com a oferta da empresa (classificação, não portão). */
+  encaixe: Encaixe;
+  /** por que este encaixe — ancorado e honesto (na dúvida, "confirmar no Brain"). */
+  justificativa: string;
+  /** a ação recomendada: a jogada (direto/adjacente) ou a munição estratégica (brecha). */
+  acao: string;
+  /** o fato de OFERTA (do Brain) que ancorou direto/adjacente. VAZIO em brecha. */
+  brainRef?: string;
+  /**
+   * F2 — URGÊNCIA (concorrente): um concorrente vigiado mirando a mesma brecha.
+   * Ancorado num sinal REAL de concorrente (nunca inventado). Omitido se não há.
+   */
+  urgencia?: string;
+  /** nome do concorrente do sinal que ancorou a urgência (do evento, não do LLM). */
+  urgenciaConcorrente?: string;
+  /** fonte do sinal do concorrente (do evento real). */
+  urgenciaFonte?: Fonte;
+  /**
+   * F2 — REFORÇO (mercado): tendência do setor que valida a jogada. Derivada do
+   * Brain + dos sinais visíveis; omitida se não houver evidência (nunca inventada).
+   */
+  reforco?: string;
+  /** F4 — fonte do reforço quando ancorado num SINAL DE MERCADO coletado (não inventada). */
+  reforcoFonte?: Fonte;
+  /** valor/urgência da jogada pra empresa (0-100). */
+  score: number;
+  /** de onde veio o sinal (do evento real — nunca inventada). */
   fonte: Fonte;
   /** de qual(is) RawEvent este item nasceu. */
   eventIds: string[];

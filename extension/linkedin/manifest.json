@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Radar — Enviar pro Radar (LinkedIn)",
+  "version": "0.1.0",
+  "description": "Captura assistida de posts do LinkedIn para o Radar Hub — clique, confirme, envie.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://*.linkedin.com/*", "https://radar.formare.tech/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.linkedin.com/*"],
+      "js": ["config.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

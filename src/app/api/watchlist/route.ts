@@ -89,12 +89,21 @@ export async function POST(req: Request) {
             sources.push({ kind, url, ...(isString(label) ? { label } : {}) });
           }
         }
+        // pilar da entidade (concorrente | conta-chave). Ausente ⇒ concorrente.
+        let pillar: "concorrente" | "conta-chave" | undefined;
+        if (payload.pillar !== undefined) {
+          if (payload.pillar !== "concorrente" && payload.pillar !== "conta-chave") {
+            return badRequest("O campo pillar precisa ser 'concorrente' ou 'conta-chave'.");
+          }
+          pillar = payload.pillar;
+        }
         const data = addCompetitor(payload.clientName, {
           name: payload.name,
           blogUrl: isString(payload.blogUrl) ? payload.blogUrl : undefined,
           siteUrl: isString(payload.siteUrl) ? payload.siteUrl : undefined,
           // a lib valida kind/url em runtime com mensagens amigáveis.
           sources: sources as AddCompetitorInput["sources"],
+          pillar,
         });
         return NextResponse.json({ data });
       }

@@ -26,8 +26,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "itemId obrigatório" }, { status: 400 });
     }
 
-    // Recupera pelo id: item da visão Geral OU leitura de lente (F6) OU leitura de venda (carteira).
-    const { items, readings, salesReadings } = await runRadarLoop();
+    // Recupera pelo id: item da visão Geral OU leitura de lente (F6) OU leitura
+    // de venda (carteira) OU jogada de relacionamento (pilar Clientes).
+    const { items, readings, salesReadings, relationshipPlays } = await runRadarLoop();
     let item = items.find((it) => it.id === itemId);
     if (!item) {
       const reading = (readings ?? []).find((r) => r.id === itemId);
@@ -69,6 +70,30 @@ export async function POST(req: NextRequest) {
           score: sale.score,
           eventIds: sale.eventIds,
           createdAt: sale.createdAt,
+        };
+      }
+    }
+    if (!item) {
+      // Pilar Clientes: a jogada de relacionamento vira card — o gatilho + o
+      // encaixe são o "porquê", a ação é a jogada; a conta ocupa "concorrente".
+      const play = (relationshipPlays ?? []).find((p) => p.id === itemId);
+      if (play) {
+        const oferta = play.brainRef ? `; oferta: ${play.brainRef}` : "";
+        const urg = play.urgencia
+          ? `; urgência (${play.urgenciaConcorrente ?? "concorrente"}): ${play.urgencia}`
+          : "";
+        const ref = play.reforco ? `; reforço de mercado: ${play.reforco}` : "";
+        item = {
+          id: play.id,
+          clientName: play.clientName,
+          sinal: play.sinal,
+          porQueImporta: `${play.gatilho} (encaixe: ${play.encaixe}${oferta}${urg}${ref})`,
+          acao: play.acao,
+          fonte: play.fonte,
+          concorrente: play.conta,
+          score: play.score,
+          eventIds: play.eventIds,
+          createdAt: play.createdAt,
         };
       }
     }

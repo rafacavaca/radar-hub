@@ -36,14 +36,23 @@ function stableReadingId(lens: string, eventId: string, sinal: string): string {
   return createHash("sha1").update(`${lens}:${eventId}:${sinal}`).digest("hex").slice(0, 16);
 }
 
+/** Corpo curto — descrições longas somadas estouram o teto de 40s do gateway. */
+function shortBody(event: RawEvent): string {
+  return (event.description || event.excerpt || "(sem descrição)").replace(/\s+/g, " ").trim().slice(0, 160);
+}
+
+/** Mais recente primeiro (publicação, senão coleta) — lemos os sinais frescos. */
+function byRecencyDesc(a: RawEvent, b: RawEvent): number {
+  return (b.publishedAt || b.collectedAt || "").localeCompare(a.publishedAt || a.collectedAt || "");
+}
+
 /** Bloco numerado de movimentos (1..N) — mesmo formato do analista geral. */
 function buildEventsBlock(events: RawEvent[]): string {
   return events
     .map((event, index) => {
       const n = index + 1;
       const category = event.category ?? "sem categoria";
-      const body = event.description || event.excerpt || "(sem descrição)";
-      return `${n}. [${event.competitorName}] ${event.title} [${category}] — ${event.url}\n   ${body}`;
+      return `${n}. [${event.competitorName}] ${event.title} [${category}] — ${event.url}\n   ${shortBody(event)}`;
     })
     .join("\n");
 }
@@ -129,9 +138,13 @@ export async function analyzeLens(
 ): Promise<LensReading[]> {
   if (events.length === 0) return [];
 
+  // CAP: geração longa estoura o teto de 40s do gateway (e o timeout abre o
+  // disjuntor, derrubando as outras lentes em cascata). Lê os 12 mais recentes.
+  const capped = [...events].sort(byRecencyDesc).slice(0, 12);
+
   const content = await completeViaGateway({
     system: buildSystem(lens),
-    prompt: buildPrompt(lens, clientName, brainContext, events),
+    prompt: buildPrompt(lens, clientName, brainContext, capped),
   });
 
   const entries = extractJsonArray(content);
@@ -147,8 +160,8 @@ export async function analyzeLens(
     if (!sinal || !leitura || !acao) continue;
 
     const eventIndex = Number(entry.eventIndex);
-    if (!Number.isInteger(eventIndex) || eventIndex < 1 || eventIndex > events.length) continue;
-    const event = events[eventIndex - 1];
+    if (!Number.isInteger(eventIndex) || eventIndex < 1 || eventIndex > capped.length) continue;
+    const event = capped[eventIndex - 1];
 
     const contaAfetada = cleanString(entry.contaAfetada);
 

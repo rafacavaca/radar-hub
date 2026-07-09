@@ -51,6 +51,16 @@ export type WatchSource = {
  *  clientes-alvo (sales-enablement — os "subjects" são clientes, ex.: hospitais). */
 export type ClientMode = "concorrentes" | "carteira";
 
+/**
+ * PILAR de uma entidade vigiada (por-entidade, não por-cliente). Deixa um mesmo
+ * workspace (ex.: TAGAT) ter os DOIS pilares ao mesmo tempo:
+ *  - "concorrente" (padrão) → analistas de concorrente (lentes + cruzamento);
+ *  - "conta-chave" → analista de RELACIONAMENTO (o pilar Clientes: gatilho da
+ *    conta × oferta do cliente → jogada). Ver docs/roadmap/…pilar-clientes….md.
+ * O modo `carteira` (Gemmini) NÃO usa isto — lá todos os subjects vão ao vendedor.
+ */
+export type EntityPillar = "concorrente" | "conta-chave";
+
 /** Nível de aderência de um subject a uma linha de produto do cliente do Radar. */
 export type FitLevel = "forte" | "sim" | "confirmar" | "nao";
 
@@ -83,6 +93,9 @@ export type Competitor = {
   sources: WatchSource[];
   /** SÓ no modo carteira: perfil do subject (tipo, modo de compra, fit por linha). */
   profile?: SubjectProfile;
+  /** pilar da entidade. Ausente ⇒ "concorrente" (legado). "conta-chave" ativa o
+   *  analista de relacionamento (pilar Clientes). Ver `pillarOf`. */
+  pillar?: EntityPillar;
 };
 
 /** Alias de vocabulário: no modo carteira, um `Competitor` é um SUBJECT. */
@@ -104,6 +117,9 @@ export type WatchClient = {
   /** modo do cliente. Ausente ⇒ "concorrentes" (comportamento legado). */
   mode?: ClientMode;
   competitors: Competitor[];
+  /** F4 — buscas de MERCADO/setor (queries) pra alimentar o ingrediente "reforço".
+   *  Ausente/vazio ⇒ sem coleta de mercado (o reforço fica derivado, honesto). */
+  market?: string[];
 };
 
 export type Watchlist = { clients: WatchClient[] };
@@ -334,6 +350,8 @@ export type AddCompetitorInput = {
   siteUrl?: string;
   /** fontes descobertas/confirmadas na tela (o caminho novo). */
   sources?: AddSourceInput[];
+  /** pilar da entidade. Ausente ⇒ concorrente (comportamento legado). */
+  pillar?: EntityPillar;
 };
 
 /**
@@ -403,6 +421,7 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
     siteUrl: siteUrl || undefined,
     enabled: true,
     sources,
+    ...(input.pillar === "conta-chave" ? { pillar: "conta-chave" as const } : {}),
   });
   writeWatchlist(watchlist);
   return watchlist;
@@ -471,6 +490,19 @@ export function setCompetitorEnabled(
   competitor.enabled = enabled;
   writeWatchlist(watchlist);
   return watchlist;
+}
+
+/**
+ * O PILAR de uma entidade, com derivação segura pra dados legados:
+ *  - respeita `competitor.pillar` quando é um valor conhecido;
+ *  - senão, deriva: carteira ⇒ "conta-chave" (subjects), demais ⇒ "concorrente".
+ * Função pura — a partição do loop (concorrentes × contas-chave) chama isto.
+ */
+export function pillarOf(competitor: Competitor, clientMode?: ClientMode): EntityPillar {
+  if (competitor.pillar === "concorrente" || competitor.pillar === "conta-chave") {
+    return competitor.pillar;
+  }
+  return clientMode === "carteira" ? "conta-chave" : "concorrente";
 }
 
 /**

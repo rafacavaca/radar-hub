@@ -17,7 +17,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 
-type ReportKind = "chat" | "sob-medida" | "agendado";
+type ReportKind = "chat" | "sob-medida" | "agendado" | "conta";
 type Fonte = { titulo: string; url: string; concorrente?: string };
 type Report = {
   id: string;
@@ -219,7 +219,13 @@ function ReportCard({ report }: { report: Report }) {
   const collapsed = isLong && !expanded;
 
   const kindLabel =
-    report.kind === "chat" ? "do chat" : report.kind === "agendado" ? "agendado" : "sob medida";
+    report.kind === "chat"
+      ? "do chat"
+      : report.kind === "agendado"
+        ? "agendado"
+        : report.kind === "conta"
+          ? "da conta"
+          : "sob medida";
   const date = new Date(report.createdAt).toLocaleDateString("pt-BR");
 
   return (
