@@ -25,6 +25,7 @@
 import { isLikelyPostUrl } from "@/lib/collectors/blog";
 import { scrape, searchWeb } from "@/lib/firecrawl";
 import { completeViaGateway } from "@/lib/gateway";
+import { runWithUsage } from "@/lib/usage/context";
 import { collectionMethod, type SourceKind } from "@/lib/watchlist";
 
 const FETCH_TIMEOUT_MS = 8000;
@@ -232,10 +233,12 @@ export async function understandSite(
     .join("\n");
   let content = "";
   try {
-    content = await completeViaGateway({
-      system: UNDERSTAND_SYSTEM,
-      prompt: `NAVEGAÇÃO DO SITE:\n${lines}\n\nMapeie o que vigiar.`,
-    });
+    content = await runWithUsage({ feature: "descoberta" }, () =>
+      completeViaGateway({
+        system: UNDERSTAND_SYSTEM,
+        prompt: `NAVEGAÇÃO DO SITE:\n${lines}\n\nMapeie o que vigiar.`,
+      }),
+    );
   } catch (err) {
     console.warn(`[discovery] entendimento indisponível: ${(err as Error).message}`);
     return [];

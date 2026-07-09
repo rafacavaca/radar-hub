@@ -31,6 +31,7 @@ import { PNG } from "pngjs";
 
 import { scrape } from "@/lib/firecrawl";
 import { analyzeImagesViaGateway } from "@/lib/gateway-vision";
+import { runWithUsage } from "@/lib/usage/context";
 import type { Competitor } from "@/lib/watchlist";
 
 export type Swatch = { hex: string; pct: number };
@@ -298,8 +299,10 @@ export async function captureIdentity(
   // 1) print + texto da página pública.
   let screenshotUrl: string | undefined;
   let mensagem = "";
+  // MEDIÇÃO (item 1): print + visão são caros — atribui ao concorrente.
+  const usageCtx = { clientName, feature: "identidade", entidadeTipo: "concorrente" as const, entidadeId: competitor.id, entidadeNome: competitor.name };
   try {
-    const scraped = await scrape(siteUrl, { formats: ["screenshot", "markdown"], onlyMainContent: false });
+    const scraped = await runWithUsage(usageCtx, () => scrape(siteUrl, { formats: ["screenshot", "markdown"], onlyMainContent: false }));
     screenshotUrl = scraped.screenshot;
     mensagem = heroFromMarkdown(scraped.markdown);
   } catch (err) {
@@ -358,11 +361,11 @@ export async function captureIdentity(
   if (!prevSnap || !prevBuffer) {
     let resumo = "Primeira captura — esta é a linha de base. Nas próximas, comparo e aviso o que mudou.";
     try {
-      const out = await analyzeImagesViaGateway({
+      const out = await runWithUsage(usageCtx, () => analyzeImagesViaGateway({
         system: BASELINE_SYSTEM,
         prompt: `Concorrente: ${competitor.name}. Mensagem de topo capturada: "${mensagem}". Descreva a identidade atual.`,
         images: [{ media_type: "image/png", data: pngBuffer.toString("base64") }],
-      });
+      }));
       if (out.trim()) resumo = `Linha de base. ${out.trim()}`;
     } catch (err) {
       console.warn(`[visual] baseline IA falhou p/ ${competitor.name}: ${(err as Error).message}`);
@@ -378,7 +381,7 @@ export async function captureIdentity(
   let aspecto = "";
   let resumoIA = "";
   try {
-    const out = await analyzeImagesViaGateway({
+    const out = await runWithUsage(usageCtx, () => analyzeImagesViaGateway({
       system: VISION_SYSTEM,
       prompt:
         `Concorrente: ${competitor.name}.\n` +
@@ -389,7 +392,7 @@ export async function captureIdentity(
         { media_type: "image/png", data: prevBuffer.toString("base64") },
         { media_type: "image/png", data: pngBuffer.toString("base64") },
       ],
-    });
+    }));
     const parsed = extractJson(out);
     mudouIA = parsed?.mudou === true;
     aspecto = typeof parsed?.aspecto === "string" ? parsed.aspecto : "";

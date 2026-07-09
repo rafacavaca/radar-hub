@@ -23,6 +23,7 @@ import { join } from "node:path";
 import { buildMaterialBlock, collectRecentItems, type AskSource } from "@/lib/ask";
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
+import { runWithUsage } from "@/lib/usage/context";
 import { buildDiagnosticoCharts, buildMovimentosCharts, chartsToMaterial, type ChartSpec } from "@/lib/diagnostico/report-charts";
 import { listDiagnosticos } from "@/lib/diagnostico/store";
 import type { RelationshipPlay } from "@/lib/types";
@@ -268,7 +269,7 @@ ${request}`;
   let lastErr: Error | null = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      content = await completeViaGateway({ system: REPORT_SYSTEM, prompt });
+      content = await runWithUsage({ clientName, feature: "relatorio", etapa: "sob_medida" }, () => completeViaGateway({ system: REPORT_SYSTEM, prompt }));
       lastErr = null;
       break;
     } catch (err) {
@@ -323,7 +324,7 @@ Redija o texto do relatório de diagnóstico competitivo de ${clientName}.`;
   let lastErr: Error | null = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      content = await completeViaGateway({ system: DIAG_REPORT_SYSTEM, prompt });
+      content = await runWithUsage({ clientName, feature: "relatorio", etapa: "diagnostico" }, () => completeViaGateway({ system: DIAG_REPORT_SYSTEM, prompt }));
       lastErr = null;
       break;
     } catch (err) {
@@ -380,7 +381,7 @@ export async function composeMovimentosReport(
   let lastErr: Error | null = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      content = await completeViaGateway({ system: MOVIMENTOS_REPORT_SYSTEM, prompt });
+      content = await runWithUsage({ clientName, feature: "relatorio", etapa: "movimentos" }, () => completeViaGateway({ system: MOVIMENTOS_REPORT_SYSTEM, prompt }));
       lastErr = null;
       break;
     } catch (err) {
@@ -453,7 +454,7 @@ Redija o briefing de relacionamento da conta ${conta} para ${clientName}.`;
   let lastErr: Error | null = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      content = await completeViaGateway({ system: CONTA_REPORT_SYSTEM, prompt });
+      content = await runWithUsage({ clientName, feature: "relatorio", etapa: "conta", entidadeTipo: "conta", entidadeNome: conta }, () => completeViaGateway({ system: CONTA_REPORT_SYSTEM, prompt }));
       lastErr = null;
       break;
     } catch (err) {

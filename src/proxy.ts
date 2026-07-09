@@ -49,7 +49,22 @@ export async function proxy(req: NextRequest) {
   const cookie = req.cookies.get("radar_auth")?.value;
   if (cookie) {
     const valid = await Promise.all(users.map((u) => sha256Hex(`${u.email}:${u.password}`)));
-    if (valid.includes(cookie)) return NextResponse.next();
+    if (valid.includes(cookie)) {
+      // ADMIN (só Rafael, o 1º usuário): /custo e /api/custo são do dono da
+      // agência. Enquanto não há papéis (item 2), admin == usuário PRINCIPAL.
+      const ehAdminRota = pathname === "/custo" || pathname.startsWith("/api/custo");
+      if (ehAdminRota) {
+        const adminCookie = await sha256Hex(`${users[0].email}:${users[0].password}`);
+        if (cookie !== adminCookie) {
+          if (pathname.startsWith("/api/")) return NextResponse.json({ error: "só o admin" }, { status: 403 });
+          const home = req.nextUrl.clone();
+          home.pathname = "/";
+          home.search = "";
+          return NextResponse.redirect(home);
+        }
+      }
+      return NextResponse.next();
+    }
   }
 
   if (pathname.startsWith("/api/")) {

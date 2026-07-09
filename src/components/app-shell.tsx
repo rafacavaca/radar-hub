@@ -126,8 +126,11 @@ export function AppShell({
     });
   }
 
-  // Telas sem chrome: login e o modo apresentação (export limpo pra imprimir).
-  if (pathname === "/entrar" || pathname.startsWith("/apresentar")) return <>{children}</>;
+  // Telas sem chrome: login, o modo apresentação (export limpo) e o painel
+  // admin de custo (standalone, fora do escopo de um cliente).
+  if (pathname === "/entrar" || pathname.startsWith("/apresentar") || pathname === "/custo") {
+    return <>{children}</>;
+  }
 
   const cliente =
     params.get("cliente") && clients.includes(params.get("cliente") as string)
@@ -227,7 +230,13 @@ export function AppShell({
         <div className="border-t border-stone-200 p-3">
           <NewClientButton clients={clients} collapsed={collapsed} />
           {!collapsed ? (
-            <p className="mt-2 px-1 text-[11px] text-stone-400">Visão geral · Configurações</p>
+            <Link
+              href="/custo"
+              title="Custo (admin)"
+              className="mt-2 flex items-center gap-1.5 px-1 text-[11px] text-stone-400 transition-colors hover:text-stone-700"
+            >
+              <span aria-hidden>◔</span> Custo · admin
+            </Link>
           ) : null}
         </div>
       </aside>

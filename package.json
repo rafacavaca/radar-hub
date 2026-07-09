@@ -47,7 +47,9 @@
     "smoke:swot": "tsx scripts/test-radar-swot.mts",
     "smoke:mov-report": "tsx scripts/test-radar-movimentos-report.mts",
     "smoke:cobertura": "tsx scripts/test-radar-cobertura.mts",
-    "smoke:dodge": "tsx scripts/test-radar-dodge.mts"
+    "smoke:dodge": "tsx scripts/test-radar-dodge.mts",
+    "smoke:custo": "tsx scripts/test-radar-custo.mts",
+    "demo:custo": "tsx scripts/demo-custo-moovefy.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",

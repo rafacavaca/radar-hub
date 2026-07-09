@@ -8,6 +8,8 @@
  * gente só consome; a segurança/isolamento é garantida no servidor.
  */
 
+import { recordLLMUsage } from "@/lib/usage/store";
+
 export type VisionImage = { media_type: "image/png" | "image/jpeg" | "image/webp"; data: string };
 
 export async function analyzeImagesViaGateway(opts: {
@@ -44,8 +46,27 @@ export async function analyzeImagesViaGateway(opts: {
     const t = await res.text().catch(() => "");
     throw new Error(`gateway-vision ${res.status}: ${t.slice(0, 200)}`);
   }
-  const data = (await res.json()) as { content?: string; error?: string };
+  const data = (await res.json()) as {
+    content?: string;
+    error?: string;
+    usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+    cost?: number;
+    model?: string;
+    latency_ms?: number;
+  };
   if (data.error) throw new Error(`gateway-vision: ${data.error}`);
   if (!data.content) throw new Error("gateway-vision: resposta sem conteúdo");
+
+  // medição (item 1): a visão é LLM cara — conta no mix, atribuída ao contexto.
+  recordLLMUsage({
+    modelo: data.model,
+    tokensIn: data.usage?.input_tokens,
+    tokensOut: data.usage?.output_tokens,
+    cacheRead: data.usage?.cache_read_input_tokens,
+    cacheWrite: data.usage?.cache_creation_input_tokens,
+    custoProvedor: typeof data.cost === "number" ? data.cost : undefined,
+    latenciaMs: data.latency_ms,
+  });
+
   return data.content;
 }

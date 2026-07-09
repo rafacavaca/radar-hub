@@ -21,6 +21,7 @@ import { runEstrategia } from "@/lib/diagnostico/estrategia";
 import { getDiagnostico, listDiagnosticos, saveDiagnostico } from "@/lib/diagnostico/store";
 import { appendDisparos, getRegras } from "@/lib/diagnostico/alertas-store";
 import { avaliarRegras, diffSnapshots, toSnapshot } from "@/lib/diagnostico/movimento";
+import { runWithUsage } from "@/lib/usage/context";
 import type { DiagnosticoConcorrente, Snapshot } from "@/lib/diagnostico/schema";
 
 const MAX_SNAPSHOTS = 12;
@@ -34,49 +35,56 @@ export async function runDiagnostico(input: {
 }): Promise<DiagnosticoConcorrente> {
   const { clientName, competitorId, name, siteUrl } = input;
 
-  // D — config do usuário (fontes extras, temas, campos custom).
-  const config = getDiagConfig(clientName, competitorId);
+  // MEDIÇÃO (item 1): tudo deste diagnóstico é atribuído ao CONCORRENTE — é o
+  // que dá o "custo marginal de +1 concorrente". Cada lente rotula sua feature.
+  return runWithUsage(
+    { clientName, feature: "diagnostico", entidadeTipo: "concorrente", entidadeId: competitorId, entidadeNome: name },
+    async () => {
+      // D — config do usuário (fontes extras, temas, campos custom).
+      const config = getDiagConfig(clientName, competitorId);
 
-  // Fato (F1): posicionamento + canais. Mídia (F2). Preço + reputação (Onda 1).
-  // fontes extras (D) entram no crawl da Lente 1; suas `pages` alimentam os campos custom.
-  const { posicionamento, paginas, pages } = await runLente1(name, siteUrl, config.fontesExtras);
-  const canais = await runLente2(name, siteUrl, clientName, competitorId);
-  const midia_paga = await runLente3(name);
-  const preco = await runLentePreco(name, siteUrl);
-  const reputacao = await runLenteReputacao(name, siteUrl);
-  // D — campos customizados (reusa as páginas já coletadas, sem re-scrape).
-  const campos_custom = await runCamposCustom(name, pages, config.camposCustom);
-  // C2 vagas + C4 releases/notícias — alimentam o motor de movimento.
-  const vagas = await runLenteVagas(name, siteUrl);
-  const news = await runLenteNews(name, siteUrl);
-  // Opinião + rascunho (F3) por último. Maturidade é RELATIVA: passa os pares
-  // (perfil de prova dos outros concorrentes já diagnosticados do cliente).
-  const peers: PerfilProva[] = listDiagnosticos(clientName)
-    .filter((d) => d.concorrente_id !== competitorId)
-    .map((d) => perfilProvaDe(d.concorrente_nome, d.posicionamento));
-  const maturidade = await runLente4(name, posicionamento, peers);
-  const estrategia = await runEstrategia(clientName, name, posicionamento, maturidade);
+      // Fato (F1): posicionamento + canais. Mídia (F2). Preço + reputação (Onda 1).
+      // fontes extras (D) entram no crawl da Lente 1; suas `pages` alimentam os campos custom.
+      const { posicionamento, paginas, pages } = await runWithUsage({ feature: "lente_1" }, () => runLente1(name, siteUrl, config.fontesExtras));
+      const canais = await runWithUsage({ feature: "lente_2" }, () => runLente2(name, siteUrl, clientName, competitorId));
+      const midia_paga = await runWithUsage({ feature: "lente_3" }, () => runLente3(name));
+      const preco = await runWithUsage({ etapa: "preco" }, () => runLentePreco(name, siteUrl));
+      const reputacao = await runWithUsage({ etapa: "reputacao" }, () => runLenteReputacao(name, siteUrl));
+      // D — campos customizados (reusa as páginas já coletadas, sem re-scrape).
+      const campos_custom = await runWithUsage({ etapa: "campos_custom" }, () => runCamposCustom(name, pages, config.camposCustom));
+      // C2 vagas + C4 releases/notícias — alimentam o motor de movimento.
+      const vagas = await runWithUsage({ etapa: "vagas" }, () => runLenteVagas(name, siteUrl));
+      const news = await runWithUsage({ etapa: "news" }, () => runLenteNews(name, siteUrl));
+      // Opinião + rascunho (F3) por último. Maturidade é RELATIVA: passa os pares
+      // (perfil de prova dos outros concorrentes já diagnosticados do cliente).
+      const peers: PerfilProva[] = listDiagnosticos(clientName)
+        .filter((d) => d.concorrente_id !== competitorId)
+        .map((d) => perfilProvaDe(d.concorrente_nome, d.posicionamento));
+      const maturidade = await runWithUsage({ feature: "lente_4" }, () => runLente4(name, posicionamento, peers));
+      const estrategia = await runWithUsage({ etapa: "estrategia" }, () => runEstrategia(clientName, name, posicionamento, maturidade));
 
-  const diag: DiagnosticoConcorrente = {
-    clientName,
-    concorrente_id: competitorId,
-    concorrente_nome: name,
-    site_url: siteUrl,
-    atualizado_em: new Date().toISOString(),
-    paginas_rastreadas: paginas,
-    posicionamento,
-    canais,
-    midia_paga,
-    preco,
-    reputacao,
-    campos_custom,
-    temas_vigiados: config.temas,
-    vagas,
-    news,
-    maturidade,
-    estrategia,
-  };
-  return saveDiagnostico(aplicarMovimentos(diag));
+      const diag: DiagnosticoConcorrente = {
+        clientName,
+        concorrente_id: competitorId,
+        concorrente_nome: name,
+        site_url: siteUrl,
+        atualizado_em: new Date().toISOString(),
+        paginas_rastreadas: paginas,
+        posicionamento,
+        canais,
+        midia_paga,
+        preco,
+        reputacao,
+        campos_custom,
+        temas_vigiados: config.temas,
+        vagas,
+        news,
+        maturidade,
+        estrategia,
+      };
+      return saveDiagnostico(aplicarMovimentos(diag));
+    },
+  );
 }
 
 /**
@@ -92,7 +100,10 @@ export async function reavaliarMaturidadeCliente(clientName: string): Promise<Ar
     const peers: PerfilProva[] = diags
       .filter((x) => x.concorrente_id !== d.concorrente_id)
       .map((x) => perfilProvaDe(x.concorrente_nome, x.posicionamento));
-    const maturidade = await runLente4(d.concorrente_nome, d.posicionamento, peers);
+    const maturidade = await runWithUsage(
+      { clientName, feature: "lente_4", entidadeTipo: "concorrente", entidadeId: d.concorrente_id, entidadeNome: d.concorrente_nome },
+      () => runLente4(d.concorrente_nome, d.posicionamento, peers),
+    );
     d.maturidade = maturidade;
     if (d.historico && d.historico.length > 0) d.historico[d.historico.length - 1].posicionamento = d.posicionamento;
     saveDiagnostico(d);

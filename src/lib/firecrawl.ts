@@ -14,6 +14,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { recordColetaUsage } from "@/lib/usage/store";
+
 const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape";
 const FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v2/search";
 const CACHE_DIR = join(process.cwd(), ".cache", "firecrawl");
@@ -123,6 +125,7 @@ export async function scrape(url: string, opts: ScrapeOptions = {}): Promise<Scr
     );
   }
 
+  const t0 = Date.now();
   let response: Response;
   try {
     response = await fetch(FIRECRAWL_SCRAPE_URL, {
@@ -159,6 +162,9 @@ export async function scrape(url: string, opts: ScrapeOptions = {}): Promise<Scr
   };
 
   writeCache(url, result);
+  // medição (item 1): 1 página raspada = 1 crédito. Só conta o HIT REAL de API
+  // (o retorno por cache acima não gasta crédito e não é medido). Fire-and-forget.
+  recordColetaUsage({ unidades: 1, tipo: "pagina", latenciaMs: Date.now() - t0 });
   return result;
 }
 
@@ -174,6 +180,7 @@ export async function searchWeb(query: string, limit = 6): Promise<SearchHit[]> 
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) return [];
 
+  const t0 = Date.now();
   try {
     const response = await fetch(FIRECRAWL_SEARCH_URL, {
       method: "POST",
@@ -187,6 +194,8 @@ export async function searchWeb(query: string, limit = 6): Promise<SearchHit[]> 
       data?: { web?: Array<{ url?: string; title?: string; description?: string }> } | Array<{ url?: string; title?: string; description?: string }>;
     };
     const rows = Array.isArray(payload.data) ? payload.data : (payload.data?.web ?? []);
+    // medição (item 1): 1 busca web = 1 crédito. Fire-and-forget.
+    recordColetaUsage({ unidades: 1, tipo: "busca", latenciaMs: Date.now() - t0 });
     return rows
       .filter((r) => typeof r?.url === "string")
       .map((r) => ({ url: r.url as string, title: (r.title ?? "").trim(), description: r.description }));

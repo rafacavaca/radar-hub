@@ -22,6 +22,7 @@ import { join } from "node:path";
 
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
+import { runWithUsage } from "@/lib/usage/context";
 import { readWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem } from "@/lib/types";
 
@@ -188,7 +189,8 @@ export async function askRadar(question: string, history: AskTurn[] = []): Promi
     buildWatchlistBlock(),
   );
 
-  const content = await completeViaGateway({ system: SYSTEM, prompt });
+  // medição (item 1): a pergunta é multi-cliente — sem clientName; feature "pergunta".
+  const content = await runWithUsage({ feature: "pergunta" }, () => completeViaGateway({ system: SYSTEM, prompt }));
   const parsed = extractJson(content);
 
   // Resposta crua como fallback (sem fontes) — melhor que erro.

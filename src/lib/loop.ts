@@ -34,6 +34,7 @@ import { crossReference, type CrossInsight } from "@/lib/cross-reference";
 import { activeLensesFor } from "@/lib/lenses";
 import { collectLinkedIn } from "@/lib/linkedin";
 import { recordSourceRun } from "@/lib/source-status";
+import { runWithUsage } from "@/lib/usage/context";
 import {
   collectionMethod,
   pillarOf,
@@ -368,10 +369,13 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
   for (const target of targets) {
     try {
       const method = collectionMethod(target.source.kind);
-      const events =
+      // medição (item 1): coleta atribuída ao concorrente/fonte do escopo.
+      const uctx = { clientName: scope.clientName, feature: "coleta", entidadeTipo: "concorrente" as const, entidadeId: target.competitor.id, entidadeNome: target.competitor.name };
+      const events = await runWithUsage(uctx, () =>
         method === "diff"
-          ? await collectByDiff(target.competitor, target.source)
-          : await collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT });
+          ? collectByDiff(target.competitor, target.source)
+          : collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT }),
+      );
       recordSourceRun(target.competitor.id, target.source.id, { eventos: events.length });
       for (const event of events) {
         if (seen.has(event.id)) continue;
@@ -404,7 +408,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
       // modo carteira: a lente "vendedor" casa sinal→linha→gatilho; sem lentes nem cruzamento.
       const sales = await withGatewayRetry(
         `vendedor (${scope.clientName})`,
-        () => analyzeVendedor(freshEvents, scope.clientName, brain.context),
+        () => runWithUsage({ clientName: scope.clientName, feature: "briefing", etapa: "vendedor" }, () => analyzeVendedor(freshEvents, scope.clientName, brain.context)),
         failures,
       );
       if (sales) salesReadings.push(...sales);
@@ -427,14 +431,14 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
         for (const lens of activeLensesFor(scope.clientName)) {
           const out = await withGatewayRetry(
             `lente ${lens.id} (${scope.clientName})`,
-            () => analyzeLens(lens, concorrenteEvents, scope.clientName, brain.context),
+            () => runWithUsage({ clientName: scope.clientName, feature: "briefing", etapa: lens.id }, () => analyzeLens(lens, concorrenteEvents, scope.clientName, brain.context)),
             failures,
           );
           if (out) readings.push(...out);
         }
         const cross = await withGatewayRetry(
           `cruzamento (${scope.clientName})`,
-          () => crossReference(concorrenteEvents, scope.clientName, brain.context),
+          () => runWithUsage({ clientName: scope.clientName, feature: "correlacao" }, () => crossReference(concorrenteEvents, scope.clientName, brain.context)),
           failures,
         );
         if (cross) crossInsights.push(...cross);
@@ -454,18 +458,19 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
           competitorContext.push(e);
         }
         const marketEvents = client.market?.length
-          ? await collectMarket(scope.clientName, client.market)
+          ? await runWithUsage({ clientName: scope.clientName, feature: "coleta", entidadeTipo: "geral" }, () => collectMarket(scope.clientName, client.market!))
           : [];
         const plays = await withGatewayRetry(
           `relacionamento (${scope.clientName})`,
           () =>
-            analyzeRelacionamento(
-              contaEvents,
-              scope.clientName,
-              brain.context,
-              competitorContext,
-              marketEvents,
-            ),
+            runWithUsage({ clientName: scope.clientName, feature: "briefing", etapa: "relacionamento" }, () =>
+              analyzeRelacionamento(
+                contaEvents,
+                scope.clientName,
+                brain.context,
+                competitorContext,
+                marketEvents,
+              )),
           failures,
         );
         if (plays) relationshipPlays.push(...plays);
@@ -523,10 +528,13 @@ export async function runRadarLoop(
     try {
       // despacha por método: listagem (blog/notícias) ou mudança (produto/vagas).
       const method = collectionMethod(target.source.kind);
-      const events =
+      // medição (item 1): coleta atribuída ao concorrente/fonte.
+      const uctx = { clientName: target.clientName, feature: "coleta", entidadeTipo: "concorrente" as const, entidadeId: target.competitor.id, entidadeNome: target.competitor.name };
+      const events = await runWithUsage(uctx, () =>
         method === "diff"
-          ? await collectByDiff(target.competitor, target.source)
-          : await collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT });
+          ? collectByDiff(target.competitor, target.source)
+          : collectBlog(target.competitor, target.source, { limit: opts.limit ?? DEFAULT_LIMIT }),
+      );
       recordSourceRun(target.competitor.id, target.source.id, { eventos: events.length });
       const bucket = eventsByClient.get(target.clientName) ?? [];
       const seen = new Set(bucket.map((e) => e.id));
@@ -578,7 +586,7 @@ export async function runRadarLoop(
       // sem as 3 lentes de concorrente nem o cruzamento interno×externo.
       const sales = await withGatewayRetry(
         `vendedor (${clientName})`,
-        () => analyzeVendedor(events, clientName, brain.context),
+        () => runWithUsage({ clientName, feature: "briefing", etapa: "vendedor" }, () => analyzeVendedor(events, clientName, brain.context)),
         failures,
       );
       if (sales) salesReadings.push(...sales);
@@ -603,7 +611,7 @@ export async function runRadarLoop(
       for (const lens of activeLensesFor(clientName)) {
         const out = await withGatewayRetry(
           `lente ${lens.id} (${clientName})`,
-          () => analyzeLens(lens, concorrenteEvents, clientName, brain.context),
+          () => runWithUsage({ clientName, feature: "briefing", etapa: lens.id }, () => analyzeLens(lens, concorrenteEvents, clientName, brain.context)),
           failures,
         );
         if (out) readings.push(...out);
@@ -612,7 +620,7 @@ export async function runRadarLoop(
       // Cruzamento interno×externo (mesma disciplina de recuo).
       const cross = await withGatewayRetry(
         `cruzamento (${clientName})`,
-        () => crossReference(concorrenteEvents, clientName, brain.context),
+        () => runWithUsage({ clientName, feature: "correlacao" }, () => crossReference(concorrenteEvents, clientName, brain.context)),
         failures,
       );
       if (cross) crossInsights.push(...cross);
@@ -623,12 +631,13 @@ export async function runRadarLoop(
     // concorrente (F2 — urgência) + os sinais de mercado (F4 — reforço).
     if (contaEvents.length > 0) {
       const marketEvents = client?.market?.length
-        ? await collectMarket(clientName, client.market)
+        ? await runWithUsage({ clientName, feature: "coleta", entidadeTipo: "geral" }, () => collectMarket(clientName, client.market!))
         : [];
       const plays = await withGatewayRetry(
         `relacionamento (${clientName})`,
         () =>
-          analyzeRelacionamento(contaEvents, clientName, brain.context, concorrenteEvents, marketEvents),
+          runWithUsage({ clientName, feature: "briefing", etapa: "relacionamento" }, () =>
+            analyzeRelacionamento(contaEvents, clientName, brain.context, concorrenteEvents, marketEvents)),
         failures,
       );
       if (plays) relationshipPlays.push(...plays);
