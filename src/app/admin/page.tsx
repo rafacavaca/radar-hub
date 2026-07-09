@@ -6,7 +6,7 @@
 
 import { redirect } from "next/navigation";
 
-import { supabaseEnabled } from "@/lib/db/supabase";
+import { supabaseConfigured, supabaseEnabled } from "@/lib/db/supabase";
 import { runAsAdmin } from "@/lib/db/admin-client";
 import { isSuperAdmin } from "@/lib/db/session";
 import { listMembers, listOrgs } from "@/lib/db/admin-ops";
@@ -15,7 +15,11 @@ import { AdminView } from "@/components/admin-view";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  if (!supabaseEnabled() || !(await isSuperAdmin())) redirect("/");
+  // Admin de orgs funciona já no modo clássico (as orgs vivem no Supabase; a
+  // rota é gateada ao usuário principal no proxy). No modo Supabase, exige o
+  // papel super_admin da sessão. Sem chaves configuradas → home.
+  if (!supabaseConfigured()) redirect("/");
+  if (supabaseEnabled() && !(await isSuperAdmin())) redirect("/");
 
   const orgs = await runAsAdmin(async () => {
     const base = await listOrgs();

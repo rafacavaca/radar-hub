@@ -29,9 +29,19 @@ function serviceKey(): string | undefined {
   return process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
-/** O multi-tenant (Supabase) está ligado? Flag + chaves presentes. */
+/** O multi-tenant (Supabase) está LIGADO (login/dados via Supabase)? Flag + chaves. */
 export function supabaseEnabled(): boolean {
   return process.env.RADAR_DB === "supabase" && !!url() && !!anonKey();
+}
+
+/**
+ * O Supabase está CONFIGURADO (chaves presentes), independente da flag de login?
+ * A área de admin (gerir orgs) pode operar já no modo clássico — as orgs vivem
+ * no Supabase de qualquer jeito; assim dá pra onboardar agências ANTES do flip
+ * do login (que muda como o Rafael entra). Precisa da service key (é escrita admin).
+ */
+export function supabaseConfigured(): boolean {
+  return !!url() && !!anonKey() && !!serviceKey();
 }
 
 /**

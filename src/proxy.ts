@@ -82,9 +82,14 @@ export async function proxy(req: NextRequest) {
   if (cookie) {
     const valid = await Promise.all(users.map((u) => sha256Hex(`${u.email}:${u.password}`)));
     if (valid.includes(cookie)) {
-      // ADMIN (só Rafael, o 1º usuário): /custo e /api/custo são do dono da
-      // agência. Enquanto não há papéis (item 2), admin == usuário PRINCIPAL.
-      const ehAdminRota = pathname === "/custo" || pathname.startsWith("/api/custo");
+      // ADMIN (só Rafael, o 1º usuário): /custo e /admin (gerir orgs) são do
+      // dono. No modo clássico admin == usuário PRINCIPAL (no modo Supabase o
+      // papel super_admin é checado nas próprias páginas/rotas).
+      const ehAdminRota =
+        pathname === "/custo" ||
+        pathname.startsWith("/api/custo") ||
+        pathname === "/admin" ||
+        pathname.startsWith("/api/admin");
       if (ehAdminRota) {
         const adminCookie = await sha256Hex(`${users[0].email}:${users[0].password}`);
         if (cookie !== adminCookie) {

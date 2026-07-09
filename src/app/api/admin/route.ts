@@ -8,7 +8,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { supabaseEnabled } from "@/lib/db/supabase";
+import { supabaseConfigured, supabaseEnabled } from "@/lib/db/supabase";
 import { runAsAdmin } from "@/lib/db/admin-client";
 import { isSuperAdmin } from "@/lib/db/session";
 import { addMember, createOrg } from "@/lib/db/admin-ops";
@@ -16,8 +16,10 @@ import { addMember, createOrg } from "@/lib/db/admin-ops";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  if (!supabaseEnabled()) return NextResponse.json({ error: "multi-tenant desligado" }, { status: 400 });
-  if (!(await isSuperAdmin())) return NextResponse.json({ error: "só o super_admin" }, { status: 403 });
+  // Chaves ausentes → indisponível. No modo Supabase exige super_admin da
+  // sessão; no modo clássico a rota já é gateada ao usuário principal no proxy.
+  if (!supabaseConfigured()) return NextResponse.json({ error: "Supabase não configurado" }, { status: 400 });
+  if (supabaseEnabled() && !(await isSuperAdmin())) return NextResponse.json({ error: "só o super_admin" }, { status: 403 });
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body || typeof body !== "object") return NextResponse.json({ error: "corpo inválido" }, { status: 400 });
