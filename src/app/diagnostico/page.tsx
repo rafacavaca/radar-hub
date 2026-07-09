@@ -9,12 +9,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getRegras, listDisparos } from "@/lib/diagnostico/alertas-store";
+import { getDiagConfig } from "@/lib/diagnostico/config";
 import { alvosDaVarredura, getDiagSchedule } from "@/lib/diagnostico/schedule";
 import { listDiagnosticos } from "@/lib/diagnostico/store";
 import { pillarOf, readWatchlist } from "@/lib/watchlist";
 
 import { AlertasDiagnostico } from "@/components/alertas-diagnostico";
 import { BattlecardCard } from "@/components/battlecard-card";
+import { DiagConfigEditor } from "@/components/diag-config-editor";
 import { DiagnosticoRunButton } from "@/components/diagnostico-run-button";
 import { FichaDiagnostico } from "@/components/ficha-diagnostico";
 import { PainelComparativo } from "@/components/painel-diagnostico";
@@ -99,11 +101,19 @@ export default async function DiagnosticoPage({
               <div key={c.id} id={`diag-${c.id}`} className="scroll-mt-6">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-[15px] font-semibold text-stone-900">{c.name}</h3>
-                  <DiagnosticoRunButton
-                    clientName={cliente}
-                    competitorId={c.id}
-                    temDiagnostico={Boolean(diag)}
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DiagConfigEditor
+                      cliente={cliente}
+                      competitorId={c.id}
+                      concorrenteNome={c.name}
+                      config={getDiagConfig(cliente, c.id)}
+                    />
+                    <DiagnosticoRunButton
+                      clientName={cliente}
+                      competitorId={c.id}
+                      temDiagnostico={Boolean(diag)}
+                    />
+                  </div>
                 </div>
                 {diag ? (
                   <>

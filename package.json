@@ -40,7 +40,8 @@
     "smoke:reputacao": "tsx scripts/test-radar-reputacao.mts",
     "smoke:battlecard": "tsx scripts/test-radar-battlecard.mts",
     "smoke:diag-schedule": "tsx scripts/test-radar-diag-schedule.mts",
-    "smoke:report-export": "tsx scripts/test-radar-report-export.mts"
+    "smoke:report-export": "tsx scripts/test-radar-report-export.mts",
+    "smoke:diag-config": "tsx scripts/test-radar-diag-config.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",

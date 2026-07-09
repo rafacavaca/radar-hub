@@ -71,6 +71,22 @@ export const CANAL_KEYS: readonly CanalKey[] = [
 export type Canais = Record<CanalKey, CanalAudit>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// D — CAMPOS CUSTOMIZADOS (definidos pelo usuário por concorrente). O motor
+// configurável aplicado ao diagnóstico: ex. "Tom de voz" (Marketing),
+// "Precificação" (Comercial). Cada resposta é um FATO honesto (fonte+data) ou
+// nao_encontrado — nunca inventado.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type CampoCustom = {
+  /** rótulo do campo (ex.: "Tom de voz"). */
+  chave: string;
+  /** a pergunta de extração que o usuário definiu. */
+  pergunta: string;
+  /** o que foi extraído (envelope Campo). */
+  resposta: Campo;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // F2 — LENTE 3 (mídia paga) + F3 — LENTE 4 (maturidade, OPINIÃO) + estratégia.
 // Blocos OPCIONAIS: um diagnóstico F1 (sem eles) segue válido.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -247,6 +263,7 @@ export type Snapshot = {
   midia_paga?: MidiaPaga;
   preco?: BlocoPreco;
   reputacao?: BlocoReputacao;
+  campos_custom?: CampoCustom[];
 };
 
 export type MovimentoTipo = "mudança" | "primeira_coleta" | "novo" | "removido";
@@ -325,6 +342,10 @@ export type DiagnosticoConcorrente = {
   reputacao?: BlocoReputacao;
   /** F1d — battlecard (derivado citado; gerado sob demanda do diag salvo). */
   battlecard?: Battlecard | null;
+  /** D — campos customizados extraídos (definidos pelo usuário). */
+  campos_custom?: CampoCustom[];
+  /** D — temas que o usuário quer vigiar neste concorrente (guiam a extração). */
+  temas_vigiados?: string[];
 };
 
 export function midiaNaoLocalizada(dataColeta: string): MidiaPlataforma {

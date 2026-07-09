@@ -84,10 +84,13 @@ function pickProductPages(siteUrl: string, links: string[], jaEscolhidas: string
   return out.slice(0, 4);
 }
 
-type Page = { url: string; label: string; markdown: string };
+export type Page = { url: string; label: string; markdown: string };
 
-/** Scrape das páginas-chave (home + sobre/soluções/clientes). Nunca lança. */
-async function collectPages(siteUrl: string): Promise<Page[]> {
+/**
+ * Scrape das páginas-chave (home + sobre/soluções/clientes + produtos). `extras`
+ * (D — fontes extras do usuário) são adicionadas ao final. Nunca lança.
+ */
+export async function collectPages(siteUrl: string, extras: string[] = []): Promise<Page[]> {
   const pages: Page[] = [];
   let links: string[] = [];
   try {
@@ -111,6 +114,17 @@ async function collectPages(siteUrl: string): Promise<Page[]> {
       pages.push({ url, label, markdown: p.markdown.slice(0, PAGE_CHARS) });
     } catch {
       // página que não abre — segue com as outras (honesto: menos material).
+    }
+  }
+  // D — fontes extras do usuário (até 3), rotuladas como tal.
+  const jaLidas = new Set(pages.map((p) => p.url.replace(/\/$/, "")));
+  for (const url of extras.slice(0, 3)) {
+    if (jaLidas.has(url.replace(/\/$/, ""))) continue;
+    try {
+      const p = await scrape(url);
+      pages.push({ url, label: "fonte-extra", markdown: p.markdown.slice(0, PAGE_CHARS) });
+    } catch {
+      // fonte extra que não abre — segue (honesto).
     }
   }
   return pages;
@@ -151,15 +165,16 @@ function cleanStr(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-export type Lente1Result = { posicionamento: Posicionamento; paginas: string[] };
+export type Lente1Result = { posicionamento: Posicionamento; paginas: string[]; pages: Page[] };
 
 /**
- * Roda a Lente 1: coleta as páginas-chave e extrai o posicionamento.
- * Sempre devolve um Posicionamento válido (campos não achados = nao_encontrado).
+ * Roda a Lente 1: coleta as páginas-chave (+ fontes extras do usuário) e extrai
+ * o posicionamento. Devolve também as `pages` coletadas (D reusa p/ campos
+ * custom, sem re-scrape). Campos não achados = nao_encontrado.
  */
-export async function runLente1(name: string, siteUrl: string): Promise<Lente1Result> {
+export async function runLente1(name: string, siteUrl: string, extras: string[] = []): Promise<Lente1Result> {
   const now = new Date().toISOString();
-  const pages = await collectPages(siteUrl);
+  const pages = await collectPages(siteUrl, extras);
   const paginas = pages.map((p) => p.url);
 
   const vazio = (): Posicionamento => ({
@@ -176,16 +191,16 @@ export async function runLente1(name: string, siteUrl: string): Promise<Lente1Re
     },
   });
 
-  if (pages.length === 0) return { posicionamento: vazio(), paginas };
+  if (pages.length === 0) return { posicionamento: vazio(), paginas, pages };
 
   let content = "";
   try {
     content = await completeViaGateway({ system: SYSTEM, prompt: buildPrompt(name, pages) });
   } catch {
-    return { posicionamento: vazio(), paginas };
+    return { posicionamento: vazio(), paginas, pages };
   }
   const raw = extractJsonObject(content);
-  if (!raw) return { posicionamento: vazio(), paginas };
+  if (!raw) return { posicionamento: vazio(), paginas, pages };
 
   const fonteDe = (fonteIndex: unknown): string | undefined => {
     const n = Number(fonteIndex);
@@ -244,5 +259,5 @@ export async function runLente1(name: string, siteUrl: string): Promise<Lente1Re
       big_numbers: listaDe(provas.big_numbers),
     },
   };
-  return { posicionamento, paginas };
+  return { posicionamento, paginas, pages };
 }

@@ -302,6 +302,23 @@ export function FichaDiagnostico({ diag, now }: { diag: DiagnosticoConcorrente; 
         </div>
       ) : null}
 
+      {/* Campos customizados (D) — definidos pelo usuário, extração honesta. */}
+      {diag.campos_custom && diag.campos_custom.length > 0 ? (
+        <div className="border-t border-stone-100 px-4 py-4 sm:px-5">
+          <p className="mb-1 flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-stone-400">
+            Campos personalizados
+            {diag.temas_vigiados && diag.temas_vigiados.length > 0 ? (
+              <span className="font-normal normal-case text-stone-400">· temas: {diag.temas_vigiados.join(", ")}</span>
+            ) : null}
+          </p>
+          {diag.campos_custom.map((cc, i) => (
+            <Linha key={i} label={cc.chave}>
+              <CampoView c={cc.resposta} now={now} />
+            </Linha>
+          ))}
+        </div>
+      ) : null}
+
       {/* Mídia paga (Lente 3, F2) */}
       {diag.midia_paga ? (
         <div className="border-t border-stone-100 px-4 py-4 sm:px-5">

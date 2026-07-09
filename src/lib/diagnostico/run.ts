@@ -13,6 +13,8 @@ import { runLente3 } from "@/lib/diagnostico/lente3";
 import { runLente4 } from "@/lib/diagnostico/lente4";
 import { runLentePreco } from "@/lib/diagnostico/lente-preco";
 import { runLenteReputacao } from "@/lib/diagnostico/lente-reputacao";
+import { runCamposCustom } from "@/lib/diagnostico/campos-custom";
+import { getDiagConfig } from "@/lib/diagnostico/config";
 import { runEstrategia } from "@/lib/diagnostico/estrategia";
 import { getDiagnostico, saveDiagnostico } from "@/lib/diagnostico/store";
 import { appendDisparos, getRegras } from "@/lib/diagnostico/alertas-store";
@@ -30,12 +32,18 @@ export async function runDiagnostico(input: {
 }): Promise<DiagnosticoConcorrente> {
   const { clientName, competitorId, name, siteUrl } = input;
 
+  // D — config do usuário (fontes extras, temas, campos custom).
+  const config = getDiagConfig(clientName, competitorId);
+
   // Fato (F1): posicionamento + canais. Mídia (F2). Preço + reputação (Onda 1).
-  const { posicionamento, paginas } = await runLente1(name, siteUrl);
+  // fontes extras (D) entram no crawl da Lente 1; suas `pages` alimentam os campos custom.
+  const { posicionamento, paginas, pages } = await runLente1(name, siteUrl, config.fontesExtras);
   const canais = await runLente2(name, siteUrl, clientName, competitorId);
   const midia_paga = await runLente3(name);
   const preco = await runLentePreco(name, siteUrl);
   const reputacao = await runLenteReputacao(name, siteUrl);
+  // D — campos customizados (reusa as páginas já coletadas, sem re-scrape).
+  const campos_custom = await runCamposCustom(name, pages, config.camposCustom);
   // Opinião + rascunho (F3) por último.
   const maturidade = await runLente4(name, posicionamento);
   const estrategia = await runEstrategia(clientName, name, posicionamento, maturidade);
@@ -52,6 +60,8 @@ export async function runDiagnostico(input: {
     midia_paga,
     preco,
     reputacao,
+    campos_custom,
+    temas_vigiados: config.temas,
     maturidade,
     estrategia,
   };

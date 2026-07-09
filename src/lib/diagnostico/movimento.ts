@@ -65,6 +65,7 @@ export function toSnapshot(diag: DiagnosticoConcorrente): Snapshot {
     midia_paga: diag.midia_paga,
     preco: diag.preco,
     reputacao: diag.reputacao,
+    campos_custom: diag.campos_custom,
   };
 }
 
@@ -419,6 +420,12 @@ export function diffSnapshots(historico: Snapshot[], novo: Snapshot, agora: stri
   // F1b preço + F1c reputação
   diffPreco(ctx, older, anterior, novo);
   diffReputacao(ctx, anterior, novo);
+
+  // D — campos customizados (mudança de valor no mesmo campo = movimento)
+  for (const cn of novo.campos_custom ?? []) {
+    const ca = (anterior.campos_custom ?? []).find((x) => x.chave === cn.chave);
+    diffCampo(ctx, `campo_custom.${cn.chave}`, cn.chave, ca?.resposta, cn.resposta, { permiteMudanca: true, severidadeMudanca: "média" });
+  }
 
   return ctx.out;
 }
