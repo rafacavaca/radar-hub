@@ -51,9 +51,11 @@
     "smoke:custo": "tsx scripts/test-radar-custo.mts",
     "demo:custo": "tsx scripts/demo-custo-moovefy.mts",
     "test:isolation": "tsx scripts/test-isolation.mts",
-    "migrate:supabase": "tsx scripts/migrate-to-supabase.mts"
+    "migrate:supabase": "tsx scripts/migrate-to-supabase.mts",
+    "admin:setup": "tsx scripts/admin-setup.mts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.110.2",
     "@types/pngjs": "^6.0.5",
     "next": "16.2.7",

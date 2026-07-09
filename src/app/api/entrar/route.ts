@@ -12,6 +12,8 @@ import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { findAuthUser, getAuthUsers } from "@/lib/auth";
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { supabaseRouteClient } from "@/lib/db/session";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +31,24 @@ function seeOther(location: string): NextResponse {
 }
 
 export async function POST(req: NextRequest) {
+  const form = await req.formData().catch(() => null);
+  const email = String(form?.get("email") ?? "").trim().toLowerCase();
+  const senha = String(form?.get("senha") ?? "");
+
+  // MULTI-TENANT (item 2): quando o Supabase está ligado, a identidade é o
+  // Supabase Auth — signInWithPassword grava a sessão nos cookies (via ssr).
+  // A senha é do usuário; o app nunca a manuseia em texto além deste POST.
+  if (supabaseEnabled()) {
+    const supabase = await supabaseRouteClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    return seeOther(error ? "/entrar?erro=1" : "/");
+  }
+
+  // Fechadura clássica (single-tenant): e-mail+senha por env → cookie sha256.
   if (getAuthUsers().length === 0) {
     // fechadura desligada (dev) — só volta pra home.
     return seeOther("/");
   }
-
-  const form = await req.formData().catch(() => null);
-  const email = String(form?.get("email") ?? "").trim().toLowerCase();
-  const senha = String(form?.get("senha") ?? "");
 
   const user = findAuthUser(email, senha);
   if (!user) {
