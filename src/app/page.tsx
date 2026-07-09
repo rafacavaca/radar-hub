@@ -17,9 +17,9 @@ import { redirect } from "next/navigation";
 
 import { buildBriefing } from "@/lib/briefing";
 import { formatDateTimePtBR } from "@/lib/format";
-import { lensesFor, LENS_LABEL, type LensId } from "@/lib/lenses";
+import { loadLensesFor, LENS_LABEL, type LensId } from "@/lib/lenses";
 import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
-import { listNotes } from "@/lib/notes";
+import { loadNotes, type RoadmapNote } from "@/lib/notes";
 import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, LensReading } from "@/lib/types";
 
@@ -101,12 +101,12 @@ export default async function BriefingPage({
     error = err instanceof Error ? err.message : "Não foi possível rodar o Radar.";
   }
 
-  const lensConfig = lente !== "geral" ? lensesFor(cliente).find((l) => l.id === lente) : null;
+  const lensConfig = lente !== "geral" ? (await loadLensesFor(cliente)).find((l) => l.id === lente) : null;
   const readings = (result.readings ?? []).filter(
     (r) => r.clientName === cliente && (lente === "geral" || r.lens === lente),
   );
   const geral = buildBriefing(result.items.filter((it) => it.clientName === cliente));
-  const notes = lente === "produto" ? listNotes(cliente) : [];
+  const notes = lente === "produto" ? await loadNotes(cliente) : [];
   const crossInsights = (result.crossInsights ?? []).filter((c) => c.clientName === cliente);
   const brain = cliente ? brainNote(result, cliente) : null;
 
@@ -286,7 +286,7 @@ function TeamView({
 }: {
   lente: LensId;
   readings: LensReading[];
-  notes: ReturnType<typeof listNotes>;
+  notes: RoadmapNote[];
 }) {
   return (
     <div className="space-y-4">

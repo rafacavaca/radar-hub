@@ -17,6 +17,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path";
 
 import { completeViaGateway } from "@/lib/gateway";
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbGetDoc, sbSetDoc } from "@/lib/db/repo-org-docs";
 import type { DiagnosticoConcorrente } from "@/lib/diagnostico/schema";
 
 export type TemaCobertura = {
@@ -78,6 +80,23 @@ export function saveCobertura(c: CoberturaConteudo): CoberturaConteudo {
   if (idx >= 0) file.coberturas[idx] = c;
   else file.coberturas.push(c);
   writeFileSafe(file);
+  return c;
+}
+
+// ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
+
+const DOC_KIND = "cobertura";
+
+/** A cobertura salva do cliente, na org da sessão (ou JSON). */
+export async function loadCobertura(clientName: string): Promise<CoberturaConteudo | null> {
+  if (!supabaseEnabled()) return getCobertura(clientName);
+  return sbGetDoc<CoberturaConteudo | null>(DOC_KIND, clientName, null);
+}
+
+/** Salva a cobertura na org da sessão (ou JSON). */
+export async function persistCobertura(c: CoberturaConteudo): Promise<CoberturaConteudo> {
+  if (!supabaseEnabled()) return saveCobertura(c);
+  await sbSetDoc(DOC_KIND, c.clientName, c);
   return c;
 }
 

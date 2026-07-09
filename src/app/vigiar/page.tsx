@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 
-import { listSourceStatus } from "@/lib/source-status";
+import { loadSourceStatus } from "@/lib/source-status";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { WatchlistEditor } from "@/components/watchlist-editor";
@@ -26,7 +26,7 @@ export default async function VigiarPage({
   const cliente =
     params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
 
-  const sourceStatus = listSourceStatus();
+  const sourceStatus = await loadSourceStatus();
   const client = watchlist.clients.find((c) => c.name === cliente);
   // escopa ao cliente E ao pilar CONCORRENTE (contas-chave têm a própria tela em Contas → Vigiar).
   const scoped = {

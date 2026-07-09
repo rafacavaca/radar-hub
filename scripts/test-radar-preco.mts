@@ -24,9 +24,15 @@ import { join } from "node:path";
 process.env.RADAR_DATA_DIR = mkdtempSync(join(tmpdir(), "radar-preco-"));
 
 const { runLentePreco, pickPricingLink } = await import("@/lib/diagnostico/lente-preco");
-const { aplicarMovimentos } = await import("@/lib/diagnostico/run");
+const { aplicarMovimentos, disparosDaVarredura } = await import("@/lib/diagnostico/run");
 const { saveDiagnostico } = await import("@/lib/diagnostico/store");
-const { listDisparos } = await import("@/lib/diagnostico/alertas-store");
+const { appendDisparos, getRegras, listDisparos } = await import("@/lib/diagnostico/alertas-store");
+// espelha o runDiagnostico: diff puro + alertas avaliados fora e anexados.
+const aplica = (d: DiagnosticoConcorrente): DiagnosticoConcorrente => {
+  const out = aplicarMovimentos(d);
+  appendDisparos(disparosDaVarredura(out, getRegras(out.clientName)));
+  return out;
+};
 const { campoFato, campoNaoEncontrado, canalNaoLocalizado, precoNaoEncontrado } = await import("@/lib/diagnostico/schema");
 const { scrape } = await import("@/lib/firecrawl");
 
@@ -98,8 +104,8 @@ const bloco = (data: string, valor: string): BlocoPreco => ({
   tipo: "fato",
 });
 
-saveDiagnostico(aplicarMovimentos(varredura("2026-07-01T10:00:00.000Z", bloco("2026-07-01T10:00:00.000Z", "R$ 50/mês"))));
-const s2 = aplicarMovimentos(varredura("2026-07-08T10:00:00.000Z", bloco("2026-07-08T10:00:00.000Z", "R$ 79/mês")));
+saveDiagnostico(aplica(varredura("2026-07-01T10:00:00.000Z", bloco("2026-07-01T10:00:00.000Z", "R$ 50/mês"))));
+const s2 = aplica(varredura("2026-07-08T10:00:00.000Z", bloco("2026-07-08T10:00:00.000Z", "R$ 79/mês")));
 saveDiagnostico(s2);
 const movPreco = (s2.movimentos ?? []).find((m) => m.campo.startsWith("preco.plano"));
 console.log(`\n· Semeado: ${movPreco ? `${movPreco.campo_label}: ${movPreco.de} → ${movPreco.para} [${movPreco.severidade}]` : "NÃO DETECTADO"}`);
@@ -115,7 +121,7 @@ add(
 );
 
 // falha de coleta de um lado = silêncio
-const s3 = aplicarMovimentos(varredura("2026-07-15T10:00:00.000Z", { ...precoNaoEncontrado("2026-07-15T10:00:00.000Z"), resumo: "página de preço inacessível nesta varredura" }));
+const s3 = aplica(varredura("2026-07-15T10:00:00.000Z", { ...precoNaoEncontrado("2026-07-15T10:00:00.000Z"), resumo: "página de preço inacessível nesta varredura" }));
 saveDiagnostico(s3);
 const movFalha = (s3.movimentos ?? []).filter((m) => m.data_deteccao === "2026-07-15T10:00:00.000Z" && m.campo.startsWith("preco"));
 add(

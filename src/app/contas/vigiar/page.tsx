@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { listSourceStatus } from "@/lib/source-status";
+import { loadSourceStatus } from "@/lib/source-status";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { WatchlistEditor } from "@/components/watchlist-editor";
@@ -34,7 +34,7 @@ export default async function ContasVigiarPage({
     redirect(`/carteira?cliente=${encodeURIComponent(cliente)}`);
   }
 
-  const sourceStatus = listSourceStatus();
+  const sourceStatus = await loadSourceStatus();
   // escopa ao cliente E ao pilar CONTA-CHAVE (o server filtra; o editor só renderiza).
   const scoped = {
     clients: watchlist.clients

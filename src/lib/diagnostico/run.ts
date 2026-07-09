@@ -19,10 +19,10 @@ import { runLenteNews } from "@/lib/diagnostico/lente-news";
 import { loadDiagConfig } from "@/lib/diagnostico/config";
 import { runEstrategia } from "@/lib/diagnostico/estrategia";
 import { getDiagnostico, loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
-import { appendDisparos, getRegras } from "@/lib/diagnostico/alertas-store";
+import { loadRegras, persistDisparos } from "@/lib/diagnostico/alertas-store";
 import { avaliarRegras, diffSnapshots, toSnapshot } from "@/lib/diagnostico/movimento";
 import { runWithUsage } from "@/lib/usage/context";
-import type { DiagnosticoConcorrente, Snapshot } from "@/lib/diagnostico/schema";
+import type { AlertaDisparo, DiagnosticoConcorrente, RegraAlerta, Snapshot } from "@/lib/diagnostico/schema";
 
 const MAX_SNAPSHOTS = 12;
 const MAX_MOVIMENTOS = 100;
@@ -85,7 +85,11 @@ export async function runDiagnostico(input: {
       // anterior pré-carregado (org-scoped em modo Supabase) — mantém
       // aplicarMovimentos pura/síncrona (os smokes a testam direto).
       const anterior = await loadDiagnostico(clientName, competitorId);
-      return persistDiagnostico(aplicarMovimentos(diag, anterior));
+      const aplicado = aplicarMovimentos(diag, anterior);
+      // alertas: avaliados aqui (fora da função pura) e persistidos org-scoped.
+      const disparos = disparosDaVarredura(aplicado, await loadRegras(clientName));
+      if (disparos.length > 0) await persistDisparos(disparos);
+      return persistDiagnostico(aplicado);
     },
   );
 }
@@ -116,12 +120,14 @@ export async function reavaliarMaturidadeCliente(clientName: string): Promise<Ar
 }
 
 /**
- * F1a (puro, testável): anexa histórico + movimentos ao diagnóstico novo,
+ * F1a (PURO, testável): anexa histórico + movimentos ao diagnóstico novo,
  * diffando contra a última varredura salva. Diagnósticos antigos (pré-F1a, sem
  * historico) contam como baseline real — o diff usa a projeção deles.
  *
  * `anterior` é INJETÁVEL (multi-tenant: o chamador passa a versão org-scoped);
  * ausente, cai no JSON síncrono — os smokes seguem chamando com 1 argumento.
+ * Os ALERTAS não são avaliados aqui (função sem efeito colateral) — o chamador
+ * usa `disparosDaVarredura` + persiste (org-scoped ou JSON).
  */
 export function aplicarMovimentos(
   novo: DiagnosticoConcorrente,
@@ -138,17 +144,6 @@ export function aplicarMovimentos(
   const historico = [...historicoAnterior, snapshotNovo].slice(-MAX_SNAPSHOTS);
   const movimentos = [...movimentosNovos, ...(anterior?.movimentos ?? [])].slice(0, MAX_MOVIMENTOS);
 
-  if (movimentosNovos.length > 0) {
-    const regras = getRegras(novo.clientName);
-    appendDisparos(
-      avaliarRegras(regras, movimentosNovos, {
-        clientName: novo.clientName,
-        concorrenteId: novo.concorrente_id,
-        concorrenteNome: novo.concorrente_nome,
-      }),
-    );
-  }
-
   // battlecard/swot são DERIVADOS sob demanda — re-varrer não pode apagar o existente
   return {
     ...novo,
@@ -157,4 +152,21 @@ export function aplicarMovimentos(
     battlecard: novo.battlecard ?? anterior?.battlecard ?? null,
     swot: novo.swot ?? anterior?.swot ?? null,
   };
+}
+
+/**
+ * Disparos de alerta da ÚLTIMA varredura (puro): avalia as regras só sobre os
+ * movimentos detectados nela (data_deteccao == atualizado_em).
+ */
+export function disparosDaVarredura(
+  diag: DiagnosticoConcorrente,
+  regras: RegraAlerta[],
+): AlertaDisparo[] {
+  const novos = (diag.movimentos ?? []).filter((m) => m.data_deteccao === diag.atualizado_em);
+  if (novos.length === 0) return [];
+  return avaliarRegras(regras, novos, {
+    clientName: diag.clientName,
+    concorrenteId: diag.concorrente_id,
+    concorrenteNome: diag.concorrente_nome,
+  });
 }

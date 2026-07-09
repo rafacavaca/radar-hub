@@ -14,6 +14,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbDeleteDoc, sbListDocs } from "@/lib/db/repo-org-docs";
+
 export type SourceStatus = {
   lastRunAt: string;
   /** quantos sinais a fonte rendeu na última rodada. */
@@ -89,4 +92,30 @@ export function forgetCompetitorStatus(competitorId: string): void {
     }
   }
   if (changed) writeFileSafe(file);
+}
+
+// ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
+// Um doc por CONCORRENTE (kind `source-status`, key = competitorId, data =
+// Record<sourceId, SourceStatus>). A ESCRITA (recordSourceRun) é do loop de
+// coleta — vira por-org no rework do loop.
+
+const DOC_KIND = "source-status";
+
+/** Todos os status da org da sessão (ou JSON), achatados por `${cid}:${sid}`. */
+export async function loadSourceStatus(): Promise<Record<string, SourceStatus>> {
+  if (!supabaseEnabled()) return listSourceStatus();
+  const docs = await sbListDocs<Record<string, SourceStatus>>(DOC_KIND);
+  const out: Record<string, SourceStatus> = {};
+  for (const doc of docs) {
+    for (const [sourceId, status] of Object.entries(doc.data ?? {})) {
+      out[statusKey(doc.key, sourceId)] = status;
+    }
+  }
+  return out;
+}
+
+/** Limpa os status de um concorrente removido, na org da sessão (ou JSON). */
+export async function dropCompetitorStatus(competitorId: string): Promise<void> {
+  if (!supabaseEnabled()) return forgetCompetitorStatus(competitorId);
+  await sbDeleteDoc(DOC_KIND, competitorId);
 }

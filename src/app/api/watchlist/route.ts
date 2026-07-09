@@ -16,8 +16,8 @@
 import { NextResponse } from "next/server";
 
 import { forgetCompetitorSnapshots } from "@/lib/collectors/content-diff";
-import { removeClientLenses } from "@/lib/lenses";
-import { forgetCompetitorStatus } from "@/lib/source-status";
+import { dropClientLenses } from "@/lib/lenses";
+import { dropCompetitorStatus } from "@/lib/source-status";
 import { forgetCompetitorVisual } from "@/lib/visual";
 import {
   addClient,
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
         const data = await removeCompetitor(payload.clientName, payload.competitorId);
         forgetCompetitorVisual(payload.competitorId); // limpa prints/paleta dele
         forgetCompetitorSnapshots(payload.competitorId); // limpa retratos de diff
-        forgetCompetitorStatus(payload.competitorId); // limpa status por fonte
+        await dropCompetitorStatus(payload.competitorId); // limpa status por fonte
         return NextResponse.json({ data });
       }
 
@@ -171,7 +171,7 @@ export async function POST(req: Request) {
       case "remove-client": {
         if (!isString(payload.clientName)) return badRequest("Envie clientName como texto.");
         const data = await removeClient(payload.clientName);
-        removeClientLenses(payload.clientName); // limpa a config das lentes dele
+        await dropClientLenses(payload.clientName); // limpa a config das lentes dele
         return NextResponse.json({ data });
       }
 

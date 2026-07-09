@@ -14,10 +14,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
-  createSchedule,
-  deleteSchedule,
-  listSchedules,
-  setScheduleEnabled,
+  loadSchedules,
+  persistSchedule,
+  persistScheduleEnabled,
+  removeSchedule,
   type Cadence,
 } from "@/lib/schedules";
 
@@ -40,7 +40,7 @@ function parseCadence(raw: unknown): Cadence | null {
 }
 
 export async function GET() {
-  return NextResponse.json({ data: { schedules: listSchedules() } });
+  return NextResponse.json({ data: { schedules: await loadSchedules() } });
 }
 
 export async function POST(req: NextRequest) {
@@ -53,13 +53,13 @@ export async function POST(req: NextRequest) {
       const request = typeof body.request === "string" ? body.request : "";
       const cadence = parseCadence(body.cadence);
       if (!cadence) return badRequest("Escolha a frequência (todo dia ou um dia da semana).");
-      const schedule = createSchedule({ clientName, request, cadence });
+      const schedule = await persistSchedule({ clientName, request, cadence });
       return NextResponse.json({ data: schedule });
     }
     if (body.action === "toggle") {
       const id = typeof body.id === "string" ? body.id : "";
       if (!id || typeof body.enabled !== "boolean") return badRequest("Envie id e enabled.");
-      const schedule = setScheduleEnabled(id, body.enabled);
+      const schedule = await persistScheduleEnabled(id, body.enabled);
       return NextResponse.json({ data: schedule });
     }
     return badRequest("Ação desconhecida. Use create ou toggle.");
@@ -73,7 +73,7 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id")?.trim() ?? "";
   if (!id) return badRequest("id obrigatório");
   try {
-    deleteSchedule(id);
+    await removeSchedule(id);
     return NextResponse.json({ data: { deleted: id } });
   } catch (err) {
     return badRequest(err instanceof Error ? err.message : "falha ao apagar");

@@ -7,7 +7,7 @@
  */
 
 import { formatDateTimePtBR } from "@/lib/format";
-import { lensesFor, LENS_LABEL, type LensId } from "@/lib/lenses";
+import { loadLensesFor, LENS_LABEL, type LensId } from "@/lib/lenses";
 import { runRadarLoop } from "@/lib/loop";
 import { loadWatchlist } from "@/lib/watchlist";
 
@@ -34,7 +34,7 @@ export default async function ApresentarPage({
   const readings = (result?.readings ?? []).filter(
     (r) => r.clientName === cliente && r.lens === lente,
   );
-  const team = lensesFor(cliente).find((l) => l.id === lente)?.team ?? "";
+  const team = (await loadLensesFor(cliente)).find((l) => l.id === lente)?.team ?? "";
 
   return (
     <section className="mx-auto max-w-3xl px-6 py-10 print:py-4">

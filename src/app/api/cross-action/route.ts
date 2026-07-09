@@ -13,7 +13,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { sendTaskToFormare } from "@/lib/formare-door";
 import { runRadarLoop } from "@/lib/loop";
-import { saveNoteFromCross } from "@/lib/notes";
+import { persistNoteFromCross } from "@/lib/notes";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "nota") {
-      const note = saveNoteFromCross(insight);
+      const note = await persistNoteFromCross(insight);
       return NextResponse.json({ data: { kind: "nota", noteId: note.id } });
     }
 

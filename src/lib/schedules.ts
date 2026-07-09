@@ -21,6 +21,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbDeleteDoc, sbGetDoc, sbListDocs, sbSetDoc } from "@/lib/db/repo-org-docs";
 import { composeReport, saveReport } from "@/lib/reports";
 import { runRadarLoop } from "@/lib/loop";
 
@@ -109,8 +111,8 @@ export function listSchedules(): Schedule[] {
 
 export type CreateScheduleInput = { clientName: string; request: string; cadence: Cadence };
 
-/** Cria um agendamento. Lança Error pt-BR se inválido. */
-export function createSchedule(input: CreateScheduleInput): Schedule {
+/** Valida e monta um agendamento novo (puro). Lança Error pt-BR se inválido. */
+function buildSchedule(input: CreateScheduleInput): Schedule {
   const clientName = (input.clientName ?? "").trim();
   const request = (input.request ?? "").trim();
   if (!clientName) throw new Error("Escolha o cliente do relatório.");
@@ -128,15 +130,13 @@ export function createSchedule(input: CreateScheduleInput): Schedule {
     .digest("hex")
     .slice(0, 16);
 
+  return { id, clientName, request, cadence: c, enabled: true, createdAt: new Date().toISOString() };
+}
+
+/** Cria um agendamento. Lança Error pt-BR se inválido. */
+export function createSchedule(input: CreateScheduleInput): Schedule {
+  const schedule = buildSchedule(input);
   const file = readFileSafe();
-  const schedule: Schedule = {
-    id,
-    clientName,
-    request,
-    cadence: c,
-    enabled: true,
-    createdAt: new Date().toISOString(),
-  };
   file.schedules.push(schedule);
   writeFileSafe(file);
   return schedule;
@@ -157,6 +157,48 @@ export function deleteSchedule(id: string): void {
   file.schedules = file.schedules.filter((x) => x.id !== id);
   if (file.schedules.length === before) throw new Error("Agendamento não encontrado.");
   writeFileSafe(file);
+}
+
+// ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
+// Um doc por agendamento (kind `schedules`, key = id). A EXECUÇÃO
+// (runDueSchedules, timer) segue no JSON — vira por-org no rework do loop.
+
+const DOC_KIND = "schedules";
+
+/** Agendamentos da org da sessão (ou JSON), mais antigos primeiro. */
+export async function loadSchedules(): Promise<Schedule[]> {
+  if (!supabaseEnabled()) return listSchedules();
+  const docs = await sbListDocs<Schedule>(DOC_KIND);
+  return docs
+    .map((d) => d.data)
+    .filter(Boolean)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** Cria um agendamento na org da sessão (ou JSON). Lança pt-BR se inválido. */
+export async function persistSchedule(input: CreateScheduleInput): Promise<Schedule> {
+  if (!supabaseEnabled()) return createSchedule(input);
+  const schedule = buildSchedule(input);
+  await sbSetDoc(DOC_KIND, schedule.id, schedule);
+  return schedule;
+}
+
+/** Liga/desliga um agendamento na org da sessão (ou JSON). */
+export async function persistScheduleEnabled(id: string, enabled: boolean): Promise<Schedule> {
+  if (!supabaseEnabled()) return setScheduleEnabled(id, enabled);
+  const s = await sbGetDoc<Schedule | null>(DOC_KIND, id, null);
+  if (!s) throw new Error("Agendamento não encontrado.");
+  const novo = { ...s, enabled };
+  await sbSetDoc(DOC_KIND, id, novo);
+  return novo;
+}
+
+/** Apaga um agendamento na org da sessão (ou JSON). */
+export async function removeSchedule(id: string): Promise<void> {
+  if (!supabaseEnabled()) return deleteSchedule(id);
+  const s = await sbGetDoc<Schedule | null>(DOC_KIND, id, null);
+  if (!s) throw new Error("Agendamento não encontrado.");
+  await sbDeleteDoc(DOC_KIND, id);
 }
 
 /** Um agendamento está VENCIDO agora? (habilitado, no dia certo, e ainda não rodou hoje) */

@@ -9,9 +9,9 @@
 import { NextResponse } from "next/server";
 
 import {
-  readLenses,
-  resetLens,
-  updateLens,
+  loadLenses,
+  persistLensReset,
+  persistLensUpdate,
   type LensId,
   type LensPatch,
 } from "@/lib/lenses";
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 const LENS_IDS = ["comercial", "produto", "marketing"];
 
 export async function GET() {
-  return NextResponse.json({ data: readLenses() });
+  return NextResponse.json({ data: await loadLenses() });
 }
 
 function badRequest(error: string) {
@@ -64,11 +64,11 @@ export async function POST(req: Request) {
           if (typeof raw.action !== "string") return badRequest("action precisa ser texto.");
           patch.action = raw.action as LensPatch["action"];
         }
-        const data = updateLens(clientName, lensId as LensId, patch);
+        const data = await persistLensUpdate(clientName, lensId as LensId, patch);
         return NextResponse.json({ data });
       }
       case "reset": {
-        const data = resetLens(clientName, lensId as LensId);
+        const data = await persistLensReset(clientName, lensId as LensId);
         return NextResponse.json({ data });
       }
       default:

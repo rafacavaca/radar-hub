@@ -11,7 +11,7 @@
  */
 
 import { loadReports } from "@/lib/reports";
-import { listSchedules } from "@/lib/schedules";
+import { loadSchedules } from "@/lib/schedules";
 import { loadWatchlist } from "@/lib/watchlist";
 
 import { ReportsView } from "@/components/reports-view";
@@ -31,9 +31,8 @@ export default async function RelatoriosPage({
 
   // escopado ao cliente da conta (relatórios e agendamentos dele).
   const reports = await loadReports(cliente || undefined);
-  const schedules = cliente
-    ? listSchedules().filter((s) => s.clientName === cliente)
-    : listSchedules();
+  const todosSchedules = await loadSchedules();
+  const schedules = cliente ? todosSchedules.filter((s) => s.clientName === cliente) : todosSchedules;
   const clients = cliente ? [cliente] : allClients;
 
   return (

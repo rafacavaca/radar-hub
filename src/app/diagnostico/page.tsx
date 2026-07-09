@@ -8,13 +8,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { getRegras, listDisparos } from "@/lib/diagnostico/alertas-store";
-import { getDiagConfig } from "@/lib/diagnostico/config";
-import { alvosDaVarredura, getDiagSchedule } from "@/lib/diagnostico/schedule";
-import { loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
+import { loadDisparos, loadRegras } from "@/lib/diagnostico/alertas-store";
+import { loadDiagConfig } from "@/lib/diagnostico/config";
+import { loadAlvosDaVarredura, loadDiagSchedule } from "@/lib/diagnostico/schedule";
+import { loadDiagnosticos } from "@/lib/diagnostico/store";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
-import { getCobertura } from "@/lib/diagnostico/cobertura";
+import { loadCobertura } from "@/lib/diagnostico/cobertura";
 import { buildMapaPosicionamento } from "@/lib/diagnostico/report-charts";
 
 import { AlertasDiagnostico } from "@/components/alertas-diagnostico";
@@ -46,7 +46,20 @@ export default async function DiagnosticoPage({
   if (client.mode === "carteira") redirect(`/carteira?cliente=${encodeURIComponent(cliente)}`);
 
   const concorrentes = client.competitors.filter((c) => pillarOf(c, client.mode) === "concorrente");
-  const diagnosticos = await loadDiagnosticos(cliente);
+  const [diagnosticos, schedule, alvos, regras, disparos, cobertura] = await Promise.all([
+    loadDiagnosticos(cliente),
+    loadDiagSchedule(cliente),
+    loadAlvosDaVarredura(cliente),
+    loadRegras(cliente),
+    loadDisparos(cliente),
+    loadCobertura(cliente),
+  ]);
+  // config por concorrente (usada dentro do map JSX — pré-carregada aqui).
+  const configs = new Map(
+    await Promise.all(
+      concorrentes.map(async (c) => [c.id, await loadDiagConfig(cliente, c.id)] as const),
+    ),
+  );
   const byId = new Map(diagnosticos.map((d) => [d.concorrente_id, d]));
   const mapa = buildMapaPosicionamento(diagnosticos);
   const now = new Date().toISOString();
@@ -73,19 +86,11 @@ export default async function DiagnosticoPage({
       </p>
 
       <div className="mt-4">
-        <VarreduraSchedule
-          cliente={cliente}
-          config={getDiagSchedule(cliente)}
-          alvos={alvosDaVarredura(cliente).length}
-        />
+        <VarreduraSchedule cliente={cliente} config={schedule} alvos={alvos.length} />
       </div>
 
       <div className="mt-6">
-        <AlertasDiagnostico
-          cliente={cliente}
-          regrasIniciais={getRegras(cliente)}
-          disparos={listDisparos(cliente)}
-        />
+        <AlertasDiagnostico cliente={cliente} regrasIniciais={regras} disparos={disparos} />
       </div>
 
       {mapa ? (
@@ -96,7 +101,7 @@ export default async function DiagnosticoPage({
 
       {byId.size >= 2 ? (
         <div className="mt-6">
-          <CoberturaCard cliente={cliente} cobertura={getCobertura(cliente)} />
+          <CoberturaCard cliente={cliente} cobertura={cobertura} />
         </div>
       ) : null}
 
@@ -126,7 +131,7 @@ export default async function DiagnosticoPage({
                       cliente={cliente}
                       competitorId={c.id}
                       concorrenteNome={c.name}
-                      config={getDiagConfig(cliente, c.id)}
+                      config={configs.get(c.id)!}
                     />
                     <DiagnosticoRunButton
                       clientName={cliente}

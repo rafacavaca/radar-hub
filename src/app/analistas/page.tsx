@@ -3,11 +3,11 @@
  * pensa, por cliente (comercial, produto, marketing).
  *
  * Server component no espírito de "transparência dos agentes": lê a config das
- * lentes direto do disco (`readLenses`, nunca lança e semeia o padrão) e entrega
- * ao editor client. Sem lógica aqui — só leitura e enquadramento.
+ * lentes (`loadLenses`, org-scoped ou JSON; nunca lança e semeia o padrão) e
+ * entrega ao editor client. Sem lógica aqui — só leitura e enquadramento.
  */
 
-import { readLenses } from "@/lib/lenses";
+import { loadLenses } from "@/lib/lenses";
 import { loadWatchlist } from "@/lib/watchlist";
 
 import { LensConfigEditor } from "@/components/lens-config-editor";
@@ -25,7 +25,7 @@ export default async function AnalistasPage({
     params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
 
   // escopado ao cliente: as lentes DELE (o CRM mostra tudo dentro da conta).
-  const file = readLenses();
+  const file = await loadLenses();
   const scoped = cliente
     ? { clients: file.clients.filter((c) => c.clientName === cliente) }
     : file;

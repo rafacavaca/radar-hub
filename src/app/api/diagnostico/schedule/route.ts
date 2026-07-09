@@ -7,16 +7,15 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { alvosDaVarredura, getDiagSchedule, setDiagSchedule } from "@/lib/diagnostico/schedule";
+import { loadAlvosDaVarredura, loadDiagSchedule, persistDiagSchedule } from "@/lib/diagnostico/schedule";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const cliente = req.nextUrl.searchParams.get("cliente")?.trim() || "";
   if (!cliente) return NextResponse.json({ error: "cliente obrigatório" }, { status: 400 });
-  return NextResponse.json({
-    data: { config: getDiagSchedule(cliente), alvos: alvosDaVarredura(cliente).length },
-  });
+  const [config, alvos] = await Promise.all([loadDiagSchedule(cliente), loadAlvosDaVarredura(cliente)]);
+  return NextResponse.json({ data: { config, alvos: alvos.length } });
 }
 
 export async function PUT(req: NextRequest) {
@@ -24,7 +23,7 @@ export async function PUT(req: NextRequest) {
   const clientName = typeof body?.clientName === "string" ? body.clientName.trim() : "";
   if (!clientName) return NextResponse.json({ error: "clientName obrigatório" }, { status: 400 });
   const weekday = Number(body?.weekday);
-  const config = setDiagSchedule(clientName, {
+  const config = await persistDiagSchedule(clientName, {
     enabled: body?.enabled === true,
     weekday: Number.isInteger(weekday) ? weekday : 1,
   });

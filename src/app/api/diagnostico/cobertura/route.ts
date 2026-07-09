@@ -7,7 +7,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { analisarCobertura, getCobertura, saveCobertura } from "@/lib/diagnostico/cobertura";
+import { analisarCobertura, loadCobertura, persistCobertura } from "@/lib/diagnostico/cobertura";
 import { loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const cliente = req.nextUrl.searchParams.get("cliente")?.trim() || "";
   if (!cliente) return NextResponse.json({ error: "cliente obrigatório" }, { status: 400 });
-  return NextResponse.json({ data: { cobertura: getCobertura(cliente) } });
+  return NextResponse.json({ data: { cobertura: await loadCobertura(cliente) } });
 }
 
 export async function POST(req: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const cobertura = await analisarCobertura(clientName, await loadDiagnosticos(clientName));
-    return NextResponse.json({ data: { cobertura: saveCobertura(cobertura) } });
+    return NextResponse.json({ data: { cobertura: await persistCobertura(cobertura) } });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Falha na cobertura." }, { status: 400 });
   }

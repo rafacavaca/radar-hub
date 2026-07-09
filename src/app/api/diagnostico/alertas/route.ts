@@ -8,7 +8,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getRegras, listDisparos, marcarVistos, saveRegras } from "@/lib/diagnostico/alertas-store";
+import { loadDisparos, loadRegras, persistRegras, persistVistos } from "@/lib/diagnostico/alertas-store";
 import type { RegraAlerta, RegraAlertaTipo } from "@/lib/diagnostico/schema";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,8 @@ const TIPOS: RegraAlertaTipo[] = [
 export async function GET(req: NextRequest) {
   const cliente = req.nextUrl.searchParams.get("cliente")?.trim() || "";
   if (!cliente) return NextResponse.json({ error: "cliente obrigatório" }, { status: 400 });
-  return NextResponse.json({ data: { regras: getRegras(cliente), disparos: listDisparos(cliente) } });
+  const [regras, disparos] = await Promise.all([loadRegras(cliente), loadDisparos(cliente)]);
+  return NextResponse.json({ data: { regras, disparos } });
 }
 
 export async function PUT(req: NextRequest) {
@@ -53,7 +54,7 @@ export async function PUT(req: NextRequest) {
           : {}),
     });
   }
-  return NextResponse.json({ data: { regras: saveRegras(clientName, regras) } });
+  return NextResponse.json({ data: { regras: await persistRegras(clientName, regras) } });
 }
 
 export async function POST(req: NextRequest) {
@@ -63,6 +64,6 @@ export async function POST(req: NextRequest) {
   if (!clientName || acao !== "marcar_vistos") {
     return NextResponse.json({ error: "Envie clientName e acao=marcar_vistos." }, { status: 400 });
   }
-  marcarVistos(clientName);
+  await persistVistos(clientName);
   return NextResponse.json({ data: { ok: true } });
 }

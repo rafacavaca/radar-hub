@@ -20,10 +20,12 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { listDiagnosticos } from "@/lib/diagnostico/store";
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbGetDoc, sbSetDoc } from "@/lib/db/repo-org-docs";
+import { listDiagnosticos, loadDiagnosticos } from "@/lib/diagnostico/store";
 import { runDiagnostico as runDiagnosticoReal } from "@/lib/diagnostico/run";
 import { localDayKey, localWeekday } from "@/lib/schedules";
-import { pillarOf, readWatchlist } from "@/lib/watchlist";
+import { pillarOf, readWatchlist, loadWatchlist, type Watchlist } from "@/lib/watchlist";
 import type { DiagnosticoConcorrente } from "@/lib/diagnostico/schema";
 
 /** Config de varredura de UM cliente. Ausente ⇒ DEFAULT (ligado, segunda). */
@@ -96,11 +98,15 @@ function markRan(clientName: string, now: Date): void {
   writeFileSafe(file);
 }
 
-/** Os concorrentes de um cliente que a varredura deve re-rodar (já com ficha + site + pilar). */
-export function alvosDaVarredura(clientName: string): Array<{ competitorId: string; name: string; siteUrl: string }> {
-  const client = readWatchlist().clients.find((c) => c.name === clientName);
+/** Os alvos da varredura dado o estado (puro — serve o caminho sync e o org-scoped). */
+function alvosDe(
+  watchlist: Watchlist,
+  clientName: string,
+  diagnosticos: DiagnosticoConcorrente[],
+): Array<{ competitorId: string; name: string; siteUrl: string }> {
+  const client = watchlist.clients.find((c) => c.name === clientName);
   if (!client) return [];
-  const comDiagnostico = new Set(listDiagnosticos(clientName).map((d) => d.concorrente_id));
+  const comDiagnostico = new Set(diagnosticos.map((d) => d.concorrente_id));
   const alvos: Array<{ competitorId: string; name: string; siteUrl: string }> = [];
   for (const comp of client.competitors) {
     if (!comDiagnostico.has(comp.id)) continue; // nunca cria sozinho
@@ -109,6 +115,11 @@ export function alvosDaVarredura(clientName: string): Array<{ competitorId: stri
     alvos.push({ competitorId: comp.id, name: comp.name, siteUrl: comp.siteUrl });
   }
   return alvos;
+}
+
+/** Os concorrentes de um cliente que a varredura deve re-rodar (já com ficha + site + pilar). */
+export function alvosDaVarredura(clientName: string): Array<{ competitorId: string; name: string; siteUrl: string }> {
+  return alvosDe(readWatchlist(), clientName, listDiagnosticos(clientName));
 }
 
 export type DiagScheduleRunResult = {
@@ -162,4 +173,37 @@ export async function runDueDiagnosticos(
   }
 
   return result;
+}
+
+// ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
+// O timer (runDueDiagnosticos/isDiagDue/markRan) segue no JSON — vira por-org
+// no rework do loop, junto com a coleta.
+
+const DOC_KIND = "diag-schedule";
+
+/** Config de varredura do cliente, na org da sessão (ou JSON). Nunca null. */
+export async function loadDiagSchedule(clientName: string): Promise<DiagScheduleClient> {
+  if (!supabaseEnabled()) return getDiagSchedule(clientName);
+  const saved = await sbGetDoc<DiagScheduleClient | null>(DOC_KIND, clientName, null);
+  return saved ? { ...DIAG_SCHEDULE_DEFAULT, ...saved } : { ...DIAG_SCHEDULE_DEFAULT };
+}
+
+/** Salva a config de varredura na org da sessão (ou JSON). */
+export async function persistDiagSchedule(
+  clientName: string,
+  input: { enabled: boolean; weekday: number },
+): Promise<DiagScheduleClient> {
+  if (!supabaseEnabled()) return setDiagSchedule(clientName, input);
+  const weekday = Number.isInteger(input.weekday) && input.weekday >= 0 && input.weekday <= 6 ? input.weekday : 1;
+  const atual = await sbGetDoc<DiagScheduleClient | null>(DOC_KIND, clientName, null);
+  const nova = { ...DIAG_SCHEDULE_DEFAULT, ...(atual ?? {}), enabled: input.enabled === true, weekday };
+  await sbSetDoc(DOC_KIND, clientName, nova);
+  return nova;
+}
+
+/** Alvos da varredura, org-scoped (watchlist + diagnósticos da org da sessão). */
+export async function loadAlvosDaVarredura(
+  clientName: string,
+): Promise<Array<{ competitorId: string; name: string; siteUrl: string }>> {
+  return alvosDe(await loadWatchlist(), clientName, await loadDiagnosticos(clientName));
 }

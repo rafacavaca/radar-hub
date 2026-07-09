@@ -23,9 +23,15 @@ import { join } from "node:path";
 process.env.RADAR_DATA_DIR = mkdtempSync(join(tmpdir(), "radar-reput-"));
 
 const { runLenteReputacao } = await import("@/lib/diagnostico/lente-reputacao");
-const { aplicarMovimentos } = await import("@/lib/diagnostico/run");
+const { aplicarMovimentos, disparosDaVarredura } = await import("@/lib/diagnostico/run");
 const { saveDiagnostico } = await import("@/lib/diagnostico/store");
-const { listDisparos } = await import("@/lib/diagnostico/alertas-store");
+const { appendDisparos, getRegras, listDisparos } = await import("@/lib/diagnostico/alertas-store");
+// espelha o runDiagnostico: diff puro + alertas avaliados fora e anexados.
+const aplica = (d: DiagnosticoConcorrente): DiagnosticoConcorrente => {
+  const out = aplicarMovimentos(d);
+  appendDisparos(disparosDaVarredura(out, getRegras(out.clientName)));
+  return out;
+};
 const { campoFato, campoNaoEncontrado, canalNaoLocalizado, reviewNaoColetado } = await import("@/lib/diagnostico/schema");
 
 import type { BlocoReputacao, DiagnosticoConcorrente, ReviewFonte } from "@/lib/diagnostico/schema";
@@ -110,8 +116,8 @@ const ra = (data: string, nota: number): ReviewFonte => ({
   data_coleta: data,
 });
 
-saveDiagnostico(aplicarMovimentos(varredura("2026-07-01T10:00:00.000Z", ra("2026-07-01T10:00:00.000Z", 7.8))));
-const q2 = aplicarMovimentos(varredura("2026-07-08T10:00:00.000Z", ra("2026-07-08T10:00:00.000Z", 6.9)));
+saveDiagnostico(aplica(varredura("2026-07-01T10:00:00.000Z", ra("2026-07-01T10:00:00.000Z", 7.8))));
+const q2 = aplica(varredura("2026-07-08T10:00:00.000Z", ra("2026-07-08T10:00:00.000Z", 6.9)));
 saveDiagnostico(q2);
 const movNota = (q2.movimentos ?? []).find((m) => m.campo === "reputacao.reclame_aqui.nota");
 console.log(`\n· Semeado: ${movNota ? `${movNota.campo_label}: ${movNota.de} → ${movNota.para} [${movNota.severidade}]` : "NÃO DETECTADO"}`);
@@ -126,7 +132,7 @@ add(
   listDisparos("Moovefy").map((d) => d.regra).join(", ") || "nenhum",
 );
 
-const q3 = aplicarMovimentos(varredura("2026-07-15T10:00:00.000Z", ra("2026-07-15T10:00:00.000Z", 7.4)));
+const q3 = aplica(varredura("2026-07-15T10:00:00.000Z", ra("2026-07-15T10:00:00.000Z", 7.4)));
 saveDiagnostico(q3);
 const disparosSubida = listDisparos("Moovefy").filter((d) => d.regra === "nota_caiu");
 add(

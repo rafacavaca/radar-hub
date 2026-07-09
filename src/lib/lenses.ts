@@ -15,7 +15,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readWatchlist } from "@/lib/watchlist";
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbDeleteDoc, sbGetDoc, sbListDocs, sbSetDoc } from "@/lib/db/repo-org-docs";
+import { loadWatchlist, readWatchlist } from "@/lib/watchlist";
 
 export type LensId = "comercial" | "produto" | "marketing";
 
@@ -195,8 +197,8 @@ export function activeLensesFor(clientName: string): LensConfig[] {
 
 export type LensPatch = Partial<Pick<LensConfig, "enabled" | "team" | "regua" | "action">>;
 
-/** Edita uma lente de um cliente e persiste. Devolve a config atualizada. */
-export function updateLens(clientName: string, lensId: LensId, patch: LensPatch): LensesFile {
+/** Valida um patch de lente (mensagens pt-BR). Compartilhado JSON/org. */
+function validarPatch(patch: LensPatch): void {
   if (patch.regua !== undefined && patch.regua.trim().length < 10) {
     throw new Error("A régua ficou curta demais — descreva o que sobe pra esta lente.");
   }
@@ -206,6 +208,19 @@ export function updateLens(clientName: string, lensId: LensId, patch: LensPatch)
   if (patch.action !== undefined && !(patch.action in ACTION_LABEL)) {
     throw new Error("Tipo de ação desconhecido.");
   }
+}
+
+/** Aplica um patch VALIDADO a uma lente (mutação local). */
+function aplicarPatch(lens: LensConfig, patch: LensPatch): void {
+  if (patch.enabled !== undefined) lens.enabled = patch.enabled;
+  if (patch.team !== undefined) lens.team = patch.team.trim();
+  if (patch.regua !== undefined) lens.regua = patch.regua.trim();
+  if (patch.action !== undefined) lens.action = patch.action;
+}
+
+/** Edita uma lente de um cliente e persiste. Devolve a config atualizada. */
+export function updateLens(clientName: string, lensId: LensId, patch: LensPatch): LensesFile {
+  validarPatch(patch);
 
   const file = readLenses();
   const client = file.clients.find((c) => c.clientName === clientName);
@@ -213,10 +228,7 @@ export function updateLens(clientName: string, lensId: LensId, patch: LensPatch)
   const lens = client.lenses.find((l) => l.id === lensId);
   if (!lens) throw new Error(`Lente não encontrada: ${lensId}`);
 
-  if (patch.enabled !== undefined) lens.enabled = patch.enabled;
-  if (patch.team !== undefined) lens.team = patch.team.trim();
-  if (patch.regua !== undefined) lens.regua = patch.regua.trim();
-  if (patch.action !== undefined) lens.action = patch.action;
+  aplicarPatch(lens, patch);
 
   writeFile(file);
   return file;
@@ -245,4 +257,79 @@ export function resetLens(clientName: string, lensId: LensId): LensesFile {
 
   writeFile(file);
   return file;
+}
+
+// ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
+// Um doc por cliente (kind `lenses`, key = cliente, data = LensConfig[]).
+// A semeadura em modo org é EM MEMÓRIA (defaults determinísticos) — só grava
+// quando o usuário edita. O loop segue no sync (vira por-org no rework).
+
+const DOC_KIND = "lenses";
+
+/** Completa lentes que faltem (versão futura) com o default. */
+function comLentesCompletas(lenses: LensConfig[]): LensConfig[] {
+  const out = [...lenses];
+  for (const id of LENS_IDS) {
+    if (!out.some((l) => l.id === id)) out.push({ id, enabled: true, ...LENS_DEFAULTS[id] });
+  }
+  return out;
+}
+
+/** Lentes de UM cliente, na org da sessão (ou JSON) — semeadas se preciso. */
+export async function loadLensesFor(clientName: string): Promise<LensConfig[]> {
+  if (!supabaseEnabled()) return lensesFor(clientName);
+  const saved = await sbGetDoc<LensConfig[] | null>(DOC_KIND, clientName, null);
+  return saved ? comLentesCompletas(saved) : defaultLensesFor(clientName).lenses;
+}
+
+/** A config completa (todos os clientes da org), semeando defaults em memória. */
+export async function loadLenses(): Promise<LensesFile> {
+  if (!supabaseEnabled()) return readLenses();
+  const [docs, watchlist] = await Promise.all([sbListDocs<LensConfig[]>(DOC_KIND), loadWatchlist()]);
+  const byClient = new Map(docs.map((d) => [d.key, comLentesCompletas(d.data ?? [])]));
+  const clients: ClientLenses[] = watchlist.clients.map((c) => ({
+    clientName: c.name,
+    lenses: byClient.get(c.name) ?? defaultLensesFor(c.name).lenses,
+  }));
+  return { clients };
+}
+
+/** Edita uma lente na org da sessão (ou JSON). Devolve a config completa. */
+export async function persistLensUpdate(
+  clientName: string,
+  lensId: LensId,
+  patch: LensPatch,
+): Promise<LensesFile> {
+  if (!supabaseEnabled()) return updateLens(clientName, lensId, patch);
+  validarPatch(patch);
+  const watchlist = await loadWatchlist();
+  if (!watchlist.clients.some((c) => c.name === clientName)) {
+    throw new Error(`Cliente não encontrado: ${clientName}`);
+  }
+  const lenses = await loadLensesFor(clientName);
+  const lens = lenses.find((l) => l.id === lensId);
+  if (!lens) throw new Error(`Lente não encontrada: ${lensId}`);
+  aplicarPatch(lens, patch);
+  await sbSetDoc(DOC_KIND, clientName, lenses);
+  return loadLenses();
+}
+
+/** Restaura a lente ao padrão, na org da sessão (ou JSON). */
+export async function persistLensReset(clientName: string, lensId: LensId): Promise<LensesFile> {
+  if (!supabaseEnabled()) return resetLens(clientName, lensId);
+  const lenses = await loadLensesFor(clientName);
+  const lens = lenses.find((l) => l.id === lensId);
+  if (!lens) throw new Error(`Lente não encontrada: ${lensId}`);
+  const defaults = LENS_DEFAULTS[lensId];
+  lens.team = defaults.team;
+  lens.regua = defaults.regua;
+  lens.action = defaults.action;
+  await sbSetDoc(DOC_KIND, clientName, lenses);
+  return loadLenses();
+}
+
+/** Limpa a config de lentes de um cliente removido, na org da sessão (ou JSON). */
+export async function dropClientLenses(clientName: string): Promise<void> {
+  if (!supabaseEnabled()) return removeClientLenses(clientName);
+  await sbDeleteDoc(DOC_KIND, clientName);
 }

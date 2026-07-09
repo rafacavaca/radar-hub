@@ -11,7 +11,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { deleteNote, saveNoteFromReading } from "@/lib/notes";
+import { persistNoteFromReading, removeNote } from "@/lib/notes";
 import { runRadarLoop } from "@/lib/loop";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    const note = saveNoteFromReading(reading);
+    const note = await persistNoteFromReading(reading);
     return NextResponse.json({ data: note });
   } catch (err) {
     const message = err instanceof Error ? err.message : "falha ao guardar a nota";
@@ -47,7 +47,7 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id")?.trim() ?? "";
   if (!id) return NextResponse.json({ error: "id obrigatório" }, { status: 400 });
   try {
-    deleteNote(id);
+    await removeNote(id);
     return NextResponse.json({ data: { deleted: id } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "falha ao apagar";

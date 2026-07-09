@@ -14,6 +14,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbGetDoc, sbListDocs, sbSetDoc } from "@/lib/db/repo-org-docs";
 import type { CrossInsight } from "@/lib/cross-reference";
 import type { LensReading } from "@/lib/types";
 
@@ -69,16 +71,10 @@ export function listNotes(clientName?: string): RoadmapNote[] {
   return [...filtered].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** Guarda uma leitura de produto como nota de roadmap (idempotente por leitura). */
-export function saveNoteFromReading(reading: LensReading): RoadmapNote {
-  const id = createHash("sha1").update(`note:${reading.id}`).digest("hex").slice(0, 16);
-  const file = readFile();
-
-  const existing = file.notes.find((n) => n.id === id);
-  if (existing) return existing; // já guardada — não duplica.
-
-  const note: RoadmapNote = {
-    id,
+/** Monta a nota de uma leitura de produto (puro — id estável por leitura). */
+function noteFromReading(reading: LensReading): RoadmapNote {
+  return {
+    id: createHash("sha1").update(`note:${reading.id}`).digest("hex").slice(0, 16),
     clientName: reading.clientName,
     sinal: reading.sinal,
     leitura: reading.leitura,
@@ -88,20 +84,12 @@ export function saveNoteFromReading(reading: LensReading): RoadmapNote {
     score: reading.score,
     createdAt: new Date().toISOString(),
   };
-  file.notes.push(note);
-  writeFile(file);
-  return note;
 }
 
-/** Guarda um insight interno×externo (F9) como nota de roadmap. Idempotente. */
-export function saveNoteFromCross(insight: CrossInsight): RoadmapNote {
-  const id = createHash("sha1").update(`note-cross:${insight.id}`).digest("hex").slice(0, 16);
-  const file = readFile();
-  const existing = file.notes.find((n) => n.id === id);
-  if (existing) return existing;
-
-  const note: RoadmapNote = {
-    id,
+/** Monta a nota de um insight interno×externo (puro — id estável). */
+function noteFromCross(insight: CrossInsight): RoadmapNote {
+  return {
+    id: createHash("sha1").update(`note-cross:${insight.id}`).digest("hex").slice(0, 16),
     clientName: insight.clientName,
     sinal: insight.sinal,
     leitura: `Externo: ${insight.externo}\nInterno: ${insight.interno}`,
@@ -111,6 +99,25 @@ export function saveNoteFromCross(insight: CrossInsight): RoadmapNote {
     score: insight.score,
     createdAt: new Date().toISOString(),
   };
+}
+
+/** Guarda uma leitura de produto como nota de roadmap (idempotente por leitura). */
+export function saveNoteFromReading(reading: LensReading): RoadmapNote {
+  const note = noteFromReading(reading);
+  const file = readFile();
+  const existing = file.notes.find((n) => n.id === note.id);
+  if (existing) return existing; // já guardada — não duplica.
+  file.notes.push(note);
+  writeFile(file);
+  return note;
+}
+
+/** Guarda um insight interno×externo (F9) como nota de roadmap. Idempotente. */
+export function saveNoteFromCross(insight: CrossInsight): RoadmapNote {
+  const note = noteFromCross(insight);
+  const file = readFile();
+  const existing = file.notes.find((n) => n.id === note.id);
+  if (existing) return existing;
   file.notes.push(note);
   writeFile(file);
   return note;
@@ -123,4 +130,53 @@ export function deleteNote(noteId: string): void {
   file.notes = file.notes.filter((n) => n.id !== noteId);
   if (file.notes.length === before) throw new Error("Nota não encontrada.");
   writeFile(file);
+}
+
+// ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
+// Um doc por cliente (kind `roadmap-notes`, key = cliente, data = RoadmapNote[]).
+
+const DOC_KIND = "roadmap-notes";
+
+/** Notas (de um cliente ou todas), na org da sessão (ou JSON). Novas primeiro. */
+export async function loadNotes(clientName?: string): Promise<RoadmapNote[]> {
+  if (!supabaseEnabled()) return listNotes(clientName);
+  const notes = clientName
+    ? await sbGetDoc<RoadmapNote[]>(DOC_KIND, clientName, [])
+    : (await sbListDocs<RoadmapNote[]>(DOC_KIND)).flatMap((d) => d.data ?? []);
+  return [...notes].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Anexa uma nota ao doc do cliente (dedupe por id). */
+async function persistNote(note: RoadmapNote): Promise<RoadmapNote> {
+  const atuais = await sbGetDoc<RoadmapNote[]>(DOC_KIND, note.clientName, []);
+  const existing = atuais.find((n) => n.id === note.id);
+  if (existing) return existing;
+  await sbSetDoc(DOC_KIND, note.clientName, [...atuais, note]);
+  return note;
+}
+
+/** Guarda uma leitura de produto como nota, na org da sessão (ou JSON). */
+export async function persistNoteFromReading(reading: LensReading): Promise<RoadmapNote> {
+  if (!supabaseEnabled()) return saveNoteFromReading(reading);
+  return persistNote(noteFromReading(reading));
+}
+
+/** Guarda um insight interno×externo como nota, na org da sessão (ou JSON). */
+export async function persistNoteFromCross(insight: CrossInsight): Promise<RoadmapNote> {
+  if (!supabaseEnabled()) return saveNoteFromCross(insight);
+  return persistNote(noteFromCross(insight));
+}
+
+/** Apaga uma nota na org da sessão (ou JSON). Lança se não existe. */
+export async function removeNote(noteId: string): Promise<void> {
+  if (!supabaseEnabled()) return deleteNote(noteId);
+  const docs = await sbListDocs<RoadmapNote[]>(DOC_KIND);
+  for (const doc of docs) {
+    const notes = doc.data ?? [];
+    if (notes.some((n) => n.id === noteId)) {
+      await sbSetDoc(DOC_KIND, doc.key, notes.filter((n) => n.id !== noteId));
+      return;
+    }
+  }
+  throw new Error("Nota não encontrada.");
 }

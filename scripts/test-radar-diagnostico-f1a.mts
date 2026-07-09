@@ -23,9 +23,9 @@ import { join } from "node:path";
 
 process.env.RADAR_DATA_DIR = mkdtempSync(join(tmpdir(), "radar-f1a-"));
 
-const { aplicarMovimentos } = await import("@/lib/diagnostico/run");
+const { aplicarMovimentos, disparosDaVarredura } = await import("@/lib/diagnostico/run");
 const { saveDiagnostico } = await import("@/lib/diagnostico/store");
-const { getRegras, saveRegras, listDisparos } = await import("@/lib/diagnostico/alertas-store");
+const { appendDisparos, getRegras, saveRegras, listDisparos } = await import("@/lib/diagnostico/alertas-store");
 const { campoFato, campoNaoEncontrado, canalNaoLocalizado } = await import("@/lib/diagnostico/schema");
 
 import type { Campo, DiagnosticoConcorrente, MidiaPaga, Produto } from "@/lib/diagnostico/schema";
@@ -90,7 +90,9 @@ function varredura(input: {
 }
 
 function roda(input: Parameters<typeof varredura>[0]): DiagnosticoConcorrente {
+  // espelha o runDiagnostico: diff puro + alertas avaliados fora e anexados.
   const d = aplicarMovimentos(varredura(input));
+  appendDisparos(disparosDaVarredura(d, getRegras(d.clientName)));
   saveDiagnostico(d);
   return d;
 }
