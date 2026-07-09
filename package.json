@@ -38,7 +38,8 @@
     "smoke:movimentos": "tsx scripts/test-radar-diagnostico-f1a.mts",
     "smoke:preco": "tsx scripts/test-radar-preco.mts",
     "smoke:reputacao": "tsx scripts/test-radar-reputacao.mts",
-    "smoke:battlecard": "tsx scripts/test-radar-battlecard.mts"
+    "smoke:battlecard": "tsx scripts/test-radar-battlecard.mts",
+    "smoke:diag-schedule": "tsx scripts/test-radar-diag-schedule.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",

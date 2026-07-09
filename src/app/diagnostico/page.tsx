@@ -9,6 +9,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getRegras, listDisparos } from "@/lib/diagnostico/alertas-store";
+import { alvosDaVarredura, getDiagSchedule } from "@/lib/diagnostico/schedule";
 import { listDiagnosticos } from "@/lib/diagnostico/store";
 import { pillarOf, readWatchlist } from "@/lib/watchlist";
 
@@ -17,6 +18,7 @@ import { BattlecardCard } from "@/components/battlecard-card";
 import { DiagnosticoRunButton } from "@/components/diagnostico-run-button";
 import { FichaDiagnostico } from "@/components/ficha-diagnostico";
 import { PainelComparativo } from "@/components/painel-diagnostico";
+import { VarreduraSchedule } from "@/components/varredura-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,14 @@ export default async function DiagnosticoPage({
         + canais de cada concorrente, com fonte e data. O que o site não diz aparece como “não
         encontrado” (honesto). Rode sob demanda.
       </p>
+
+      <div className="mt-4">
+        <VarreduraSchedule
+          cliente={cliente}
+          config={getDiagSchedule(cliente)}
+          alvos={alvosDaVarredura(cliente).length}
+        />
+      </div>
 
       <div className="mt-6">
         <AlertasDiagnostico
