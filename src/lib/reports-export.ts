@@ -154,6 +154,31 @@ function desenhaChart(ctx: PdfCtx, c: ChartSpec): void {
       ctx.y -= 14;
     }
     ctx.y -= 4;
+  } else if (c.tipo === "dispersao") {
+    const W = A4.w - M - M;
+    const H = 150;
+    garanteEspaco(ctx, H + 18);
+    const x0 = M;
+    const y0 = ctx.y - H;
+    const px = (v: number) => x0 + (v / c.eixoX.maxVal) * W;
+    const py = (v: number) => y0 + (v / c.eixoY.maxVal) * H;
+    const midX = x0 + W / 2;
+    const midY = y0 + H / 2;
+    // quadrantes + eixos
+    ctx.page.drawLine({ start: { x: midX, y: y0 }, end: { x: midX, y: y0 + H }, thickness: 0.4, color: hex(CHART_THEME.grid), dashArray: [2, 2] });
+    ctx.page.drawLine({ start: { x: x0, y: midY }, end: { x: x0 + W, y: midY }, thickness: 0.4, color: hex(CHART_THEME.grid), dashArray: [2, 2] });
+    ctx.page.drawLine({ start: { x: x0, y: y0 }, end: { x: x0 + W, y: y0 }, thickness: 0.6, color: hex(CHART_THEME.ink400) });
+    ctx.page.drawLine({ start: { x: x0, y: y0 }, end: { x: x0, y: y0 + H }, thickness: 0.6, color: hex(CHART_THEME.ink400) });
+    ctx.page.drawText(ansi(c.eixoX.min), { x: x0, y: y0 - 9, size: 6.5, font: ctx.font, color: hex(CHART_THEME.ink400) });
+    ctx.page.drawText(ansi(c.eixoX.max), { x: x0 + W - 40, y: y0 - 9, size: 6.5, font: ctx.font, color: hex(CHART_THEME.ink400) });
+    for (const p of c.pontos) {
+      const x = px(p.x);
+      const y = py(p.y);
+      ctx.page.drawCircle({ x, y, size: 3, color: hex(CHART_THEME.brand) });
+      ctx.page.drawText(ansi(p.label).slice(0, 18), { x: x + 5, y: y - 2, size: 6.5, font: ctx.bold, color: hex(CHART_THEME.ink) });
+    }
+    ctx.y = y0 - 14;
+    texto(ctx, `X: ${c.eixoX.label} · Y: ${c.eixoY.label}${c.ausentes?.length ? ` · fora do mapa: ${c.ausentes.join(", ")}` : ""}`, { size: 7, cor: CHART_THEME.ink400, gap: 2 });
   } else {
     // linha
     const W = A4.w - M - M;
@@ -301,6 +326,24 @@ function addChartToSlide(pptx: PptxGenJS, slide: PptxGenJS.Slide, c: ChartSpec):
     slide.addChart(pptx.ChartType.line, [{ name: c.titulo, labels: c.pontos.map((p) => p.x.slice(5)), values: c.pontos.map((p) => p.y) }], {
       ...area, chartColors: [bare(CHART_THEME.brand)], showLegend: false, lineSize: 2, lineDataSymbol: "circle",
     });
+  } else if (c.tipo === "dispersao") {
+    // 2x2 como tabela (scatter do pptx rotula mal os pontos) — quadrante calculado
+    const midX = c.eixoX.maxVal / 2;
+    const quad = (p: { x: number; y: number }) =>
+      `${p.x >= midX ? c.eixoX.max : c.eixoX.min} · ${p.y >= 50 ? c.eixoY.max : c.eixoY.min}`;
+    const head = [
+      { text: "Concorrente", options: { bold: true, fontSize: 10, color: bare(CHART_THEME.ink700) } },
+      { text: c.eixoX.label, options: { bold: true, fontSize: 10, color: bare(CHART_THEME.ink700) } },
+      { text: c.eixoY.label, options: { bold: true, fontSize: 10, color: bare(CHART_THEME.ink700) } },
+      { text: "Quadrante", options: { bold: true, fontSize: 10, color: bare(CHART_THEME.ink700) } },
+    ];
+    const rows = c.pontos.map((p) => [
+      { text: p.label, options: { bold: true, fontSize: 10, color: bare(CHART_THEME.ink) } },
+      { text: p.notaX ?? String(p.x), options: { fontSize: 10, color: bare(CHART_THEME.ink700) } },
+      { text: `${p.y}${p.notaY ? ` (${p.notaY})` : ""}`, options: { fontSize: 10, color: bare(CHART_THEME.ink700) } },
+      { text: quad(p), options: { fontSize: 10, color: bare(CHART_THEME.brand) } },
+    ]);
+    slide.addTable([head, ...rows], { ...area, fontFace: "Arial", border: { type: "solid", pt: 0.5, color: bare(CHART_THEME.grid) } });
   } else {
     // grade -> tabela de presença
     const head = [{ text: "", options: { fill: { color: PAPER_HEX } } }, ...c.colunas.map((col) => ({ text: col, options: { bold: true, fontSize: 9, color: bare(CHART_THEME.ink700) } }))];

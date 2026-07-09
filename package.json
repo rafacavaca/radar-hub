@@ -42,7 +42,8 @@
     "smoke:diag-schedule": "tsx scripts/test-radar-diag-schedule.mts",
     "smoke:report-export": "tsx scripts/test-radar-report-export.mts",
     "smoke:diag-config": "tsx scripts/test-radar-diag-config.mts",
-    "smoke:vagas-news": "tsx scripts/test-radar-vagas-news.mts"
+    "smoke:vagas-news": "tsx scripts/test-radar-vagas-news.mts",
+    "smoke:mapa": "tsx scripts/test-radar-mapa.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",

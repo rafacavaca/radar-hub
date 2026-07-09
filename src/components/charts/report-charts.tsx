@@ -5,7 +5,7 @@
  * O mesmo SVG aparece na tela, no link compartilhável e no print.
  */
 
-import type { BarrasChart, ChartSpec, GradeChart, LinhaChart, RoscaChart } from "@/lib/diagnostico/report-charts";
+import type { BarrasChart, ChartSpec, DispersaoChart, GradeChart, LinhaChart, RoscaChart } from "@/lib/diagnostico/report-charts";
 import { CHART_THEME, corPorNatureza } from "@/lib/diagnostico/chart-theme";
 import { formatDateShort } from "@/lib/format";
 
@@ -179,6 +179,55 @@ function Linha({ c }: { c: LinhaChart }) {
   );
 }
 
+function Dispersao({ c }: { c: DispersaoChart }) {
+  const W = 460;
+  const H = 300;
+  const pad = { l: 44, r: 16, t: 16, b: 40 };
+  const px = (v: number) => pad.l + (v / c.eixoX.maxVal) * (W - pad.l - pad.r);
+  const py = (v: number) => H - pad.b - (v / c.eixoY.maxVal) * (H - pad.t - pad.b);
+  const midX = pad.l + (W - pad.l - pad.r) / 2;
+  const midY = pad.t + (H - pad.t - pad.b) / 2;
+
+  return (
+    <Moldura c={c}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={c.titulo}>
+        {/* quadrantes */}
+        <line x1={midX} y1={pad.t} x2={midX} y2={H - pad.b} stroke={CHART_THEME.grid} strokeDasharray="3 3" />
+        <line x1={pad.l} y1={midY} x2={W - pad.r} y2={midY} stroke={CHART_THEME.grid} strokeDasharray="3 3" />
+        {/* eixos */}
+        <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke={CHART_THEME.ink400} strokeWidth="1" />
+        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke={CHART_THEME.ink400} strokeWidth="1" />
+        {/* rótulos dos extremos */}
+        <text x={pad.l} y={H - 6} fontSize="9" fill={CHART_THEME.ink400}>{c.eixoX.min}</text>
+        <text x={W - pad.r} y={H - 6} textAnchor="end" fontSize="9" fill={CHART_THEME.ink400}>{c.eixoX.max}</text>
+        <text x={pad.l + 3} y={H - pad.b - 4} fontSize="9" fill={CHART_THEME.ink400}>{c.eixoY.min}</text>
+        <text x={pad.l + 3} y={pad.t + 10} fontSize="9" fill={CHART_THEME.ink400}>{c.eixoY.max}</text>
+        {/* pontos */}
+        {c.pontos.map((p, i) => {
+          const x = px(p.x);
+          const y = py(p.y);
+          const anchor = x > W - 90 ? "end" : "start";
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r="5" fill={CHART_THEME.brand} fillOpacity="0.85" />
+              <text x={anchor === "end" ? x - 8 : x + 8} y={y + 3} textAnchor={anchor} fontSize="10" fontWeight="600" fill={CHART_THEME.ink}>
+                {p.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="mt-1 flex flex-wrap justify-between gap-2 text-[11px] text-stone-400">
+        <span>X: {c.eixoX.label}</span>
+        <span>Y: {c.eixoY.label}</span>
+      </div>
+      {c.ausentes && c.ausentes.length > 0 ? (
+        <p className="mt-1 text-[11px] text-stone-400">Fora do mapa: {c.ausentes.join(", ")}</p>
+      ) : null}
+    </Moldura>
+  );
+}
+
 export function ReportChart({ chart }: { chart: ChartSpec }) {
   switch (chart.tipo) {
     case "barras":
@@ -189,6 +238,8 @@ export function ReportChart({ chart }: { chart: ChartSpec }) {
       return <Rosca c={chart} />;
     case "linha":
       return <Linha c={chart} />;
+    case "dispersao":
+      return <Dispersao c={chart} />;
   }
 }
 
@@ -197,7 +248,9 @@ export function ReportCharts({ charts }: { charts: ChartSpec[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {charts.map((c, i) => (
-        <ReportChart key={i} chart={c} />
+        <div key={i} className={c.tipo === "dispersao" || c.tipo === "grade" ? "sm:col-span-2" : ""}>
+          <ReportChart chart={c} />
+        </div>
       ))}
     </div>
   );

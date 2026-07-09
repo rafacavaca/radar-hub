@@ -63,7 +63,24 @@ export type LinhaChart = {
   data: string;
 };
 
-export type ChartSpec = BarrasChart | GradeChart | RoscaChart | LinhaChart;
+/** E1 — Dispersão / mapa 2x2 (concorrentes plotados em dois eixos). */
+export type DispersaoPonto = { label: string; x: number; y: number; notaX?: string; notaY?: string };
+export type EixoDef = { label: string; min: string; max: string; maxVal: number };
+export type DispersaoChart = {
+  tipo: "dispersao";
+  titulo: string;
+  subtitulo?: string;
+  eixoX: EixoDef;
+  eixoY: EixoDef;
+  pontos: DispersaoPonto[];
+  /** concorrentes fora do mapa por falta de dado (honesto), com o motivo. */
+  ausentes?: string[];
+  natureza: Natureza;
+  fonte: string;
+  data: string;
+};
+
+export type ChartSpec = BarrasChart | GradeChart | RoscaChart | LinhaChart | DispersaoChart;
 
 const NIVEL_ORDER = ["icônica", "proprietária", "diferenciada", "padronizada", "clichê", "desestruturada", "defasada"];
 function nivelRank(nivel: string | null | undefined): number {
@@ -179,6 +196,10 @@ export function buildDiagnosticoCharts(diags: DiagnosticoConcorrente[]): ChartSp
     });
   }
 
+  // E1. Mapa de posicionamento 2x2 (síntese) — logo após maturidade.
+  const mapa = buildMapaPosicionamento(diags);
+  if (mapa) charts.push(mapa);
+
   // 5. Evolução (FATO) — movimentos por varredura (do histórico F1a). Honesto:
   // só aparece quando há ≥2 varreduras acumuladas (senão a série é uma linha reta).
   const maxSnaps = Math.max(...diags.map((d) => d.historico?.length ?? 0));
@@ -210,6 +231,45 @@ export function buildDiagnosticoCharts(diags: DiagnosticoConcorrente[]): ChartSp
   return charts;
 }
 
+/**
+ * E1 — MAPA DE POSICIONAMENTO 2x2. Síntese sobre o que JÁ coletamos:
+ *   eixo X = amplitude de portfólio (nº de produtos: especialista → generalista)
+ *   eixo Y = maturidade de comunicação (Lente 4: defasado → referência)
+ * Honesto: X é heurística transparente (contagem de produtos, rotulada); Y é
+ * OPINIÃO (a régua da Lente 4). Concorrente sem maturidade avaliada NÃO é
+ * plotado (fica em `ausentes` com o motivo) — nunca uma posição inventada.
+ */
+export function buildMapaPosicionamento(diags: DiagnosticoConcorrente[]): DispersaoChart | null {
+  const data = dataDoConjunto(diags);
+  const plotaveis = diags.filter((d) => d.maturidade?.status === "avaliado" && d.maturidade.score !== null);
+  if (plotaveis.length < 2) return null; // 2x2 só faz sentido com ≥2 pontos
+
+  const maxProdutos = Math.max(1, ...plotaveis.map((d) => d.posicionamento.produtos.length));
+  const pontos: DispersaoPonto[] = plotaveis.map((d) => ({
+    label: d.concorrente_nome,
+    x: d.posicionamento.produtos.length,
+    y: d.maturidade!.score as number,
+    notaX: `${d.posicionamento.produtos.length} produto(s)`,
+    notaY: d.maturidade!.nivel ?? undefined,
+  }));
+  const ausentes = diags
+    .filter((d) => !(d.maturidade?.status === "avaliado" && d.maturidade.score !== null))
+    .map((d) => `${d.concorrente_nome} (sem maturidade avaliada)`);
+
+  return {
+    tipo: "dispersao",
+    titulo: "Mapa de posicionamento do mercado",
+    subtitulo: "amplitude de portfólio × maturidade de comunicação",
+    eixoX: { label: "Amplitude de portfólio", min: "especialista", max: "generalista", maxVal: maxProdutos },
+    eixoY: { label: "Maturidade de comunicação", min: "defasado", max: "referência", maxVal: 100 },
+    pontos,
+    ausentes: ausentes.length ? ausentes : undefined,
+    natureza: "opiniao", // Y é opinião (Lente 4); X é heurística de contagem
+    fonte: "diagnóstico do Radar — nº de produtos (fato) × maturidade (opinião Lente 4)",
+    data,
+  };
+}
+
 /** Resumo textual dos gráficos — vira o "material" pro narrador do relatório. */
 export function chartsToMaterial(charts: ChartSpec[]): string {
   return charts
@@ -218,6 +278,8 @@ export function chartsToMaterial(charts: ChartSpec[]): string {
       if (c.tipo === "barras") return `${head}\n${c.series.map((s) => `  - ${s.label}: ${s.valor ?? "sem dado"}${c.unidade ?? ""}${s.nota ? ` (${s.nota})` : ""}`).join("\n")}`;
       if (c.tipo === "rosca") return `${head}\n${c.fatias.map((s) => `  - ${s.label}: ${s.valor}`).join("\n")}`;
       if (c.tipo === "linha") return `${head}\n${c.pontos.map((p) => `  - ${p.x}: ${p.y}`).join("\n")}`;
+      if (c.tipo === "dispersao")
+        return `${head} (X=${c.eixoX.label} ${c.eixoX.min}→${c.eixoX.max}; Y=${c.eixoY.label} ${c.eixoY.min}→${c.eixoY.max})\n${c.pontos.map((p) => `  - ${p.label}: ${c.eixoX.label}=${p.x}${p.notaX ? ` (${p.notaX})` : ""}, ${c.eixoY.label}=${p.y}${p.notaY ? ` (${p.notaY})` : ""}`).join("\n")}${c.ausentes?.length ? `\n  (fora do mapa: ${c.ausentes.join(", ")})` : ""}`;
       // grade
       return `${head}\n  colunas: ${c.colunas.join(", ")}\n${c.linhas.map((l) => `  - ${l.label}: ${l.celulas.map((v, i) => (v === "sim" ? c.colunas[i] : null)).filter(Boolean).join(", ") || "nenhum"}`).join("\n")}`;
     })

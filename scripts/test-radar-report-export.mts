@@ -41,7 +41,7 @@ if (diags.length < 2) {
 const charts = buildDiagnosticoCharts(diags);
 console.log(`GRÁFICOS (${charts.length}) de ${diags.length} concorrentes:`);
 for (const c of charts) {
-  const n = c.tipo === "barras" ? c.series.length : c.tipo === "rosca" ? c.fatias.length : c.tipo === "linha" ? c.pontos.length : c.linhas.length;
+  const n = c.tipo === "barras" ? c.series.length : c.tipo === "rosca" ? c.fatias.length : c.tipo === "linha" || c.tipo === "dispersao" ? c.pontos.length : c.linhas.length;
   console.log(`  · [${c.natureza}] ${c.tipo.padEnd(7)} "${c.titulo}" — ${n} item(ns) · fonte: ${c.fonte} · data: ${c.data.slice(0, 10)}`);
 }
 

@@ -14,8 +14,11 @@ import { alvosDaVarredura, getDiagSchedule } from "@/lib/diagnostico/schedule";
 import { listDiagnosticos } from "@/lib/diagnostico/store";
 import { pillarOf, readWatchlist } from "@/lib/watchlist";
 
+import { buildMapaPosicionamento } from "@/lib/diagnostico/report-charts";
+
 import { AlertasDiagnostico } from "@/components/alertas-diagnostico";
 import { BattlecardCard } from "@/components/battlecard-card";
+import { ReportChart } from "@/components/charts/report-charts";
 import { DiagConfigEditor } from "@/components/diag-config-editor";
 import { DiagnosticoRunButton } from "@/components/diagnostico-run-button";
 import { FichaDiagnostico } from "@/components/ficha-diagnostico";
@@ -40,7 +43,9 @@ export default async function DiagnosticoPage({
   if (client.mode === "carteira") redirect(`/carteira?cliente=${encodeURIComponent(cliente)}`);
 
   const concorrentes = client.competitors.filter((c) => pillarOf(c, client.mode) === "concorrente");
-  const byId = new Map(listDiagnosticos(cliente).map((d) => [d.concorrente_id, d]));
+  const diagnosticos = listDiagnosticos(cliente);
+  const byId = new Map(diagnosticos.map((d) => [d.concorrente_id, d]));
+  const mapa = buildMapaPosicionamento(diagnosticos);
   const now = new Date().toISOString();
   const q = cliente ? `?cliente=${encodeURIComponent(cliente)}` : "";
 
@@ -79,6 +84,12 @@ export default async function DiagnosticoPage({
           disparos={listDisparos(cliente)}
         />
       </div>
+
+      {mapa ? (
+        <div className="mt-6">
+          <ReportChart chart={mapa} />
+        </div>
+      ) : null}
 
       {byId.size >= 2 ? (
         <div className="mt-6">
