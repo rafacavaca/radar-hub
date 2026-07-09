@@ -20,7 +20,7 @@ import { formatDateTimePtBR } from "@/lib/format";
 import { lensesFor, LENS_LABEL, type LensId } from "@/lib/lenses";
 import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
 import { listNotes } from "@/lib/notes";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, LensReading } from "@/lib/types";
 
 import type { CrossInsight, CrossVerdict } from "@/lib/cross-reference";
@@ -83,7 +83,7 @@ export default async function BriefingPage({
 }) {
   const params = await searchParams;
 
-  const watchlistClients = readWatchlist().clients;
+  const watchlistClients = (await loadWatchlist()).clients;
   const clients = watchlistClients.map((c) => c.name);
   const cliente =
     params.cliente && clients.includes(params.cliente) ? params.cliente : (clients[0] ?? "");

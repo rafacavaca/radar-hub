@@ -23,7 +23,7 @@ import {
   addClient,
   addCompetitor,
   addSourcesToCompetitor,
-  readWatchlist,
+  loadWatchlist,
   removeClient,
   removeCompetitor,
   setCompetitorEnabled,
@@ -33,7 +33,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ data: readWatchlist() });
+  return NextResponse.json({ data: await loadWatchlist() });
 }
 
 /** true só para string de verdade — checagem defensiva do corpo, sem zod. */

@@ -12,7 +12,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { runDiagnostico } from "@/lib/diagnostico/run";
 import { listDiagnosticos } from "@/lib/diagnostico/store";
-import { pillarOf, readWatchlist } from "@/lib/watchlist";
+import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Envie clientName e competitorId." }, { status: 400 });
   }
 
-  const client = readWatchlist().clients.find((c) => c.name === clientName);
+  const client = (await loadWatchlist()).clients.find((c) => c.name === clientName);
   const competitor = client?.competitors.find((c) => c.id === competitorId);
   if (!competitor || pillarOf(competitor, client?.mode) === "conta-chave") {
     return NextResponse.json({ error: "Concorrente não encontrado neste cliente." }, { status: 404 });

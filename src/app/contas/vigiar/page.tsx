@@ -11,7 +11,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { listSourceStatus } from "@/lib/source-status";
-import { pillarOf, readWatchlist } from "@/lib/watchlist";
+import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { WatchlistEditor } from "@/components/watchlist-editor";
 
@@ -23,7 +23,7 @@ export default async function ContasVigiarPage({
   searchParams: Promise<{ cliente?: string }>;
 }) {
   const params = await searchParams;
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   const allClients = watchlist.clients.map((c) => c.name);
   const cliente =
     params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");

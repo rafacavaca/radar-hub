@@ -12,7 +12,7 @@
 
 import { listReports } from "@/lib/reports";
 import { listSchedules } from "@/lib/schedules";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 
 import { ReportsView } from "@/components/reports-view";
 import { SchedulesManager } from "@/components/schedules-manager";
@@ -25,7 +25,7 @@ export default async function RelatoriosPage({
   searchParams: Promise<{ cliente?: string }>;
 }) {
   const params = await searchParams;
-  const allClients = readWatchlist().clients.map((c) => c.name);
+  const allClients = (await loadWatchlist()).clients.map((c) => c.name);
   const cliente =
     params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
 

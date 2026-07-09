@@ -14,7 +14,7 @@ import { buildBriefing } from "@/lib/briefing";
 import { ageInDays, formatDateShort, formatDateTimePtBR } from "@/lib/format";
 import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
 import { listVisualReports } from "@/lib/visual";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem } from "@/lib/types";
 
 import { RodarAgora } from "@/components/rodar-agora";
@@ -28,7 +28,7 @@ export default async function VisaoPage({
   searchParams: Promise<{ cliente?: string }>;
 }) {
   const params = await searchParams;
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   const clientNames = watchlist.clients.map((c) => c.name);
   const cliente =
     params.cliente && clientNames.includes(params.cliente) ? params.cliente : (clientNames[0] ?? "");

@@ -11,7 +11,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 import { captureIdentity, listVisualReports } from "@/lib/visual";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   }
 
   // resolve concorrente + cliente na watchlist.
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   let found: { clientName: string; competitor: (typeof watchlist.clients)[number]["competitors"][number] } | null =
     null;
   for (const client of watchlist.clients) {

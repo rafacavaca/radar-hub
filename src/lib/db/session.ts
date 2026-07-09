@@ -57,3 +57,21 @@ export async function currentUser(): Promise<{ id: string; email?: string } | nu
     return null;
   }
 }
+
+/**
+ * A org ATIVA da sessão (id) — a 1ª membership do usuário (RLS só devolve as
+ * dele). Para escrever, é a org onde grava. null se não logado/sem org.
+ */
+export async function currentOrgId(): Promise<string | null> {
+  try {
+    const sb = await supabaseRouteClient();
+    const { data } = await sb
+      .from("memberships")
+      .select("org_id, created_at")
+      .order("created_at", { ascending: true })
+      .limit(1);
+    return (data?.[0] as { org_id?: string } | undefined)?.org_id ?? null;
+  } catch {
+    return null;
+  }
+}

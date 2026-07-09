@@ -12,7 +12,7 @@
 import Link from "next/link";
 
 import { latestByCompetitor, type VisualReport } from "@/lib/visual";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 
 import { IdentidadeView } from "@/components/identidade-view";
 
@@ -24,7 +24,7 @@ export default async function IdentidadePage({
   searchParams: Promise<{ cliente?: string }>;
 }) {
   const params = await searchParams;
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   const allClients = watchlist.clients.map((c) => c.name);
   const cliente =
     params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");

@@ -8,7 +8,7 @@
 
 import { formatDateTimePtBR } from "@/lib/format";
 import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 
 import { FeedList } from "@/components/feed-list";
 import { RodarAgora } from "@/components/rodar-agora";
@@ -21,7 +21,7 @@ export default async function FeedPage({
   searchParams: Promise<{ cliente?: string }>;
 }) {
   const params = await searchParams;
-  const clientNames = readWatchlist().clients.map((c) => c.name);
+  const clientNames = (await loadWatchlist()).clients.map((c) => c.name);
   const cliente =
     params.cliente && clientNames.includes(params.cliente) ? params.cliente : (clientNames[0] ?? "");
 

@@ -8,7 +8,7 @@
  */
 
 import { readLenses } from "@/lib/lenses";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 
 import { LensConfigEditor } from "@/components/lens-config-editor";
 
@@ -20,7 +20,7 @@ export default async function AnalistasPage({
   searchParams: Promise<{ cliente?: string }>;
 }) {
   const params = await searchParams;
-  const allClients = readWatchlist().clients.map((c) => c.name);
+  const allClients = (await loadWatchlist()).clients.map((c) => c.name);
   const cliente =
     params.cliente && allClients.includes(params.cliente) ? params.cliente : (allClients[0] ?? "");
 

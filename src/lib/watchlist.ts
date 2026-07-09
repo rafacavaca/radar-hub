@@ -16,6 +16,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { supabaseEnabled } from "@/lib/db/supabase";
+import { sbReadWatchlist, sbWriteWatchlist } from "@/lib/db/repo-watchlist";
+
 /** Tipos de fonte pública que registramos por concorrente. */
 export type SourceKind = "blog" | "noticias" | "releases" | "produto" | "vagas";
 
@@ -298,6 +301,26 @@ export function writeWatchlist(watchlist: Watchlist): void {
   const tmp = `${path}.tmp`;
   writeFileSync(tmp, JSON.stringify(watchlist, null, 2), "utf8");
   renameSync(tmp, path);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MULTI-TENANT (item 2 — cutover, ADITIVO e green-preserving). loadWatchlist /
+// saveWatchlist são a API ORG-SCOPED: em modo Supabase leem/gravam do banco
+// (RLS escopa por org da sessão); senão caem no JSON síncrono de hoje. As
+// superfícies que servem o usuário migram de readWatchlist() → await
+// loadWatchlist() uma a uma, mantendo a árvore verde. Só ligar RADAR_DB=supabase
+// quando TODAS tiverem migrado (senão um leitor JSON veria dados fora de org).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Leitura da watchlist da ORG da sessão (Supabase/RLS) ou o JSON (modo clássico). */
+export async function loadWatchlist(): Promise<Watchlist> {
+  return supabaseEnabled() ? sbReadWatchlist() : readWatchlist();
+}
+
+/** Escrita da watchlist na ORG da sessão (Supabase/RLS) ou o JSON (modo clássico). */
+export async function saveWatchlist(watchlist: Watchlist): Promise<void> {
+  if (supabaseEnabled()) return sbWriteWatchlist(watchlist);
+  writeWatchlist(watchlist);
 }
 
 function findClient(watchlist: Watchlist, clientName: string): WatchClient {

@@ -3,7 +3,7 @@ import { Archivo } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 
 // UMA família em toda a interface — hierarquia por tamanho, peso e cor.
 const archivo = Archivo({
@@ -19,13 +19,14 @@ export const metadata: Metadata = {
     "Movimentos de concorrentes cruzados com o que se sabe do cliente, prontos pra decisão.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // CLIENTE é a unidade primária: a sidebar lista as contas (a watchlist).
-  const clientList = readWatchlist().clients;
+  // CLIENTE é a unidade primária: a sidebar lista as contas (a watchlist da org
+  // da sessão em modo Supabase; RLS escopa — cada agência vê só as suas).
+  const clientList = (await loadWatchlist()).clients;
   const clients = clientList.map((c) => c.name);
   const modes = Object.fromEntries(clientList.map((c) => [c.name, c.mode ?? "concorrentes"]));
 

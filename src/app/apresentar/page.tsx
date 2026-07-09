@@ -9,7 +9,7 @@
 import { formatDateTimePtBR } from "@/lib/format";
 import { lensesFor, LENS_LABEL, type LensId } from "@/lib/lenses";
 import { runRadarLoop } from "@/lib/loop";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist } from "@/lib/watchlist";
 
 import { LensReadingCard } from "@/components/lens-reading-card";
 import { PrintButton } from "@/components/print-button";
@@ -25,7 +25,7 @@ export default async function ApresentarPage({
 }) {
   const params = await searchParams;
 
-  const clients = readWatchlist().clients.map((c) => c.name);
+  const clients = (await loadWatchlist()).clients.map((c) => c.name);
   const cliente =
     params.cliente && clients.includes(params.cliente) ? params.cliente : (clients[0] ?? "");
   const lente = (LENSES.includes(params.lente as LensId) ? params.lente : "comercial") as LensId;

@@ -12,7 +12,7 @@ import { getRegras, listDisparos } from "@/lib/diagnostico/alertas-store";
 import { getDiagConfig } from "@/lib/diagnostico/config";
 import { alvosDaVarredura, getDiagSchedule } from "@/lib/diagnostico/schedule";
 import { listDiagnosticos } from "@/lib/diagnostico/store";
-import { pillarOf, readWatchlist } from "@/lib/watchlist";
+import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { getCobertura } from "@/lib/diagnostico/cobertura";
 import { buildMapaPosicionamento } from "@/lib/diagnostico/report-charts";
@@ -36,7 +36,7 @@ export default async function DiagnosticoPage({
   searchParams: Promise<{ cliente?: string }>;
 }) {
   const params = await searchParams;
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   const clientNames = watchlist.clients.map((c) => c.name);
   const cliente =
     params.cliente && clientNames.includes(params.cliente) ? params.cliente : (clientNames[0] ?? "");
