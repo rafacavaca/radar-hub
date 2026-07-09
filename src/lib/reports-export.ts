@@ -171,11 +171,24 @@ function desenhaChart(ctx: PdfCtx, c: ChartSpec): void {
     ctx.page.drawLine({ start: { x: x0, y: y0 }, end: { x: x0, y: y0 + H }, thickness: 0.6, color: hex(CHART_THEME.ink400) });
     ctx.page.drawText(ansi(c.eixoX.min), { x: x0, y: y0 - 9, size: 6.5, font: ctx.font, color: hex(CHART_THEME.ink400) });
     ctx.page.drawText(ansi(c.eixoX.max), { x: x0 + W - 40, y: y0 - 9, size: 6.5, font: ctx.font, color: hex(CHART_THEME.ink400) });
-    for (const p of c.pontos) {
-      const x = px(p.x);
-      const y = py(p.y);
-      ctx.page.drawCircle({ x, y, size: 3, color: hex(CHART_THEME.brand) });
-      ctx.page.drawText(ansi(p.label).slice(0, 18), { x: x + 5, y: y - 2, size: 6.5, font: ctx.bold, color: hex(CHART_THEME.ink) });
+    // dots na posição real
+    for (const p of c.pontos) ctx.page.drawCircle({ x: px(p.x), y: py(p.y), size: 3, color: hex(CHART_THEME.brand) });
+    // labels desempilhados por LADO (y do PDF cresce pra cima): garante gap vertical
+    const LH = 9;
+    for (const side of ["dir", "esq"] as const) {
+      const grupo = c.pontos
+        .map((p) => ({ label: p.label, x: px(p.x), y: py(p.y) }))
+        .filter((p) => (side === "dir" ? p.x > x0 + W * 0.62 : p.x <= x0 + W * 0.62))
+        .sort((a, b) => b.y - a.y); // de cima pra baixo
+      let prevY = Infinity;
+      for (const p of grupo) {
+        let ly = Math.min(p.y, prevY - LH);
+        if (ly < y0 + 2) ly = y0 + 2;
+        prevY = ly;
+        const lx = side === "dir" ? p.x + 5 : Math.max(x0, p.x - 5 - ctx.bold.widthOfTextAtSize(ansi(p.label).slice(0, 16), 6.5));
+        if (Math.abs(ly - p.y) > 1) ctx.page.drawLine({ start: { x: p.x, y: p.y }, end: { x: lx, y: ly + 2 }, thickness: 0.4, color: hex(CHART_THEME.grid) });
+        ctx.page.drawText(ansi(p.label).slice(0, 16), { x: lx, y: ly, size: 6.5, font: ctx.bold, color: hex(CHART_THEME.ink) });
+      }
     }
     ctx.y = y0 - 14;
     texto(ctx, `X: ${c.eixoX.label} · Y: ${c.eixoY.label}${c.ausentes?.length ? ` · fora do mapa: ${c.ausentes.join(", ")}` : ""}`, { size: 7, cor: CHART_THEME.ink400, gap: 2 });

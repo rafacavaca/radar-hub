@@ -10,7 +10,7 @@
 import { runLente1 } from "@/lib/diagnostico/lente1";
 import { runLente2 } from "@/lib/diagnostico/lente2";
 import { runLente3 } from "@/lib/diagnostico/lente3";
-import { runLente4 } from "@/lib/diagnostico/lente4";
+import { runLente4, perfilProvaDe, type PerfilProva } from "@/lib/diagnostico/lente4";
 import { runLentePreco } from "@/lib/diagnostico/lente-preco";
 import { runLenteReputacao } from "@/lib/diagnostico/lente-reputacao";
 import { runCamposCustom } from "@/lib/diagnostico/campos-custom";
@@ -18,7 +18,7 @@ import { runLenteVagas } from "@/lib/diagnostico/lente-vagas";
 import { runLenteNews } from "@/lib/diagnostico/lente-news";
 import { getDiagConfig } from "@/lib/diagnostico/config";
 import { runEstrategia } from "@/lib/diagnostico/estrategia";
-import { getDiagnostico, saveDiagnostico } from "@/lib/diagnostico/store";
+import { getDiagnostico, listDiagnosticos, saveDiagnostico } from "@/lib/diagnostico/store";
 import { appendDisparos, getRegras } from "@/lib/diagnostico/alertas-store";
 import { avaliarRegras, diffSnapshots, toSnapshot } from "@/lib/diagnostico/movimento";
 import type { DiagnosticoConcorrente, Snapshot } from "@/lib/diagnostico/schema";
@@ -49,8 +49,12 @@ export async function runDiagnostico(input: {
   // C2 vagas + C4 releases/notícias — alimentam o motor de movimento.
   const vagas = await runLenteVagas(name, siteUrl);
   const news = await runLenteNews(name, siteUrl);
-  // Opinião + rascunho (F3) por último.
-  const maturidade = await runLente4(name, posicionamento);
+  // Opinião + rascunho (F3) por último. Maturidade é RELATIVA: passa os pares
+  // (perfil de prova dos outros concorrentes já diagnosticados do cliente).
+  const peers: PerfilProva[] = listDiagnosticos(clientName)
+    .filter((d) => d.concorrente_id !== competitorId)
+    .map((d) => perfilProvaDe(d.concorrente_nome, d.posicionamento));
+  const maturidade = await runLente4(name, posicionamento, peers);
   const estrategia = await runEstrategia(clientName, name, posicionamento, maturidade);
 
   const diag: DiagnosticoConcorrente = {
@@ -73,6 +77,28 @@ export async function runDiagnostico(input: {
     estrategia,
   };
   return saveDiagnostico(aplicarMovimentos(diag));
+}
+
+/**
+ * Re-avalia a MATURIDADE (Lente 4) de TODOS os concorrentes de um cliente,
+ * cada um relativo aos demais (perfil de prova como pares) — do posicionamento
+ * JÁ salvo, sem re-scrape. Corrige o colapso de notas idênticas quando a lente
+ * antiga julgava no vácuo. Nunca lança pelo LLM (cada falha vira nao_avaliado).
+ */
+export async function reavaliarMaturidadeCliente(clientName: string): Promise<Array<{ nome: string; nivel: string | null; score: number | null; status: string }>> {
+  const diags = listDiagnosticos(clientName);
+  const out: Array<{ nome: string; nivel: string | null; score: number | null; status: string }> = [];
+  for (const d of diags) {
+    const peers: PerfilProva[] = diags
+      .filter((x) => x.concorrente_id !== d.concorrente_id)
+      .map((x) => perfilProvaDe(x.concorrente_nome, x.posicionamento));
+    const maturidade = await runLente4(d.concorrente_nome, d.posicionamento, peers);
+    d.maturidade = maturidade;
+    if (d.historico && d.historico.length > 0) d.historico[d.historico.length - 1].posicionamento = d.posicionamento;
+    saveDiagnostico(d);
+    out.push({ nome: d.concorrente_nome, nivel: maturidade.nivel, score: maturidade.score, status: maturidade.status });
+  }
+  return out;
 }
 
 /**

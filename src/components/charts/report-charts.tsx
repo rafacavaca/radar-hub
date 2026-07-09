@@ -7,6 +7,7 @@
 
 import type { BarrasChart, ChartSpec, DispersaoChart, GradeChart, LinhaChart, RoscaChart } from "@/lib/diagnostico/report-charts";
 import { CHART_THEME, corPorNatureza } from "@/lib/diagnostico/chart-theme";
+import { dodgeLabels } from "@/lib/diagnostico/label-dodge";
 import { formatDateShort } from "@/lib/format";
 
 function Selo({ natureza }: { natureza: "fato" | "opiniao" }) {
@@ -188,6 +189,10 @@ function Dispersao({ c }: { c: DispersaoChart }) {
   const midX = pad.l + (W - pad.l - pad.r) / 2;
   const midY = pad.t + (H - pad.t - pad.b) / 2;
 
+  // posições renderizadas + rótulos desempilhados (por lado, ordenados por y)
+  const rendered = c.pontos.map((p) => ({ label: p.label, x: px(p.x), y: py(p.y) }));
+  const labels = dodgeLabels(rendered, { width: W, lineHeight: 13, top: pad.t + 6, bottom: H - pad.b - 4 });
+
   return (
     <Moldura c={c}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={c.titulo}>
@@ -202,15 +207,17 @@ function Dispersao({ c }: { c: DispersaoChart }) {
         <text x={W - pad.r} y={H - 6} textAnchor="end" fontSize="9" fill={CHART_THEME.ink400}>{c.eixoX.max}</text>
         <text x={pad.l + 3} y={H - pad.b - 4} fontSize="9" fill={CHART_THEME.ink400}>{c.eixoY.min}</text>
         <text x={pad.l + 3} y={pad.t + 10} fontSize="9" fill={CHART_THEME.ink400}>{c.eixoY.max}</text>
-        {/* pontos */}
-        {c.pontos.map((p, i) => {
-          const x = px(p.x);
-          const y = py(p.y);
-          const anchor = x > W - 90 ? "end" : "start";
+        {/* dots (na posição real) */}
+        {rendered.map((p, i) => (
+          <circle key={`d${i}`} cx={p.x} cy={p.y} r="5" fill={CHART_THEME.brand} fillOpacity="0.85" />
+        ))}
+        {/* labels desempilhados + leader quando deslocado */}
+        {labels.map((p, i) => {
+          const lx = p.side === "end" ? p.x - 9 : p.x + 9;
           return (
-            <g key={i}>
-              <circle cx={x} cy={y} r="5" fill={CHART_THEME.brand} fillOpacity="0.85" />
-              <text x={anchor === "end" ? x - 8 : x + 8} y={y + 3} textAnchor={anchor} fontSize="10" fontWeight="600" fill={CHART_THEME.ink}>
+            <g key={`l${i}`}>
+              {p.deslocado ? <line x1={p.x} y1={p.y} x2={lx} y2={p.labelY - 3} stroke={CHART_THEME.grid} strokeWidth="0.75" /> : null}
+              <text x={lx} y={p.labelY} textAnchor={p.side} fontSize="10" fontWeight="600" fill={CHART_THEME.ink}>
                 {p.label}
               </text>
             </g>
