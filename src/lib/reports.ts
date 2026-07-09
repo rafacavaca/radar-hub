@@ -23,11 +23,11 @@ import { join } from "node:path";
 import { buildMaterialBlock, collectRecentItems, type AskSource } from "@/lib/ask";
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
-import { buildDiagnosticoCharts, chartsToMaterial, type ChartSpec } from "@/lib/diagnostico/report-charts";
+import { buildDiagnosticoCharts, buildMovimentosCharts, chartsToMaterial, type ChartSpec } from "@/lib/diagnostico/report-charts";
 import { listDiagnosticos } from "@/lib/diagnostico/store";
 import type { RelationshipPlay } from "@/lib/types";
 
-export type ReportKind = "chat" | "sob-medida" | "agendado" | "conta" | "diagnostico";
+export type ReportKind = "chat" | "sob-medida" | "agendado" | "conta" | "diagnostico" | "movimentos";
 
 export type Report = {
   id: string;
@@ -335,6 +335,61 @@ Redija o texto do relatório de diagnóstico competitivo de ${clientName}.`;
 
   const { titulo, corpo } = parseReportOutput(content);
   // fontes = sites dos concorrentes diagnosticados (proveniência do relatório)
+  const fontes: AskSource[] = diags.map((d) => ({ titulo: `Diagnóstico ${d.concorrente_nome}`, url: d.site_url, concorrente: d.concorrente_nome }));
+  return { titulo, corpo, fontes, charts };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Onda 3 · F — Relatório executivo "O QUE MUDOU": digest dos movimentos (F1a)
+// de todos os concorrentes num período. Honesto com a esparsidade do histórico.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MOVIMENTOS_REPORT_SYSTEM =
+  "Você é o RADAR, redigindo um RELATÓRIO EXECUTIVO 'o que mudou' para o dono da agência Formare. " +
+  "Recebe o DIGEST dos movimentos reais (mudanças detectadas entre varreduras) dos concorrentes num período. " +
+  "Escreva SÓ o texto, em MARKDOWN PURO (sem JSON, sem ```). 1ª linha = título nível 1 (ex.: '# O que mudou — <cliente> (últimos N dias)'). " +
+  "Depois: resumo executivo (2-3 linhas), '## Destaques' (os movimentos que mais importam, agrupados por concorrente), '## O que observar'. " +
+  "REGRAS: (1) HONESTIDADE — só cite os movimentos do digest; se houve POUCO movimento no período, DIGA isso claramente (não infle); NÃO invente mudança; " +
+  "(2) priorize por severidade/impacto comercial; (3) seja CONCISO — máx ~400 palavras.";
+
+/**
+ * Compõe o relatório "o que mudou" de UM cliente num período (dias). Monta os
+ * gráficos de movimento + pede a narrativa ao LLM. NÃO salva. Lança se não há
+ * diagnóstico. Honesto quando o período teve pouco/zero movimento.
+ */
+export async function composeMovimentosReport(
+  clientName: string,
+  dias: number,
+): Promise<{ titulo: string; corpo: string; fontes: AskSource[]; charts: ChartSpec[] }> {
+  const diags = listDiagnosticos(clientName);
+  if (diags.length === 0) {
+    throw new Error(`${clientName} ainda não tem diagnósticos — gere ao menos um concorrente primeiro.`);
+  }
+  const { charts, total, porConcorrente } = buildMovimentosCharts(diags, dias, new Date().toISOString());
+
+  const digest =
+    total === 0
+      ? `NENHUM movimento detectado nos últimos ${dias} dias. (O histórico de varreduras ainda é curto — a varredura semanal automática vai acumular sinal ao longo das semanas.)`
+      : porConcorrente
+          .map((c) => `${c.nome} (${c.movs.length}):\n${c.movs.map((m) => `  - [${m.tipo}] ${m.label}: ${m.de ?? "—"} -> ${m.para ?? "—"} (${m.data.slice(0, 10)})`).join("\n")}`)
+          .join("\n\n");
+
+  const prompt = `CLIENTE: ${clientName}\nPERÍODO: últimos ${dias} dias\nTOTAL DE MOVIMENTOS: ${total}\n\nDIGEST DOS MOVIMENTOS:\n${digest}\n\nRedija o relatório executivo "o que mudou".`;
+
+  let content = "";
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      content = await completeViaGateway({ system: MOVIMENTOS_REPORT_SYSTEM, prompt });
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err as Error;
+    }
+  }
+  if (lastErr) throw lastErr;
+
+  const { titulo, corpo } = parseReportOutput(content);
   const fontes: AskSource[] = diags.map((d) => ({ titulo: `Diagnóstico ${d.concorrente_nome}`, url: d.site_url, concorrente: d.concorrente_nome }));
   return { titulo, corpo, fontes, charts };
 }

@@ -21,6 +21,7 @@ import { runRadarLoop } from "@/lib/loop";
 import {
   composeContaReport,
   composeDiagnosticoReport,
+  composeMovimentosReport,
   composeReport,
   deleteReport,
   ensureShareToken,
@@ -111,6 +112,23 @@ export async function POST(req: NextRequest) {
         fontes: draft.fontes,
         charts: draft.charts,
         origem: "Relatório de diagnóstico competitivo",
+      });
+      return NextResponse.json({ data: report });
+    }
+
+    if (action === "compose-movimentos") {
+      if (!clientName) return badRequest("Escolha o cliente do relatório.");
+      const diasRaw = Number(body.dias);
+      const dias = Number.isInteger(diasRaw) && diasRaw > 0 && diasRaw <= 365 ? diasRaw : 90;
+      const draft = await composeMovimentosReport(clientName, dias);
+      const report = saveReport({
+        clientName,
+        kind: "movimentos",
+        titulo: draft.titulo,
+        corpo: draft.corpo,
+        fontes: draft.fontes,
+        charts: draft.charts,
+        origem: `O que mudou — últimos ${dias} dias`,
       });
       return NextResponse.json({ data: report });
     }

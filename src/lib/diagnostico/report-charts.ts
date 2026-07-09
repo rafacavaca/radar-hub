@@ -270,6 +270,54 @@ export function buildMapaPosicionamento(diags: DiagnosticoConcorrente[]): Disper
   };
 }
 
+/**
+ * Onda 3 · F — CHARTS do relatório "o que mudou": movimentos numa JANELA de N
+ * dias, por concorrente e por tipo. Honesto: só movimentos reais (com data de
+ * detecção dentro da janela); primeira_coleta não conta como "mudança".
+ */
+export function buildMovimentosCharts(
+  diags: DiagnosticoConcorrente[],
+  dias: number,
+  agoraISO: string,
+): { charts: ChartSpec[]; total: number; porConcorrente: Array<{ nome: string; movs: Array<{ label: string; tipo: string; de: string | number | null; para: string | number | null; data: string; fonte?: string }> }> } {
+  const corte = new Date(new Date(agoraISO).getTime() - dias * 86400_000).toISOString();
+  const data = dataDoConjunto(diags);
+
+  const porConcorrente = diags
+    .map((d) => {
+      const movs = (d.movimentos ?? [])
+        .filter((m) => m.tipo !== "primeira_coleta" && m.data_deteccao >= corte)
+        .map((m) => ({ label: m.campo_label, tipo: m.tipo, de: m.de, para: m.para, data: m.data_deteccao, fonte: m.fonte_url_para ?? m.fonte_url_de }));
+      return { nome: d.concorrente_nome, movs };
+    })
+    .filter((x) => x.movs.length > 0);
+
+  const total = porConcorrente.reduce((s, x) => s + x.movs.length, 0);
+  const charts: ChartSpec[] = [];
+
+  if (total > 0) {
+    charts.push({
+      tipo: "barras",
+      titulo: "Movimentos por concorrente",
+      subtitulo: `mudanças reais nos últimos ${dias} dias`,
+      series: [...porConcorrente].sort((a, b) => b.movs.length - a.movs.length).map((x) => ({ label: x.nome, valor: x.movs.length })),
+      unidade: "",
+      natureza: "fato",
+      fonte: "varreduras do diagnóstico (Radar)",
+      data,
+    });
+    // por tipo (rosca)
+    const porTipo = new Map<string, number>();
+    for (const x of porConcorrente) for (const m of x.movs) porTipo.set(m.tipo, (porTipo.get(m.tipo) ?? 0) + 1);
+    const fatias = [...porTipo.entries()].map(([label, valor]) => ({ label, valor }));
+    if (fatias.length > 1) {
+      charts.push({ tipo: "rosca", titulo: "Movimentos por tipo", subtitulo: `distribuição no período`, fatias, natureza: "fato", fonte: "varreduras do diagnóstico (Radar)", data });
+    }
+  }
+
+  return { charts, total, porConcorrente };
+}
+
 /** Resumo textual dos gráficos — vira o "material" pro narrador do relatório. */
 export function chartsToMaterial(charts: ChartSpec[]): string {
   return charts

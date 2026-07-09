@@ -20,7 +20,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import type { ChartSpec } from "@/lib/diagnostico/report-charts";
 import { ReportCharts } from "@/components/charts/report-charts";
 
-type ReportKind = "chat" | "sob-medida" | "agendado" | "conta" | "diagnostico";
+type ReportKind = "chat" | "sob-medida" | "agendado" | "conta" | "diagnostico" | "movimentos";
 type Fonte = { titulo: string; url: string; concorrente?: string };
 type Report = {
   id: string;
@@ -55,29 +55,30 @@ export function ReportsView({ reports, clients }: { reports: Report[]; clients: 
 function DiagnosticoComposer({ clients }: { clients: string[] }) {
   const router = useRouter();
   const [client, setClient] = useState(clients[0] ?? "");
-  const [busy, setBusy] = useState(false);
+  const [dias, setDias] = useState(90);
+  const [busy, setBusy] = useState<null | "diag" | "mov">(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function gerar() {
+  async function gerar(action: "compose-diagnostico" | "compose-movimentos", tag: "diag" | "mov") {
     if (busy) return;
-    setBusy(true);
+    setBusy(tag);
     setError(null);
     try {
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "compose-diagnostico", clientName: client }),
+        body: JSON.stringify({ action, clientName: client, ...(action === "compose-movimentos" ? { dias } : {}) }),
       });
       const payload = (await res.json().catch(() => null)) as { data?: Report; error?: string } | null;
       if (!res.ok || !payload?.data) {
-        setError(payload?.error ?? "Não foi possível gerar o relatório de diagnóstico.");
+        setError(payload?.error ?? "Não foi possível gerar o relatório.");
         return;
       }
       router.refresh();
     } catch {
       setError("Falha de conexão. Tente de novo.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -85,12 +86,11 @@ function DiagnosticoComposer({ clients }: { clients: string[] }) {
     <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex items-center gap-2">
         <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-red-500" />
-        <h2 className="text-[17px] font-semibold tracking-tight text-stone-900">Relatório de diagnóstico competitivo</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight text-stone-900">Relatórios do diagnóstico</h2>
       </div>
       <p className="mt-1 text-sm text-stone-500">
-        Um relatório com <span className="font-medium text-stone-700">gráficos</span> — maturidade, canais,
-        reputação, mix de mercado e evolução — montados do diagnóstico salvo, com fonte e data em cada um.
-        Pronto pra exportar em PDF/PPTX ou compartilhar por link.
+        Com <span className="font-medium text-stone-700">gráficos</span> (fonte e data em cada um), prontos para
+        exportar em PDF/PPTX ou compartilhar por link.
       </p>
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -107,12 +107,31 @@ function DiagnosticoComposer({ clients }: { clients: string[] }) {
         ) : null}
         <button
           type="button"
-          onClick={gerar}
-          disabled={busy}
+          onClick={() => gerar("compose-diagnostico", "diag")}
+          disabled={busy !== null}
           className="min-h-[40px] rounded-md bg-stone-900 px-5 py-2 text-sm font-medium text-stone-50 hover:bg-stone-700 disabled:opacity-50"
         >
-          {busy ? "Montando com gráficos…" : "Gerar relatório de diagnóstico"}
+          {busy === "diag" ? "Montando…" : "Diagnóstico competitivo"}
         </button>
+        <span className="inline-flex items-center gap-2 rounded-md border border-stone-200 px-2 py-1">
+          <button
+            type="button"
+            onClick={() => gerar("compose-movimentos", "mov")}
+            disabled={busy !== null}
+            className="min-h-[32px] rounded bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+          >
+            {busy === "mov" ? "Montando…" : "O que mudou"}
+          </button>
+          <select
+            value={dias}
+            onChange={(e) => setDias(Number(e.target.value))}
+            className="rounded border border-stone-200 bg-white px-1.5 py-1 text-xs text-stone-600"
+          >
+            <option value={30}>30 dias</option>
+            <option value={90}>90 dias</option>
+            <option value={180}>180 dias</option>
+          </select>
+        </span>
       </div>
     </div>
   );
@@ -303,7 +322,9 @@ function ReportCard({ report }: { report: Report }) {
           ? "da conta"
           : report.kind === "diagnostico"
             ? "diagnóstico"
-            : "sob medida";
+            : report.kind === "movimentos"
+              ? "o que mudou"
+              : "sob medida";
   const date = new Date(report.createdAt).toLocaleDateString("pt-BR");
 
   return (
