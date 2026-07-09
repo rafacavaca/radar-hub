@@ -8,7 +8,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getDiagConfig, setDiagConfig, type DiagConfig } from "@/lib/diagnostico/config";
+import { loadDiagConfig, saveDiagConfig, type DiagConfig } from "@/lib/diagnostico/config";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const cliente = req.nextUrl.searchParams.get("cliente")?.trim() || "";
   const competitorId = req.nextUrl.searchParams.get("competitorId")?.trim() || "";
   if (!cliente || !competitorId) return NextResponse.json({ error: "cliente e competitorId obrigatórios" }, { status: 400 });
-  return NextResponse.json({ data: { config: getDiagConfig(cliente, competitorId) } });
+  return NextResponse.json({ data: { config: await loadDiagConfig(cliente, competitorId) } });
 }
 
 export async function PUT(req: NextRequest) {
@@ -34,5 +34,5 @@ export async function PUT(req: NextRequest) {
       pergunta: typeof c?.pergunta === "string" ? c.pergunta : "",
     }));
   }
-  return NextResponse.json({ data: { config: setDiagConfig(clientName, competitorId, patch) } });
+  return NextResponse.json({ data: { config: await saveDiagConfig(clientName, competitorId, patch) } });
 }

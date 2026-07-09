@@ -16,7 +16,7 @@ import { runLenteReputacao } from "@/lib/diagnostico/lente-reputacao";
 import { runCamposCustom } from "@/lib/diagnostico/campos-custom";
 import { runLenteVagas } from "@/lib/diagnostico/lente-vagas";
 import { runLenteNews } from "@/lib/diagnostico/lente-news";
-import { getDiagConfig } from "@/lib/diagnostico/config";
+import { loadDiagConfig } from "@/lib/diagnostico/config";
 import { runEstrategia } from "@/lib/diagnostico/estrategia";
 import { getDiagnostico, loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
 import { appendDisparos, getRegras } from "@/lib/diagnostico/alertas-store";
@@ -41,7 +41,7 @@ export async function runDiagnostico(input: {
     { clientName, feature: "diagnostico", entidadeTipo: "concorrente", entidadeId: competitorId, entidadeNome: name },
     async () => {
       // D — config do usuário (fontes extras, temas, campos custom).
-      const config = getDiagConfig(clientName, competitorId);
+      const config = await loadDiagConfig(clientName, competitorId);
 
       // Fato (F1): posicionamento + canais. Mídia (F2). Preço + reputação (Onda 1).
       // fontes extras (D) entram no crawl da Lente 1; suas `pages` alimentam os campos custom.
