@@ -15,6 +15,8 @@
 
 import { config } from "dotenv";
 
+import type { Bucket } from "@/lib/usage/aggregate";
+
 config({ path: ".env.local" });
 
 const CLIENTE = "Moovefy";
@@ -54,7 +56,7 @@ async function main(): Promise<void> {
   console.log(`Total estimado: ${agg.fmtUSD(t.custo)}  ·  ${t.chamadas} chamada(s)  ·  in ${t.tokensIn} / out ${t.tokensOut} tokens  ·  ${t.unidades} página(s) de coleta`);
   if (t.custoProvedor > 0) console.log(`Cross-check do provedor (SDK): ${agg.fmtUSD(t.custoProvedor)}`);
 
-  const linha = (b: agg.Bucket) => `  ${b.rotulo.padEnd(28)} ${agg.fmtUSD(b.custo).padStart(9)}  ${String(b.chamadas).padStart(3)} ch${b.tokensIn + b.tokensOut > 0 ? ` · ${b.tokensIn + b.tokensOut} tok` : b.unidades ? ` · ${b.unidades} un` : ""}`;
+  const linha = (b: Bucket) => `  ${b.rotulo.padEnd(28)} ${agg.fmtUSD(b.custo).padStart(9)}  ${String(b.chamadas).padStart(3)} ch${b.tokensIn + b.tokensOut > 0 ? ` · ${b.tokensIn + b.tokensOut} tok` : b.unidades ? ` · ${b.unidades} un` : ""}`;
 
   console.log("\nPor feature:");
   agg.porFeature(eventos).forEach((b) => console.log(linha(b)));
