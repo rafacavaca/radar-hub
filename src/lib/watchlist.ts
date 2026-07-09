@@ -335,23 +335,23 @@ function findClient(watchlist: Watchlist, clientName: string): WatchClient {
  * sozinha. O nome deve casar com `workspaces.name` do Formare pra Brain e
  * cards baterem — a tela oferece a lista real pela porta.
  */
-export function addClient(clientName: string): Watchlist {
+export async function addClient(clientName: string): Promise<Watchlist> {
   const name = (clientName ?? "").trim();
   if (!name) throw new Error("Dê o nome do cliente.");
   if (name.length > 120) throw new Error("Nome de cliente longo demais.");
 
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   if (watchlist.clients.some((c) => c.name === name)) {
     throw new Error(`"${name}" já está no Radar.`);
   }
   watchlist.clients.push({ name, competitors: [] });
-  writeWatchlist(watchlist);
+  await saveWatchlist(watchlist);
   return watchlist;
 }
 
 /** Remove um CLIENTE do Radar (só a vigilância — NÃO toca o Formare). */
-export function removeClient(clientName: string): Watchlist {
-  const watchlist = readWatchlist();
+export async function removeClient(clientName: string): Promise<Watchlist> {
+  const watchlist = await loadWatchlist();
   const before = watchlist.clients.length;
   watchlist.clients = watchlist.clients.filter((c) => c.name !== clientName);
   if (watchlist.clients.length === before) {
@@ -360,7 +360,7 @@ export function removeClient(clientName: string): Watchlist {
   if (watchlist.clients.length === 0) {
     throw new Error("O Radar precisa de pelo menos um cliente — adicione outro antes de remover este.");
   }
-  writeWatchlist(watchlist);
+  await saveWatchlist(watchlist);
   return watchlist;
 }
 
@@ -383,7 +383,7 @@ export type AddCompetitorInput = {
  * Lança Error com mensagem amigável (pt-BR) quando a entrada é inválida —
  * a API converte em 400 e a tela mostra ao Rafael.
  */
-export function addCompetitor(clientName: string, input: AddCompetitorInput): Watchlist {
+export async function addCompetitor(clientName: string, input: AddCompetitorInput): Promise<Watchlist> {
   const name = (input.name ?? "").trim();
   const blogUrl = (input.blogUrl ?? "").trim();
   const siteUrl = (input.siteUrl ?? "").trim();
@@ -432,7 +432,7 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
   const id = slugify(name);
   if (!id) throw new Error("Esse nome não gera um identificador válido — use letras/números.");
 
-  const watchlist = readWatchlist();
+  const watchlist = await loadWatchlist();
   const client = findClient(watchlist, clientName);
   if (client.competitors.some((c) => c.id === id)) {
     throw new Error(`"${name}" já está na lista deste cliente.`);
@@ -446,7 +446,7 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
     sources,
     ...(input.pillar === "conta-chave" ? { pillar: "conta-chave" as const } : {}),
   });
-  writeWatchlist(watchlist);
+  await saveWatchlist(watchlist);
   return watchlist;
 }
 
@@ -454,12 +454,12 @@ export function addCompetitor(clientName: string, input: AddCompetitorInput): Wa
  * Adiciona FONTES a um concorrente EXISTENTE (o botão "Achar mais fontes").
  * Dedupe por URL; valida tipo e URL. Devolve a lista + quantas entraram.
  */
-export function addSourcesToCompetitor(
+export async function addSourcesToCompetitor(
   clientName: string,
   competitorId: string,
   sources: AddSourceInput[],
-): { watchlist: Watchlist; added: number } {
-  const watchlist = readWatchlist();
+): Promise<{ watchlist: Watchlist; added: number }> {
+  const watchlist = await loadWatchlist();
   const client = findClient(watchlist, clientName);
   const competitor = client.competitors.find((c) => c.id === competitorId);
   if (!competitor) throw new Error(`Concorrente não encontrado: ${competitorId}`);
@@ -483,35 +483,35 @@ export function addSourcesToCompetitor(
     });
     added++;
   }
-  if (added > 0) writeWatchlist(watchlist);
+  if (added > 0) await saveWatchlist(watchlist);
   return { watchlist, added };
 }
 
 /** Remove um concorrente do cliente e persiste. Devolve a lista atualizada. */
-export function removeCompetitor(clientName: string, competitorId: string): Watchlist {
-  const watchlist = readWatchlist();
+export async function removeCompetitor(clientName: string, competitorId: string): Promise<Watchlist> {
+  const watchlist = await loadWatchlist();
   const client = findClient(watchlist, clientName);
   const before = client.competitors.length;
   client.competitors = client.competitors.filter((c) => c.id !== competitorId);
   if (client.competitors.length === before) {
     throw new Error(`Concorrente não encontrado: ${competitorId}`);
   }
-  writeWatchlist(watchlist);
+  await saveWatchlist(watchlist);
   return watchlist;
 }
 
 /** Liga/desliga a vigilância de um concorrente e persiste. Devolve a lista atualizada. */
-export function setCompetitorEnabled(
+export async function setCompetitorEnabled(
   clientName: string,
   competitorId: string,
   enabled: boolean,
-): Watchlist {
-  const watchlist = readWatchlist();
+): Promise<Watchlist> {
+  const watchlist = await loadWatchlist();
   const client = findClient(watchlist, clientName);
   const competitor = client.competitors.find((c) => c.id === competitorId);
   if (!competitor) throw new Error(`Concorrente não encontrado: ${competitorId}`);
   competitor.enabled = enabled;
-  writeWatchlist(watchlist);
+  await saveWatchlist(watchlist);
   return watchlist;
 }
 

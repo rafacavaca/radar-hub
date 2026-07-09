@@ -97,7 +97,7 @@ export async function POST(req: Request) {
           }
           pillar = payload.pillar;
         }
-        const data = addCompetitor(payload.clientName, {
+        const data = await addCompetitor(payload.clientName, {
           name: payload.name,
           blogUrl: isString(payload.blogUrl) ? payload.blogUrl : undefined,
           siteUrl: isString(payload.siteUrl) ? payload.siteUrl : undefined,
@@ -112,7 +112,7 @@ export async function POST(req: Request) {
         if (!isString(payload.clientName) || !isString(payload.competitorId)) {
           return badRequest("Envie clientName e competitorId como texto.");
         }
-        const data = removeCompetitor(payload.clientName, payload.competitorId);
+        const data = await removeCompetitor(payload.clientName, payload.competitorId);
         forgetCompetitorVisual(payload.competitorId); // limpa prints/paleta dele
         forgetCompetitorSnapshots(payload.competitorId); // limpa retratos de diff
         forgetCompetitorStatus(payload.competitorId); // limpa status por fonte
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
         if (typeof payload.enabled !== "boolean") {
           return badRequest("O campo enabled precisa ser true ou false.");
         }
-        const data = setCompetitorEnabled(
+        const data = await setCompetitorEnabled(
           payload.clientName,
           payload.competitorId,
           payload.enabled,
@@ -153,7 +153,7 @@ export async function POST(req: Request) {
           sources.push({ kind, url, ...(isString(label) ? { label } : {}) });
         }
         // a lib valida kind/url em runtime com mensagens amigáveis.
-        const result = addSourcesToCompetitor(
+        const result = await addSourcesToCompetitor(
           payload.clientName,
           payload.competitorId,
           sources as Parameters<typeof addSourcesToCompetitor>[2],
@@ -164,13 +164,13 @@ export async function POST(req: Request) {
       // F7 — multi-cliente
       case "add-client": {
         if (!isString(payload.clientName)) return badRequest("Envie clientName como texto.");
-        const data = addClient(payload.clientName);
+        const data = await addClient(payload.clientName);
         return NextResponse.json({ data });
       }
 
       case "remove-client": {
         if (!isString(payload.clientName)) return badRequest("Envie clientName como texto.");
-        const data = removeClient(payload.clientName);
+        const data = await removeClient(payload.clientName);
         removeClientLenses(payload.clientName); // limpa a config das lentes dele
         return NextResponse.json({ data });
       }
