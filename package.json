@@ -53,7 +53,8 @@
     "test:isolation": "tsx scripts/test-isolation.mts",
     "migrate:supabase": "tsx scripts/migrate-to-supabase.mts",
     "admin:setup": "tsx scripts/admin-setup.mts",
-    "smoke:org-loop": "tsx scripts/test-org-loop.mts"
+    "smoke:org-loop": "tsx scripts/test-org-loop.mts",
+    "test:flip": "tsx scripts/test-flip-check.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

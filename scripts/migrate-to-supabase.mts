@@ -98,8 +98,88 @@ async function main(): Promise<void> {
   }
   console.log(`reports=${nRep}`);
 
-  // 5) usage_events (medição — item 1)
+  // 5) STORES PEQUENOS → org_docs (mesmos kinds/keys dos dispatchers do app).
+  const docs: Array<{ kind: string; key: string; data: unknown }> = [];
+
+  // diag-config: Record<"cliente::competitorId", DiagConfig>
+  const diagCfg = readJson<{ configs: Record<string, unknown> }>("diagnostico-config.json", { configs: {} });
+  for (const [key, data] of Object.entries(diagCfg.configs)) docs.push({ kind: "diag-config", key, data });
+
+  // alertas: regras por cliente + disparos agrupados por cliente
+  const alertas = readJson<{ regras: Record<string, unknown>; disparos: Array<{ clientName?: string }> }>(
+    "diagnostico-alertas.json", { regras: {}, disparos: [] },
+  );
+  for (const [key, data] of Object.entries(alertas.regras)) docs.push({ kind: "diag-alertas-regras", key, data });
+  const dispPorCliente = new Map<string, unknown[]>();
+  for (const d of alertas.disparos) {
+    const cli = String(d.clientName ?? "");
+    if (!cli) continue;
+    dispPorCliente.set(cli, [...(dispPorCliente.get(cli) ?? []), d]);
+  }
+  for (const [key, data] of dispPorCliente) docs.push({ kind: "diag-alertas-disparos", key, data });
+
+  // varredura agendada do diagnóstico: config por cliente
+  const diagSched = readJson<{ clients: Record<string, unknown> }>("diagnostico-schedule.json", { clients: {} });
+  for (const [key, data] of Object.entries(diagSched.clients)) docs.push({ kind: "diag-schedule", key, data });
+
+  // cobertura: uma por cliente
+  const cob = readJson<{ coberturas: Array<{ clientName?: string }> }>("cobertura.json", { coberturas: [] });
+  for (const c of cob.coberturas) if (c.clientName) docs.push({ kind: "cobertura", key: String(c.clientName), data: c });
+
+  // lentes: LensConfig[] por cliente
+  const lenses = readJson<{ clients: Array<{ clientName?: string; lenses?: unknown }> }>("lenses.json", { clients: [] });
+  for (const c of lenses.clients) if (c.clientName) docs.push({ kind: "lenses", key: String(c.clientName), data: c.lenses ?? [] });
+
+  // notas de roadmap: agrupadas por cliente
+  const notes = readJson<{ notes: Array<{ clientName?: string }> }>("roadmap-notes.json", { notes: [] });
+  const notasPorCliente = new Map<string, unknown[]>();
+  for (const n of notes.notes) {
+    const cli = String(n.clientName ?? "");
+    if (!cli) continue;
+    notasPorCliente.set(cli, [...(notasPorCliente.get(cli) ?? []), n]);
+  }
+  for (const [key, data] of notasPorCliente) docs.push({ kind: "roadmap-notes", key, data });
+
+  // status por fonte: "cid:sid" → doc por concorrente {sid: status}
+  const status = readJson<{ status: Record<string, unknown> }>("source-status.json", { status: {} });
+  const statusPorCmp = new Map<string, Record<string, unknown>>();
+  for (const [k, v] of Object.entries(status.status)) {
+    const i = k.indexOf(":");
+    if (i <= 0) continue;
+    const cid = k.slice(0, i), sid = k.slice(i + 1);
+    const doc = statusPorCmp.get(cid) ?? {};
+    doc[sid] = v;
+    statusPorCmp.set(cid, doc);
+  }
+  for (const [key, data] of statusPorCmp) docs.push({ kind: "source-status", key, data });
+
+  // relatórios agendados: um doc por agendamento
+  const sched = readJson<{ schedules: Array<{ id?: string }> }>("schedules.json", { schedules: [] });
+  for (const s of sched.schedules) if (s.id) docs.push({ kind: "schedules", key: String(s.id), data: s });
+
+  // cache do dia do loop (regenerável, mas evita re-rodar o loop já no flip)
+  try {
+    const dia = new Date().toISOString().slice(0, 10);
+    const cachePath = join(process.cwd(), ".cache", `loop-${dia}.json`);
+    if (existsSync(cachePath)) {
+      docs.push({ kind: "loop-cache", key: dia, data: JSON.parse(readFileSync(cachePath, "utf8")) });
+    }
+  } catch { /* cache ilegível — o loop regenera */ }
+
+  let nDoc = 0;
+  for (const d of docs) {
+    await admin.from("org_docs").upsert(
+      { org_id: orgId, kind: d.kind, key: d.key, data: d.data ?? {}, updated_at: new Date().toISOString() },
+      { onConflict: "org_id,kind,key" },
+    );
+    nDoc++;
+  }
+  console.log(`org_docs=${nDoc} (config/alertas/schedule/cobertura/lentes/notas/status/agendados/cache)`);
+
+  // 6) usage_events (medição — item 1). Re-sync limpo: apaga os da org e
+  // re-insere do JSONL (fonte da verdade) — re-rodar não duplica.
   const usage = readJsonl("usage-events.jsonl");
+  await admin.from("usage_events").delete().eq("org_id", orgId);
   let nUse = 0;
   for (const e of usage) {
     await admin.from("usage_events").insert({
