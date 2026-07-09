@@ -45,7 +45,8 @@
     "smoke:vagas-news": "tsx scripts/test-radar-vagas-news.mts",
     "smoke:mapa": "tsx scripts/test-radar-mapa.mts",
     "smoke:swot": "tsx scripts/test-radar-swot.mts",
-    "smoke:mov-report": "tsx scripts/test-radar-movimentos-report.mts"
+    "smoke:mov-report": "tsx scripts/test-radar-movimentos-report.mts",
+    "smoke:cobertura": "tsx scripts/test-radar-cobertura.mts"
   },
   "dependencies": {
     "@types/pngjs": "^6.0.5",

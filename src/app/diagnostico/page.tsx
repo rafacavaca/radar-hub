@@ -14,10 +14,12 @@ import { alvosDaVarredura, getDiagSchedule } from "@/lib/diagnostico/schedule";
 import { listDiagnosticos } from "@/lib/diagnostico/store";
 import { pillarOf, readWatchlist } from "@/lib/watchlist";
 
+import { getCobertura } from "@/lib/diagnostico/cobertura";
 import { buildMapaPosicionamento } from "@/lib/diagnostico/report-charts";
 
 import { AlertasDiagnostico } from "@/components/alertas-diagnostico";
 import { BattlecardCard } from "@/components/battlecard-card";
+import { CoberturaCard } from "@/components/cobertura-card";
 import { SwotCard } from "@/components/swot-card";
 import { ReportChart } from "@/components/charts/report-charts";
 import { DiagConfigEditor } from "@/components/diag-config-editor";
@@ -89,6 +91,12 @@ export default async function DiagnosticoPage({
       {mapa ? (
         <div className="mt-6">
           <ReportChart chart={mapa} />
+        </div>
+      ) : null}
+
+      {byId.size >= 2 ? (
+        <div className="mt-6">
+          <CoberturaCard cliente={cliente} cobertura={getCobertura(cliente)} />
         </div>
       ) : null}
 
