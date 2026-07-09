@@ -578,7 +578,8 @@ function regraCasa(regra: RegraAlerta, m: Movimento): boolean {
       return de - para >= (regra.limiar ?? 0.5);
     }
     case "release_novo":
-      return (m.campo === "news.item" && m.tipo === "novo") || (m.campo === "posicionamento.produtos" && m.tipo === "novo");
+      // só releases/notícias — "produto novo" é da regra produto_novo (regras independentes)
+      return m.campo === "news.item" && m.tipo === "novo";
     case "vagas_variacao": {
       if (m.campo === "vagas.areas" && m.tipo === "novo") return true; // área nova = expansão
       if (m.campo !== "vagas.total" || m.tipo !== "mudança") return false;
