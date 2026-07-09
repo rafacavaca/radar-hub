@@ -188,6 +188,30 @@ export function AppShell({
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Clientes">
+          {/* HOJE — o ritual da manhã é da AGÊNCIA (cruza os clientes), acima da lista */}
+          <Link
+            href="/hoje"
+            aria-current={pathname === "/hoje" ? "page" : undefined}
+            title={collapsed ? "Hoje" : undefined}
+            className={
+              (collapsed ? "flex justify-center rounded-md py-1.5 " : "mb-2 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm ") +
+              "transition-colors " +
+              (pathname === "/hoje"
+                ? "bg-stone-100 font-semibold text-stone-900"
+                : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
+            }
+          >
+            <span
+              aria-hidden
+              className={
+                "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[13px] " +
+                (pathname === "/hoje" ? "bg-stone-900 text-white" : "bg-stone-200 text-stone-600")
+              }
+            >
+              ☀
+            </span>
+            {!collapsed ? <span>Hoje</span> : null}
+          </Link>
           {!collapsed ? (
             <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
               Clientes
@@ -246,8 +270,12 @@ export function AppShell({
         </div>
       </aside>
 
-      {/* CONTEÚDO — topbar do cliente (fixo) + tabs + página (rola) */}
+      {/* CONTEÚDO — topbar do cliente (fixo) + tabs + página (rola).
+          /hoje é da agência: sem cabeçalho de cliente (a página tem o próprio). */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {pathname === "/hoje" ? (
+          <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        ) : (
         <header className="shrink-0 border-b border-stone-200 bg-stone-50">
           {/* mobile: marca + seletor de cliente */}
           <div className="flex items-center gap-2.5 px-5 py-2.5 md:hidden">
@@ -306,8 +334,11 @@ export function AppShell({
             })}
           </nav>
         </header>
+        )}
 
-        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        {pathname !== "/hoje" ? (
+          <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        ) : null}
       </div>
     </div>
   );

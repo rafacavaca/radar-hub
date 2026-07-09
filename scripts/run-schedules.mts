@@ -17,12 +17,14 @@ import { config } from "dotenv";
 import { markAdminProcess } from "@/lib/db/admin-client";
 import { listOrgsAsCollector, runAsOrgCollector } from "@/lib/db/collector-org";
 import { supabaseEnabled } from "@/lib/db/supabase";
+import { ensureDigestMatinal } from "@/lib/digest";
+import { maybeSendDigestEmail } from "@/lib/digest-email";
 import { runDueSchedules } from "@/lib/schedules";
 import { runDueDiagnosticos } from "@/lib/diagnostico/schedule";
 
 config({ path: ".env.local" });
 
-/** Uma passada completa (relatórios + diagnóstico) no contexto atual. */
+/** Uma passada completa (relatórios + diagnóstico + digest matinal) no contexto atual. */
 async function passada(now: Date, label: string): Promise<void> {
   // 1. Relatórios agendados (F10).
   const result = await runDueSchedules(now);
@@ -39,6 +41,17 @@ async function passada(now: Date, label: string): Promise<void> {
   );
   for (const d of diag.detalhe) console.log(`  ✓ ${d.clientName}/${d.competitorId}: ${d.movimentosNovos} movimento(s) novo(s)`);
   for (const e of diag.erros) console.log(`  ✗ ${e.clientName}/${e.competitorId}: ${e.error}`);
+
+  // 3. Digest matinal (ritual F1) — a partir das 6h locais, 1x por dia; e-mail
+  //    é opt-in (placeholder: sem provedor configurado, só registra).
+  const matinal = await ensureDigestMatinal(now);
+  console.log(
+    `[run-schedules ${now.toISOString()}] (${label}) digest: ${matinal.acao}${matinal.digest ? ` · itens=${matinal.digest.itens.length} adiados=${matinal.digest.adiados.length}${matinal.digest.tranquilo ? " · dia tranquilo" : ""}` : ""}`,
+  );
+  if (matinal.acao === "gerado" && matinal.digest) {
+    const envio = await maybeSendDigestEmail(matinal.digest, label);
+    console.log(`[run-schedules ${now.toISOString()}] (${label}) e-mail do digest: ${envio}`);
+  }
 }
 
 async function main(): Promise<void> {

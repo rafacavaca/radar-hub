@@ -23,7 +23,7 @@ import { loadEstados, type EstadosFile } from "@/lib/briefing-estado";
 import { loadDisparos } from "@/lib/diagnostico/alertas-store";
 import { sbGetDoc, sbSetDoc } from "@/lib/db/repo-org-docs";
 import { supabaseEnabled } from "@/lib/db/supabase";
-import { peekLoopResult, type RadarLoopResult } from "@/lib/loop";
+import { peekLoopResult, runRadarLoop, type RadarLoopResult } from "@/lib/loop";
 import { loadReports, type Report } from "@/lib/reports";
 import { localDayKey } from "@/lib/schedules";
 import { loadWatchlist } from "@/lib/watchlist";
@@ -312,4 +312,31 @@ export async function ensureDigest(now: Date, opts: { force?: boolean } = {}): P
   }
   const [material, estados] = await Promise.all([coletarMaterial(now), loadEstados()]);
   return persistDigest(buildDigest(material, estados, now));
+}
+
+/** Hora local no fuso do Brasil (0-23). */
+function localHourBrasil(now: Date): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(now),
+  );
+}
+
+export type DigestMatinalResult = { acao: "cedo" | "ja-existia" | "gerado"; digest?: Digest };
+
+/**
+ * O passo MATINAL do cron (por org): a partir das 6h locais, 1x por dia,
+ * GARANTE o material (roda o loop — cacheado; é o "Radar trabalha de
+ * madrugada") e gera o digest. Falha do loop não bloqueia: o digest sai do que
+ * há (alertas/relatórios/adiados) com a ausência declarada nas observações.
+ */
+export async function ensureDigestMatinal(now: Date): Promise<DigestMatinalResult> {
+  if (localHourBrasil(now) < 6) return { acao: "cedo" };
+  const existente = await loadDigest(localDayKey(now));
+  if (existente) return { acao: "ja-existia", digest: existente };
+  try {
+    await runRadarLoop();
+  } catch (err) {
+    console.warn(`[digest] loop indisponível na geração matinal: ${(err as Error).message} — digest segue do material que há.`);
+  }
+  return { acao: "gerado", digest: await ensureDigest(now) };
 }

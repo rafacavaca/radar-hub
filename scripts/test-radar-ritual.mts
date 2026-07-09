@@ -178,6 +178,18 @@ add(
   dCap.observacoes.join(" | "),
 );
 
+// ── 8: e-mail (placeholder) — render puro cobre item e dia tranquilo ──
+const { renderDigestEmailHTML, maybeSendDigestEmail } = await import("@/lib/digest-email");
+const htmlCheio = renderDigestEmailHTML(d1, "https://radar.test");
+const htmlCalmo = renderDigestEmailHTML(dTranquilo, "https://radar.test");
+add(
+  "E-mail: render traz os itens (com cliente/fonte) e a versão 'dia tranquilo'",
+  htmlCheio.includes("Intelia") && htmlCheio.includes("Moovefy") && htmlCalmo.includes("Dia tranquilo"),
+);
+delete process.env.RESEND_API_KEY;
+const envio = await maybeSendDigestEmail(d1, "formare");
+add("E-mail: sem provedor configurado → 'sem-config' (opt-in, zero efeito)", envio === "sem-config", envio);
+
 // ── Resultado ──
 console.log("── Resultado ──");
 let ok = true;
