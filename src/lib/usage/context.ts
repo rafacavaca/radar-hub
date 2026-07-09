@@ -31,7 +31,13 @@ export type UsageContext = {
   entidadeNome?: string;
 };
 
-const storage = new AsyncLocalStorage<UsageContext>();
+// Ancorada em globalThis — o runtime do cron (tsx) pode carregar o módulo duas
+// vezes (interop ESM/CJS); cada cópia com a própria ALS perderia a atribuição.
+declare global {
+  var __radarUsageALS: AsyncLocalStorage<UsageContext> | undefined;
+}
+const storage: AsyncLocalStorage<UsageContext> = (globalThis.__radarUsageALS ??=
+  new AsyncLocalStorage<UsageContext>());
 
 /** O contexto vigente (ou undefined fora de um `runWithUsage`). */
 export function getUsageContext(): UsageContext | undefined {

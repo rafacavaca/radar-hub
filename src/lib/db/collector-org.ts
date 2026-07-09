@@ -18,7 +18,15 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import { adminClient } from "@/lib/db/admin-client";
 
-const orgALS = new AsyncLocalStorage<{ orgId: string }>();
+// ANCORADO EM globalThis: o runtime do cron (tsx) pode carregar este módulo
+// DUAS vezes (interop ESM/CJS) — cada cópia com sua própria ALS quebraria o
+// contexto (currentOrgId=null no meio da passada; visto ao vivo). Uma store
+// por PROCESSO, não por instância de módulo.
+declare global {
+  var __radarOrgALS: AsyncLocalStorage<{ orgId: string }> | undefined;
+}
+const orgALS: AsyncLocalStorage<{ orgId: string }> = (globalThis.__radarOrgALS ??=
+  new AsyncLocalStorage<{ orgId: string }>());
 
 /** A org do coletor em execução, se estamos dentro de runAsOrgCollector. */
 export function collectorOrgId(): string | null {

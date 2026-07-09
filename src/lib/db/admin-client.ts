@@ -17,7 +17,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const adminALS = new AsyncLocalStorage<true>();
+// Ancorada em globalThis — mesmo motivo do collector-org: o tsx pode duplicar
+// a instância do módulo (ESM/CJS) e cada cópia teria sua ALS.
+declare global {
+  var __radarAdminALS: AsyncLocalStorage<true> | undefined;
+}
+const adminALS: AsyncLocalStorage<true> = (globalThis.__radarAdminALS ??= new AsyncLocalStorage<true>());
 
 /** Roda `fn` marcado como contexto admin (request-scoped). */
 export function runAsAdmin<T>(fn: () => T): T {
