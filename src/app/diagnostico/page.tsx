@@ -15,13 +15,13 @@ import { loadDiagnosticos } from "@/lib/diagnostico/store";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { loadCobertura } from "@/lib/diagnostico/cobertura";
-import { buildMapaPosicionamento } from "@/lib/diagnostico/report-charts";
+import { buildDiagnosticoCharts, buildMapaPosicionamento } from "@/lib/diagnostico/report-charts";
 
 import { AlertasDiagnostico } from "@/components/alertas-diagnostico";
 import { BattlecardCard } from "@/components/battlecard-card";
 import { CoberturaCard } from "@/components/cobertura-card";
 import { SwotCard } from "@/components/swot-card";
-import { ReportChart } from "@/components/charts/report-charts";
+import { ReportChart, ReportCharts } from "@/components/charts/report-charts";
 import { DiagConfigEditor } from "@/components/diag-config-editor";
 import { DiagnosticoRunButton } from "@/components/diagnostico-run-button";
 import { FichaDiagnostico } from "@/components/ficha-diagnostico";
@@ -62,6 +62,9 @@ export default async function DiagnosticoPage({
   );
   const byId = new Map(diagnosticos.map((d) => [d.concorrente_id, d]));
   const mapa = buildMapaPosicionamento(diagnosticos);
+  // F2 — o dashboard do mercado: maturidade, canais, reputação, mix e evolução
+  // (o mapa 2x2 já tem bloco próprio acima — sai daqui pra não duplicar).
+  const graficos = buildDiagnosticoCharts(diagnosticos).filter((c) => c.tipo !== "dispersao");
   const now = new Date().toISOString();
   const q = cliente ? `?cliente=${encodeURIComponent(cliente)}` : "";
 
@@ -96,6 +99,15 @@ export default async function DiagnosticoPage({
       {mapa ? (
         <div className="mt-6">
           <ReportChart chart={mapa} />
+        </div>
+      ) : null}
+
+      {graficos.length > 0 ? (
+        <div className="mt-6">
+          <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+            Mercado em gráficos
+          </h2>
+          <ReportCharts charts={graficos} />
         </div>
       ) : null}
 

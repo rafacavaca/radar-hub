@@ -23,6 +23,8 @@ export type BarrasChart = {
   unidade?: string;
   /** teto do eixo (pra escala estável); auto se ausente. */
   max?: number;
+  /** rótulos dos extremos do eixo (ex.: defasada → referência). */
+  escala?: { min: string; max: string };
   natureza: Natureza;
   fonte: string;
   data: string;
@@ -133,6 +135,7 @@ export function buildDiagnosticoCharts(diags: DiagnosticoConcorrente[]): ChartSp
         .map((d) => ({ label: d.concorrente_nome, valor: d.maturidade?.score ?? null, nota: d.maturidade?.nivel ?? undefined })),
       unidade: "/100",
       max: 100,
+      escala: { min: "defasada", max: "referência" },
       natureza: "opiniao",
       fonte: "avaliação do Radar (Lente 4)",
       data,

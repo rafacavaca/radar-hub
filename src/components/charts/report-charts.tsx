@@ -1,14 +1,50 @@
+"use client";
+
 /**
- * G — gráficos do relatório em SVG puro (server-safe; sem dependência de chart
- * lib). Render do ChartSpec no design-system: papel quente, Archivo, vermelho de
- * marca. Todo gráfico exibe FONTE + DATA + selo de natureza (fato/opinião).
- * O mesmo SVG aparece na tela, no link compartilhável e no print.
+ * G/F2 — gráficos do relatório em RECHARTS, temados ao design system (papel
+ * quente, Archivo, vermelho de marca) com ANIMAÇÃO de entrada (ao entrar na
+ * viewport; desligada em prefers-reduced-motion) e tooltip no hover.
+ *
+ * HONESTIDADE (inalterada): todo gráfico segue na Moldura com selo de natureza
+ * (fato/opinião) + FONTE + DATA; concorrente sem dado aparece como "sem dado"
+ * (nunca um valor inventado); o 2x2 mantém o desempilhamento de rótulos
+ * (dodgeLabels) — beleza não apaga proveniência.
+ *
+ * O EXPORT (PDF/PPTX) é independente: consome o ChartSpec direto (reports-export).
  */
+
+import { useEffect, useRef, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  Pie,
+  PieChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import type { BarrasChart, ChartSpec, DispersaoChart, GradeChart, LinhaChart, RoscaChart } from "@/lib/diagnostico/report-charts";
 import { CHART_THEME, corPorNatureza } from "@/lib/diagnostico/chart-theme";
 import { dodgeLabels } from "@/lib/diagnostico/label-dodge";
 import { formatDateShort } from "@/lib/format";
+
+import { ChartReveal, usePrefersReducedMotion } from "@/components/charts/reveal";
+
+const FONT = "var(--font-archivo), ui-sans-serif, system-ui, sans-serif";
+const AXIS_TICK = { fontSize: 11, fill: CHART_THEME.ink400, fontFamily: FONT } as const;
+const ANIM_MS = 750;
+
+// ── moldura de honestidade (selo + fonte + data) — igual à de sempre ────────
 
 function Selo({ natureza }: { natureza: "fato" | "opiniao" }) {
   const op = natureza === "opiniao";
@@ -27,7 +63,7 @@ function Selo({ natureza }: { natureza: "fato" | "opiniao" }) {
 
 function Moldura({ c, children }: { c: ChartSpec; children: React.ReactNode }) {
   return (
-    <figure className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
+    <figure className="rounded-lg border border-stone-200 bg-white p-4 sm:p-5">
       <figcaption className="mb-3">
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="text-sm font-semibold text-stone-900">{c.titulo}</h4>
@@ -37,43 +73,98 @@ function Moldura({ c, children }: { c: ChartSpec; children: React.ReactNode }) {
       </figcaption>
       {children}
       <p className="mt-3 border-t border-stone-100 pt-2 text-[11px] text-stone-400">
-        fonte: {c.fonte} · dado de {formatDateShort(c.data) ?? c.data.slice(0, 10)}
+        fonte: {c.fonte} · dado de {formatDateShort(c.data) || c.data.slice(0, 10)}
       </p>
     </figure>
   );
 }
 
+/** Tooltip custom — cartão papel/tinta, Archivo, hairline. */
+function TipCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[12px] leading-snug text-stone-700 shadow-md">
+      {children}
+    </div>
+  );
+}
+
+// ── BARRAS (maturidade, reputação, movimentos) — horizontais, animadas ──────
+
+type BarRow = { label: string; valor: number | null; nota?: string };
+
+function BarrasTooltip({ active, payload, unidade }: { active?: boolean; payload?: Array<{ payload: BarRow }>; unidade?: string }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+  return (
+    <TipCard>
+      <p className="font-semibold text-stone-900">{row.label}</p>
+      <p>{row.valor === null ? "sem dado" : `${row.valor}${unidade ?? ""}`}{row.nota ? ` · ${row.nota}` : ""}</p>
+    </TipCard>
+  );
+}
+
 function Barras({ c }: { c: BarrasChart }) {
+  const reduced = usePrefersReducedMotion();
   const max = c.max ?? Math.max(1, ...c.series.map((s) => s.valor ?? 0));
   const cor = corPorNatureza(c.natureza);
+  const rows: BarRow[] = c.series.map((s) => ({ label: s.label, valor: s.valor, nota: s.nota }));
+  const H = rows.length * 36 + 24;
+
   return (
     <Moldura c={c}>
-      <div className="space-y-2">
-        {c.series.map((s, i) => {
-          const pct = s.valor === null ? 0 : Math.round((s.valor / max) * 100);
-          return (
-            <div key={i} className="grid grid-cols-[120px_1fr_auto] items-center gap-2">
-              <span className="truncate text-xs text-stone-600" title={s.label}>{s.label}</span>
-              <span className="h-5 rounded bg-stone-100" role="img" aria-label={`${s.label}: ${s.valor ?? "sem dado"}`}>
-                <span className="block h-5 rounded" style={{ width: `${pct}%`, background: s.valor === null ? CHART_THEME.absent : cor }} />
-              </span>
-              <span className="w-20 text-right text-xs tabular-nums text-stone-700">
-                {s.valor === null ? <span className="text-stone-400">sem dado</span> : `${s.valor}${c.unidade ?? ""}`}
-                {s.nota ? <span className="block text-[10px] text-stone-400">{s.nota}</span> : null}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <ChartReveal height={H}>
+        <ResponsiveContainer width="100%" height={H}>
+          <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 56, bottom: 4, left: 8 }} barCategoryGap="28%">
+            <CartesianGrid horizontal={false} stroke={CHART_THEME.grid} strokeDasharray="3 3" />
+            <XAxis type="number" domain={[0, max]} hide />
+            <YAxis
+              type="category"
+              dataKey="label"
+              width={118}
+              tickLine={false}
+              axisLine={false}
+              tick={{ ...AXIS_TICK, fill: CHART_THEME.ink700 }}
+            />
+            <Tooltip content={<BarrasTooltip unidade={c.unidade} />} cursor={{ fill: CHART_THEME.paper }} />
+            <Bar
+              dataKey="valor"
+              radius={[3, 3, 3, 3]}
+              isAnimationActive={!reduced}
+              animationDuration={ANIM_MS}
+              animationEasing="ease-out"
+              background={{ fill: CHART_THEME.paper, radius: 3 }}
+            >
+              {rows.map((r, i) => (
+                <Cell key={i} fill={cor} />
+              ))}
+              <LabelList
+                dataKey="valor"
+                position="right"
+                formatter={(v: unknown) => (v === null || v === undefined ? "sem dado" : `${v}${c.unidade ?? ""}`)}
+                style={{ fontSize: 11, fill: CHART_THEME.ink700, fontFamily: FONT, fontWeight: 600 }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartReveal>
+      {c.escala ? (
+        <div className="mt-1 flex justify-between pl-[126px] pr-14 text-[10px] text-stone-400">
+          <span>← {c.escala.min}</span>
+          <span>{c.escala.max} →</span>
+        </div>
+      ) : null}
     </Moldura>
   );
 }
 
+// ── GRADE (presença por canal) — matriz polida, hover, entrada em cascata ───
+
 function Grade({ c }: { c: GradeChart }) {
+  const totais = c.colunas.map((_, i) => c.linhas.filter((l) => l.celulas[i] === "sim").length);
   return (
     <Moldura c={c}>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[420px] border-collapse text-xs">
+        <table className="w-full min-w-[440px] border-collapse text-xs">
           <thead>
             <tr>
               <th className="p-1.5" />
@@ -83,147 +174,244 @@ function Grade({ c }: { c: GradeChart }) {
             </tr>
           </thead>
           <tbody>
-            {c.linhas.map((l) => (
-              <tr key={l.label}>
-                <td className="p-1.5 font-medium text-stone-700">{l.label}</td>
+            {c.linhas.map((l, li) => (
+              <tr key={l.label} className="border-t border-stone-100">
+                <td className="p-2 font-medium text-stone-700">{l.label}</td>
                 {l.celulas.map((cel, i) => (
-                  <td key={i} className="p-1.5 text-center">
+                  <td key={i} className="p-2 text-center">
                     <span
-                      className="inline-block h-4 w-4 rounded"
-                      style={{ background: cel === "sim" ? CHART_THEME.positive : cel === "parcial" ? CHART_THEME.opinion : CHART_THEME.grid }}
-                      title={cel === "sim" ? "presente" : cel === "parcial" ? "parcial" : "ausente"}
+                      title={`${l.label} · ${c.colunas[i]}: ${cel === "sim" ? "presente" : cel === "parcial" ? "parcial" : "ausente"}`}
+                      className={
+                        "inline-block h-5 w-5 rounded-md transition-transform duration-150 hover:scale-125 motion-safe:animate-[grade-in_.45s_ease-out_both] " +
+                        (cel === "sim"
+                          ? "bg-emerald-600/90 ring-1 ring-emerald-700/20"
+                          : cel === "parcial"
+                            ? "bg-amber-400/80 ring-1 ring-amber-700/20"
+                            : "bg-stone-100 ring-1 ring-inset ring-stone-200")
+                      }
+                      style={{ animationDelay: `${(li * c.colunas.length + i) * 22}ms` }}
                     />
                   </td>
                 ))}
               </tr>
             ))}
+            <tr className="border-t border-stone-200">
+              <td className="p-2 text-[10px] font-semibold uppercase tracking-wide text-stone-400">no canal</td>
+              {totais.map((t, i) => (
+                <td key={i} className="p-2 text-center text-[11px] font-semibold tabular-nums text-stone-500">
+                  {t}/{c.linhas.length}
+                </td>
+              ))}
+            </tr>
           </tbody>
         </table>
       </div>
+      <style>{`@keyframes grade-in { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }`}</style>
     </Moldura>
+  );
+}
+
+// ── ROSCA (mix de canais) — donut animado + legenda com % ───────────────────
+
+function RoscaTooltip({ active, payload, total }: { active?: boolean; payload?: Array<{ name: string; value: number }>; total: number }) {
+  if (!active || !payload?.length) return null;
+  const { name, value } = payload[0];
+  return (
+    <TipCard>
+      <p className="font-semibold text-stone-900">{name}</p>
+      <p>{value} · {Math.round((value / total) * 100)}%</p>
+    </TipCard>
   );
 }
 
 function Rosca({ c }: { c: RoscaChart }) {
+  const reduced = usePrefersReducedMotion();
   const total = c.fatias.reduce((s, f) => s + (f.valor ?? 0), 0) || 1;
-  const R = 52;
-  const C = 2 * Math.PI * R;
-  let offset = 0;
+  const data = c.fatias.map((f) => ({ name: f.label, value: f.valor ?? 0 }));
+  const H = 190;
+
   return (
     <Moldura c={c}>
-      <div className="flex flex-wrap items-center gap-5">
-        <svg viewBox="0 0 140 140" className="h-32 w-32 shrink-0" role="img" aria-label={c.titulo}>
-          <circle cx="70" cy="70" r={R} fill="none" stroke={CHART_THEME.grid} strokeWidth="16" />
-          {c.fatias.map((f, i) => {
-            const frac = (f.valor ?? 0) / total;
-            const dash = frac * C;
-            const el = (
-              <circle
-                key={i}
-                cx="70"
-                cy="70"
-                r={R}
-                fill="none"
-                stroke={CHART_THEME.categoric[i % CHART_THEME.categoric.length]}
-                strokeWidth="16"
-                strokeDasharray={`${dash} ${C - dash}`}
-                strokeDashoffset={-offset}
-                transform="rotate(-90 70 70)"
-              />
-            );
-            offset += dash;
-            return el;
-          })}
-        </svg>
-        <ul className="space-y-1 text-xs">
-          {c.fatias.map((f, i) => (
-            <li key={i} className="flex items-center gap-2">
-              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: CHART_THEME.categoric[i % CHART_THEME.categoric.length] }} />
-              <span className="text-stone-700">{f.label}</span>
-              <span className="tabular-nums text-stone-400">{f.valor}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <ChartReveal height={H}>
+        <div className="flex flex-wrap items-center gap-5">
+          <div className="relative h-[190px] w-[190px] shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip content={<RoscaTooltip total={total} />} />
+                <Pie
+                  data={data}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={56}
+                  outerRadius={86}
+                  paddingAngle={2}
+                  cornerRadius={3}
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                  isAnimationActive={!reduced}
+                  animationDuration={ANIM_MS + 150}
+                  animationEasing="ease-out"
+                >
+                  {data.map((_, i) => (
+                    <Cell key={i} fill={CHART_THEME.categoric[i % CHART_THEME.categoric.length]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-xl font-bold tabular-nums text-stone-900">{total}</span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-stone-400">total</span>
+            </div>
+          </div>
+          <ul className="min-w-[150px] flex-1 space-y-1.5 text-xs">
+            {c.fatias.map((f, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: CHART_THEME.categoric[i % CHART_THEME.categoric.length] }} />
+                <span className="flex-1 truncate text-stone-700">{f.label}</span>
+                <span className="tabular-nums font-semibold text-stone-700">{f.valor}</span>
+                <span className="w-9 text-right tabular-nums text-stone-400">{Math.round(((f.valor ?? 0) / total) * 100)}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </ChartReveal>
     </Moldura>
+  );
+}
+
+// ── LINHA (evolução temporal) — área que se desenha ─────────────────────────
+
+function LinhaTooltip({ active, payload, label, unidade }: { active?: boolean; payload?: Array<{ value: number }>; label?: string; unidade?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <TipCard>
+      <p className="font-semibold text-stone-900">{label}</p>
+      <p>{payload[0].value} {unidade ?? ""}</p>
+    </TipCard>
   );
 }
 
 function Linha({ c }: { c: LinhaChart }) {
-  const W = 460;
-  const H = 140;
-  const pad = { l: 28, r: 12, t: 12, b: 24 };
-  const maxY = Math.max(1, ...c.pontos.map((p) => p.y));
-  const n = c.pontos.length;
-  const x = (i: number) => pad.l + (n <= 1 ? 0 : (i / (n - 1)) * (W - pad.l - pad.r));
-  const y = (v: number) => pad.t + (1 - v / maxY) * (H - pad.t - pad.b);
-  const linha = c.pontos.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.y).toFixed(1)}`).join(" ");
+  const reduced = usePrefersReducedMotion();
+  const data = c.pontos.map((p) => ({ x: p.x.slice(5), full: p.x, y: p.y }));
+  const H = 200;
   return (
     <Moldura c={c}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={c.titulo}>
-        <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke={CHART_THEME.grid} />
-        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke={CHART_THEME.grid} />
-        {n === 1 ? (
-          <circle cx={x(0)} cy={y(c.pontos[0].y)} r="3.5" fill={CHART_THEME.brand} />
-        ) : (
-          <path d={linha} fill="none" stroke={CHART_THEME.brand} strokeWidth="2" />
-        )}
-        {c.pontos.map((p, i) => (
-          <g key={i}>
-            <circle cx={x(i)} cy={y(p.y)} r="2.5" fill={CHART_THEME.brand} />
-            <text x={x(i)} y={H - pad.b + 14} textAnchor="middle" fontSize="8" fill={CHART_THEME.ink400}>{p.x.slice(5)}</text>
-          </g>
-        ))}
-        <text x={pad.l - 6} y={y(maxY) + 3} textAnchor="end" fontSize="8" fill={CHART_THEME.ink400}>{maxY}</text>
-      </svg>
+      <ChartReveal height={H}>
+        <ResponsiveContainer width="100%" height={H}>
+          <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
+            <defs>
+              <linearGradient id="radar-area" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={CHART_THEME.brand} stopOpacity={0.18} />
+                <stop offset="100%" stopColor={CHART_THEME.brand} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} stroke={CHART_THEME.grid} strokeDasharray="3 3" />
+            <XAxis dataKey="x" tickLine={false} axisLine={{ stroke: CHART_THEME.grid }} tick={AXIS_TICK} />
+            <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={AXIS_TICK} width={34} />
+            <Tooltip content={<LinhaTooltip unidade={c.unidade} />} cursor={{ stroke: CHART_THEME.grid }} />
+            <Area
+              type="monotone"
+              dataKey="y"
+              stroke={CHART_THEME.brand}
+              strokeWidth={2}
+              fill="url(#radar-area)"
+              dot={{ r: 3, fill: CHART_THEME.brand, strokeWidth: 0 }}
+              activeDot={{ r: 4.5, fill: CHART_THEME.brand, stroke: "#fff", strokeWidth: 1.5 }}
+              isAnimationActive={!reduced}
+              animationDuration={ANIM_MS + 250}
+              animationEasing="ease-out"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </ChartReveal>
     </Moldura>
   );
 }
 
-function Dispersao({ c }: { c: DispersaoChart }) {
-  const W = 460;
-  const H = 300;
-  const pad = { l: 44, r: 16, t: 16, b: 40 };
-  const px = (v: number) => pad.l + (v / c.eixoX.maxVal) * (W - pad.l - pad.r);
-  const py = (v: number) => H - pad.b - (v / c.eixoY.maxVal) * (H - pad.t - pad.b);
-  const midX = pad.l + (W - pad.l - pad.r) / 2;
-  const midY = pad.t + (H - pad.t - pad.b) / 2;
+// ── DISPERSÃO (mapa 2x2) — quadrantes + dots animados + rótulos desempilhados ─
 
-  // posições renderizadas + rótulos desempilhados (por lado, ordenados por y)
-  const rendered = c.pontos.map((p) => ({ label: p.label, x: px(p.x), y: py(p.y) }));
-  const labels = dodgeLabels(rendered, { width: W, lineHeight: 13, top: pad.t + 6, bottom: H - pad.b - 4 });
+function Dispersao({ c }: { c: DispersaoChart }) {
+  const reduced = usePrefersReducedMotion();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((es) => setW(Math.round(es[0].contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const H = 320;
+  const m = { l: 46, r: 18, t: 14, b: 42 };
+  const points = c.pontos.map((p) => ({ x: p.x, y: p.y, label: p.label, notaX: p.notaX, notaY: p.notaY }));
+
+  // geometria explícita (mesmos domínios do chart) → dodge em pixels reais.
+  const px = (v: number) => m.l + (v / c.eixoX.maxVal) * Math.max(0, w - m.l - m.r);
+  const py = (v: number) => H - m.b - (v / c.eixoY.maxVal) * (H - m.t - m.b);
+  const labels = w > 0 ? dodgeLabels(points.map((p) => ({ label: p.label, x: px(p.x), y: py(p.y) })), { width: w, lineHeight: 14, top: m.t + 8, bottom: H - m.b - 6 }) : [];
 
   return (
     <Moldura c={c}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={c.titulo}>
-        {/* quadrantes */}
-        <line x1={midX} y1={pad.t} x2={midX} y2={H - pad.b} stroke={CHART_THEME.grid} strokeDasharray="3 3" />
-        <line x1={pad.l} y1={midY} x2={W - pad.r} y2={midY} stroke={CHART_THEME.grid} strokeDasharray="3 3" />
-        {/* eixos */}
-        <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke={CHART_THEME.ink400} strokeWidth="1" />
-        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke={CHART_THEME.ink400} strokeWidth="1" />
-        {/* rótulos dos extremos */}
-        <text x={pad.l} y={H - 6} fontSize="9" fill={CHART_THEME.ink400}>{c.eixoX.min}</text>
-        <text x={W - pad.r} y={H - 6} textAnchor="end" fontSize="9" fill={CHART_THEME.ink400}>{c.eixoX.max}</text>
-        <text x={pad.l + 3} y={H - pad.b - 4} fontSize="9" fill={CHART_THEME.ink400}>{c.eixoY.min}</text>
-        <text x={pad.l + 3} y={pad.t + 10} fontSize="9" fill={CHART_THEME.ink400}>{c.eixoY.max}</text>
-        {/* dots (na posição real) */}
-        {rendered.map((p, i) => (
-          <circle key={`d${i}`} cx={p.x} cy={p.y} r="5" fill={CHART_THEME.brand} fillOpacity="0.85" />
-        ))}
-        {/* labels desempilhados + leader quando deslocado */}
-        {labels.map((p, i) => {
-          const lx = p.side === "end" ? p.x - 9 : p.x + 9;
-          return (
-            <g key={`l${i}`}>
-              {p.deslocado ? <line x1={p.x} y1={p.y} x2={lx} y2={p.labelY - 3} stroke={CHART_THEME.grid} strokeWidth="0.75" /> : null}
-              <text x={lx} y={p.labelY} textAnchor={p.side} fontSize="10" fontWeight="600" fill={CHART_THEME.ink}>
-                {p.label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+      <ChartReveal height={H}>
+        <div ref={wrapRef} className="relative w-full" style={{ height: H }}>
+          {w > 0 ? (
+            <ScatterChart width={w} height={H} margin={{ top: m.t, right: m.r, bottom: m.b - 28, left: m.l - 34 }}>
+              <CartesianGrid stroke={CHART_THEME.grid} strokeDasharray="3 3" />
+              <XAxis type="number" dataKey="x" domain={[0, c.eixoX.maxVal]} tickLine={false} axisLine={{ stroke: CHART_THEME.ink400 }} tick={AXIS_TICK} tickCount={5} />
+              <YAxis type="number" dataKey="y" domain={[0, c.eixoY.maxVal]} tickLine={false} axisLine={{ stroke: CHART_THEME.ink400 }} tick={AXIS_TICK} width={34} tickCount={5} />
+              <ReferenceLine x={c.eixoX.maxVal / 2} stroke={CHART_THEME.ink400} strokeDasharray="4 4" strokeOpacity={0.5} />
+              <ReferenceLine y={c.eixoY.maxVal / 2} stroke={CHART_THEME.ink400} strokeDasharray="4 4" strokeOpacity={0.5} />
+              <Tooltip
+                cursor={false}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const p = payload[0].payload as (typeof points)[number];
+                  return (
+                    <TipCard>
+                      <p className="font-semibold text-stone-900">{p.label}</p>
+                      <p>{c.eixoX.label}: {p.x}{p.notaX ? ` (${p.notaX})` : ""}</p>
+                      <p>{c.eixoY.label}: {p.y}{p.notaY ? ` (${p.notaY})` : ""}</p>
+                    </TipCard>
+                  );
+                }}
+              />
+              <Scatter
+                data={points}
+                fill={CHART_THEME.brand}
+                isAnimationActive={!reduced}
+                animationDuration={ANIM_MS}
+                animationEasing="ease-out"
+                shape={(props: unknown) => {
+                  const { cx, cy } = props as { cx?: number; cy?: number };
+                  if (cx === undefined || cy === undefined) return <g />;
+                  return <circle cx={cx} cy={cy} r={6} fill={CHART_THEME.brand} fillOpacity={0.9} stroke="#fff" strokeWidth={1.5} />;
+                }}
+              />
+            </ScatterChart>
+          ) : null}
+
+          {/* rótulos desempilhados (HTML sobreposto — nunca colidem) */}
+          {labels.map((p, i) => (
+            <span key={i} className="pointer-events-none absolute" style={{ left: 0, top: 0, transform: `translate(${p.side === "end" ? p.x - 10 : p.x + 10}px, ${p.labelY - 8}px)` }}>
+              {p.deslocado ? (
+                <svg className="absolute" style={{ left: p.side === "end" ? "auto" : -10, right: p.side === "end" ? -10 : "auto", top: 0 }} width="10" height="16">
+                  <line x1={p.side === "end" ? 10 : 0} y1={p.y - p.labelY + 8} x2={p.side === "end" ? 0 : 10} y2={8} stroke={CHART_THEME.grid} />
+                </svg>
+              ) : null}
+              <span className={"block text-[11px] font-semibold text-stone-800 " + (p.side === "end" ? "-translate-x-full" : "")}>{p.label}</span>
+            </span>
+          ))}
+
+          {/* extremos dos eixos (a linguagem do 2x2) */}
+          <span className="pointer-events-none absolute text-[10px] text-stone-400" style={{ left: m.l, bottom: 4 }}>← {c.eixoX.min}</span>
+          <span className="pointer-events-none absolute text-[10px] text-stone-400" style={{ right: m.r, bottom: 4 }}>{c.eixoX.max} →</span>
+          <span className="pointer-events-none absolute text-[10px] text-stone-400" style={{ left: 4, top: m.t, writingMode: "vertical-rl", transform: "rotate(180deg)" }}>← {c.eixoY.min}</span>
+          <span className="pointer-events-none absolute text-[10px] text-stone-400" style={{ left: 4, bottom: m.b, writingMode: "vertical-rl", transform: "rotate(180deg)" }}>{c.eixoY.max} →</span>
+        </div>
+      </ChartReveal>
       <div className="mt-1 flex flex-wrap justify-between gap-2 text-[11px] text-stone-400">
         <span>X: {c.eixoX.label}</span>
         <span>Y: {c.eixoY.label}</span>
@@ -234,6 +422,8 @@ function Dispersao({ c }: { c: DispersaoChart }) {
     </Moldura>
   );
 }
+
+// ── dispatcher (mesmo contrato de sempre) ───────────────────────────────────
 
 export function ReportChart({ chart }: { chart: ChartSpec }) {
   switch (chart.tipo) {
