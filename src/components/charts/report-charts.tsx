@@ -13,7 +13,7 @@
  * O EXPORT (PDF/PPTX) é independente: consome o ChartSpec direto (reports-export).
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -90,7 +90,7 @@ function TipCard({ children }: { children: React.ReactNode }) {
 
 // ── BARRAS (maturidade, reputação, movimentos) — horizontais, animadas ──────
 
-type BarRow = { label: string; valor: number | null; nota?: string };
+type BarRow = { label: string; valor: number | null; valorPlot: number; rotulo: string; nota?: string };
 
 function BarrasTooltip({ active, payload, unidade }: { active?: boolean; payload?: Array<{ payload: BarRow }>; unidade?: string }) {
   if (!active || !payload?.length) return null;
@@ -107,7 +107,16 @@ function Barras({ c }: { c: BarrasChart }) {
   const reduced = usePrefersReducedMotion();
   const max = c.max ?? Math.max(1, ...c.series.map((s) => s.valor ?? 0));
   const cor = corPorNatureza(c.natureza);
-  const rows: BarRow[] = c.series.map((s) => ({ label: s.label, valor: s.valor, nota: s.nota }));
+  // valorPlot: null vira 0 (trilho vazio, honesto) — o valor REAL fica em
+  // `valor` (tooltip) e o rótulo pré-computado garante o "sem dado" na ponta
+  // (LabelList pula entradas null; com dataKey de string, não pula).
+  const rows: BarRow[] = c.series.map((s) => ({
+    label: s.label,
+    valor: s.valor,
+    valorPlot: s.valor ?? 0,
+    rotulo: s.valor === null ? "sem dado" : `${s.valor}${c.unidade ?? ""}`,
+    nota: s.nota,
+  }));
   const H = rows.length * 36 + 24;
 
   return (
@@ -127,7 +136,7 @@ function Barras({ c }: { c: BarrasChart }) {
             />
             <Tooltip content={<BarrasTooltip unidade={c.unidade} />} cursor={{ fill: CHART_THEME.paper }} />
             <Bar
-              dataKey="valor"
+              dataKey="valorPlot"
               radius={[3, 3, 3, 3]}
               isAnimationActive={!reduced}
               animationDuration={ANIM_MS}
@@ -138,9 +147,8 @@ function Barras({ c }: { c: BarrasChart }) {
                 <Cell key={i} fill={cor} />
               ))}
               <LabelList
-                dataKey="valor"
+                dataKey="rotulo"
                 position="right"
-                formatter={(v: unknown) => (v === null || v === undefined ? "sem dado" : `${v}${c.unidade ?? ""}`)}
                 style={{ fontSize: 11, fill: CHART_THEME.ink700, fontFamily: FONT, fontWeight: 600 }}
               />
             </Bar>
@@ -152,6 +160,13 @@ function Barras({ c }: { c: BarrasChart }) {
           <span>← {c.escala.min}</span>
           <span>{c.escala.max} →</span>
         </div>
+      ) : null}
+      {/* honestidade: quem não tem o dado é DECLARADO (o trilho fica vazio; o
+          LabelList pula barras de largura zero — a anotação garante o registro). */}
+      {rows.some((r) => r.valor === null) ? (
+        <p className="mt-1 text-[11px] text-stone-400">
+          sem dado: {rows.filter((r) => r.valor === null).map((r) => r.label).join(", ")}
+        </p>
       ) : null}
     </Moldura>
   );
@@ -333,16 +348,19 @@ function Linha({ c }: { c: LinhaChart }) {
 
 function Dispersao({ c }: { c: DispersaoChart }) {
   const reduced = usePrefersReducedMotion();
-  const wrapRef = useRef<HTMLDivElement>(null);
+  // CALLBACK REF, não useRef+useEffect: o wrapper só MONTA quando o ChartReveal
+  // libera (viewport) — um effect de montagem do componente rodaria antes, com
+  // ref nulo, e o observer nunca seria anexado (bug real: mapa sem players).
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [w, setW] = useState(0);
 
   useEffect(() => {
-    const el = wrapRef.current;
     if (!el) return;
+    setW(Math.round(el.getBoundingClientRect().width)); // mede já na montagem
     const ro = new ResizeObserver((es) => setW(Math.round(es[0].contentRect.width)));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [el]);
 
   const H = 320;
   const m = { l: 46, r: 18, t: 14, b: 42 };
@@ -356,11 +374,11 @@ function Dispersao({ c }: { c: DispersaoChart }) {
   return (
     <Moldura c={c}>
       <ChartReveal height={H}>
-        <div ref={wrapRef} className="relative w-full" style={{ height: H }}>
+        <div ref={setEl} className="relative w-full" style={{ height: H }}>
           {w > 0 ? (
             <ScatterChart width={w} height={H} margin={{ top: m.t, right: m.r, bottom: m.b - 28, left: m.l - 34 }}>
               <CartesianGrid stroke={CHART_THEME.grid} strokeDasharray="3 3" />
-              <XAxis type="number" dataKey="x" domain={[0, c.eixoX.maxVal]} tickLine={false} axisLine={{ stroke: CHART_THEME.ink400 }} tick={AXIS_TICK} tickCount={5} />
+              <XAxis type="number" dataKey="x" domain={[0, c.eixoX.maxVal]} height={28} tickLine={false} axisLine={{ stroke: CHART_THEME.ink400 }} tick={AXIS_TICK} tickCount={5} />
               <YAxis type="number" dataKey="y" domain={[0, c.eixoY.maxVal]} tickLine={false} axisLine={{ stroke: CHART_THEME.ink400 }} tick={AXIS_TICK} width={34} tickCount={5} />
               <ReferenceLine x={c.eixoX.maxVal / 2} stroke={CHART_THEME.ink400} strokeDasharray="4 4" strokeOpacity={0.5} />
               <ReferenceLine y={c.eixoY.maxVal / 2} stroke={CHART_THEME.ink400} strokeDasharray="4 4" strokeOpacity={0.5} />
