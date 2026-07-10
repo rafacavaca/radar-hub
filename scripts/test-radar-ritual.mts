@@ -24,7 +24,7 @@ import { join } from "node:path";
 process.env.RADAR_DATA_DIR = mkdtempSync(join(tmpdir(), "radar-ritual-"));
 delete process.env.RADAR_DB; // modo clássico (JSON isolado)
 
-const { buildDigest, ensureDigest, loadDigest } = await import("@/lib/digest");
+const { buildDigest, ensureDigest, loadDigest, agruparPorSinal } = await import("@/lib/digest");
 const { setEstado, loadEstados } = await import("@/lib/briefing-estado");
 const { localDayKey } = await import("@/lib/schedules");
 
@@ -176,6 +176,40 @@ add(
   "Cap por cliente (6) aplicado COM observação (nunca corte silencioso)",
   dCap.itens.length === 6 && dCap.observacoes.some((o) => o.includes("+3")),
   dCap.observacoes.join(" | "),
+);
+
+// ── 7b: AGRUPAR POR SINAL (F1.7) — 2 lentes do MESMO evento viram 1 grupo ──
+const leituraLente = (id: string, lens: "comercial" | "produto" | "marketing", evento: string): LensReading => ({
+  ...leitura(id, 72),
+  clientName: "Ploomes",
+  lens,
+  eventIds: [evento],
+});
+const dLentes = buildDigest(
+  {
+    clientes: ["Ploomes"],
+    loop: {
+      items: [],
+      readings: [leituraLente("p-prod", "produto", "ev-ploomes"), leituraLente("p-mkt", "marketing", "ev-ploomes"), leitura("outro", 70)],
+      ranAt: "2026-07-10T08:00:00.000Z",
+    },
+    disparos: [],
+    relatoriosNovos: [],
+  },
+  {},
+  hoje,
+);
+const grupos = agruparPorSinal(dLentes.itens);
+const grupoPloomes = grupos.find((g) => g.head.clientName === "Ploomes");
+add(
+  "Agrupa por sinal: Ploomes (produto+marketing do mesmo evento) = 1 grupo com 2 lentes",
+  Boolean(grupoPloomes) && grupoPloomes!.itens.length === 2 && new Set(grupoPloomes!.itens.map((i) => i.lens)).size === 2,
+  grupoPloomes ? `lentes=${grupoPloomes.itens.map((i) => i.lens).join("+")}` : "não agrupou",
+);
+add(
+  "Sinais distintos ficam em grupos separados (Ploomes + Moovefy = 2 grupos)",
+  grupos.length === 2,
+  `grupos=${grupos.length}`,
 );
 
 // ── 8: e-mail (placeholder) — render puro cobre item e dia tranquilo ──

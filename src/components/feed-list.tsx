@@ -11,12 +11,14 @@
  * topo. Datas em 1º plano (RecencyStamp), fonte citada.
  */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ageInDays } from "@/lib/format";
 import type { ClientEvent } from "@/lib/loop";
 
 import { attenuated, RecencyStamp, SourceRef } from "@/components/signal-meta";
+
+const FEED_SEEN_KEY = "radar:feed:seen";
 
 const KIND_LABEL: Record<string, string> = {
   blog: "artigo",
@@ -35,6 +37,27 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
   const [range, setRange] = useState<Range>("all");
   const [recentes, setRecentes] = useState(true);
   const [competitor, setCompetitor] = useState<string>("all");
+
+  // NÃO-LIDO (F1.4): sinais novos desde a última visita ganham ponto vermelho.
+  const idSig = useMemo(() => events.map((e) => e.id).join(","), [events]);
+  const [unseen, setUnseen] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let seen: string[] = [];
+    try {
+      seen = JSON.parse(localStorage.getItem(FEED_SEEN_KEY) || "[]") as string[];
+    } catch {
+      seen = [];
+    }
+    const seenSet = new Set(seen);
+    const ids = events.map((e) => e.id);
+    setUnseen(new Set(ids.filter((id) => !seenSet.has(id))));
+    try {
+      localStorage.setItem(FEED_SEEN_KEY, JSON.stringify(Array.from(new Set([...seen, ...ids])).slice(-1500)));
+    } catch {
+      /* localStorage indisponível */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idSig]);
 
   // concorrentes presentes nos eventos (pra o filtro), em ordem alfabética.
   const competitors = Array.from(new Set(events.map((e) => e.competitorName)))
@@ -117,7 +140,7 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
         ) : (
           <ul className="divide-y divide-stone-200 overflow-hidden rounded-lg border border-stone-200 bg-white">
             {list.map((event) => (
-              <FeedRow key={`${event.clientName}-${event.id}`} event={event} now={now} />
+              <FeedRow key={`${event.clientName}-${event.id}`} event={event} now={now} unread={unseen.has(event.id)} />
             ))}
           </ul>
         )}
@@ -126,14 +149,20 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
   );
 }
 
-function FeedRow({ event, now }: { event: ClientEvent; now: string }) {
+function FeedRow({ event, now, unread = false }: { event: ClientEvent; now: string; unread?: boolean }) {
   const [open, setOpen] = useState(false);
   const velho = attenuated(event.publishedAt, event.collectedAt, now);
   const conteudo = (event.excerpt || event.description || "").trim();
 
   return (
-    <li data-testid="feed-item" className={"px-4 py-3.5 sm:px-5 " + (velho ? "opacity-70" : "")}>
+    <li
+      data-testid="feed-item"
+      className={"px-4 py-3.5 sm:px-5 " + (velho ? "opacity-70 " : "") + (unread ? "border-l-2 border-l-red-500" : "")}
+    >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {unread ? (
+          <span aria-hidden title="Novo desde a sua última visita" className="inline-block h-1.5 w-1.5 rounded-full bg-red-500" />
+        ) : null}
         <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
           {event.competitorName}
         </span>

@@ -18,6 +18,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { HojeBadge } from "@/components/hoje-badge";
 import { NewClientButton } from "@/components/new-client-dialog";
 
 type Section = { label: string; href: string; match: (p: string) => boolean };
@@ -91,14 +92,26 @@ function ChevronLeftIcon() {
   );
 }
 
+function GearIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
 export function AppShell({
   clients,
   modes,
+  isAdmin = false,
   children,
 }: {
   clients: string[];
   /** modo por cliente (nome → "concorrentes" | "carteira"); ausente ⇒ concorrentes. */
   modes?: Record<string, string>;
+  /** o usuário da sessão pode administrar (super_admin / dono no modo clássico). */
+  isAdmin?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -211,6 +224,7 @@ export function AppShell({
               ☀
             </span>
             {!collapsed ? <span>Hoje</span> : null}
+            {!collapsed ? <HojeBadge /> : null}
           </Link>
           {!collapsed ? (
             <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
@@ -255,17 +269,44 @@ export function AppShell({
           </ul>
         </nav>
 
-        {/* rodapé — "+ Novo cliente" é GLOBAL (ação da agência, não da conta) */}
-        <div className="border-t border-stone-200 p-3">
+        {/* rodapé — "+ Novo cliente" é GLOBAL (ação da agência) + Administração */}
+        <div className="space-y-2 border-t border-stone-200 p-3">
           <NewClientButton clients={clients} collapsed={collapsed} />
-          {!collapsed ? (
-            <Link
-              href="/custo"
-              title="Custo (admin)"
-              className="mt-2 flex items-center gap-1.5 px-1 text-[11px] text-stone-400 transition-colors hover:text-stone-700"
-            >
-              <span aria-hidden>◔</span> Custo · admin
-            </Link>
+          {isAdmin ? (
+            collapsed ? (
+              <Link
+                href="/admin"
+                title="Administração"
+                aria-label="Administração"
+                className="flex justify-center rounded-md py-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+              >
+                <GearIcon />
+              </Link>
+            ) : (
+              <div>
+                <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-400">Administração</p>
+                <Link
+                  href="/admin"
+                  aria-current={pathname === "/admin" ? "page" : undefined}
+                  className={
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors " +
+                    (pathname === "/admin" ? "bg-stone-100 font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
+                  }
+                >
+                  <GearIcon /> Agências
+                </Link>
+                <Link
+                  href="/custo"
+                  aria-current={pathname === "/custo" ? "page" : undefined}
+                  className={
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors " +
+                    (pathname === "/custo" ? "bg-stone-100 font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
+                  }
+                >
+                  <span aria-hidden className="inline-flex h-4 w-4 items-center justify-center text-stone-400">◔</span> Custo
+                </Link>
+              </div>
+            )
           ) : null}
         </div>
       </aside>

@@ -55,6 +55,10 @@ export type DigestItem = {
   /** data de publicação/detecção (ISO) — datas são cidadãs de 1ª classe. */
   data?: string;
   score: number;
+  /** chave do SINAL de origem (mesmo evento) — agrupa leituras de lentes distintas. */
+  sinalKey?: string;
+  /** a lente que produziu (só em kind=leitura) — rótulo curto + tooltip. */
+  lens?: "comercial" | "produto" | "marketing";
 };
 
 export type Digest = {
@@ -122,6 +126,9 @@ function candidatos(material: DigestMaterial): DigestItem[] {
       detalhe: r.leitura,
       acao: r.acao,
       origem: `Lente ${r.lens}`,
+      lens: r.lens,
+      // MESMA chave para as lentes do MESMO evento → agrupam sob uma manchete.
+      sinalKey: `${r.clientName}::${r.eventIds?.[0] ?? r.id}`,
       fonte: r.fonte,
       data: r.publishedAt ?? r.collectedAt ?? r.createdAt,
       score: r.score,
@@ -138,6 +145,7 @@ function candidatos(material: DigestMaterial): DigestItem[] {
       detalhe: s.gatilho,
       acao: s.angulo,
       origem: `Gatilho de venda · linha ${s.linha}`,
+      sinalKey: `sr:${s.eventIds?.[0] ?? s.id}`,
       fonte: s.fonte,
       data: s.publishedAt ?? s.collectedAt ?? s.createdAt,
       score: s.score,
@@ -154,6 +162,7 @@ function candidatos(material: DigestMaterial): DigestItem[] {
       detalhe: `${p.gatilho} — encaixe ${p.encaixe}: ${p.justificativa}`,
       acao: p.acao,
       origem: `Relacionamento · ${p.conta}`,
+      sinalKey: `rp:${p.eventIds?.[0] ?? p.id}`,
       fonte: p.fonte,
       data: p.publishedAt ?? p.createdAt,
       score: p.score,
@@ -171,6 +180,7 @@ function candidatos(material: DigestMaterial): DigestItem[] {
       titulo: `${d.concorrente_nome}: ${m.campo_label}${dePara}`,
       detalhe: `Movimento detectado na varredura — regra "${REGRA_LABEL[d.regra] ?? d.regra}".`,
       origem: `Alerta de diagnóstico`,
+      sinalKey: `al:${d.id}`,
       fonte: m.fonte_url_para ? { url: m.fonte_url_para } : m.fonte_url_de ? { url: m.fonte_url_de } : undefined,
       data: m.data_deteccao,
       score: m.severidade === "alta" ? 80 : m.severidade === "média" ? 65 : 50,
@@ -186,12 +196,50 @@ function candidatos(material: DigestMaterial): DigestItem[] {
       detalhe: r.origem ? `Pedido recorrente: "${r.origem}"` : "Saiu do agendamento.",
       acao: "Ler em Relatórios.",
       origem: "Relatório agendado",
+      sinalKey: `rep:${r.id}`,
       data: r.createdAt,
       score: 55,
     });
   }
 
   return out;
+}
+
+// ── AGRUPAMENTO POR SINAL (F1.7) — o mesmo evento lido por várias lentes vira
+//    UMA manchete com as leituras aninhadas. Puro; a tela consome. ───────────
+
+export type DigestGroup = {
+  /** chave estável do grupo (sinalKey ou id quando não há chave). */
+  key: string;
+  /** o item "cabeça" (o de maior score) — dá manchete, fonte, data, cliente. */
+  head: DigestItem;
+  /** todos os itens do sinal (1 quando não agrupa), mais forte primeiro. */
+  itens: DigestItem[];
+  /** score do grupo = o do item mais forte. */
+  score: number;
+};
+
+/**
+ * Agrupa itens pelo SINAL de origem (sinalKey), preservando a ordem por
+ * relevância. Itens sem sinalKey (digests antigos) caem em grupos unitários.
+ */
+export function agruparPorSinal(itens: DigestItem[]): DigestGroup[] {
+  const grupos = new Map<string, DigestItem[]>();
+  const ordem: string[] = [];
+  for (const item of itens) {
+    const key = item.sinalKey ?? item.id;
+    if (!grupos.has(key)) {
+      grupos.set(key, []);
+      ordem.push(key);
+    }
+    grupos.get(key)!.push(item);
+  }
+  return ordem
+    .map((key) => {
+      const lista = [...grupos.get(key)!].sort((a, b) => b.score - a.score);
+      return { key, head: lista[0], itens: lista, score: lista[0].score };
+    })
+    .sort((a, b) => b.score - a.score);
 }
 
 /**
