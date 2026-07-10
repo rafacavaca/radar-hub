@@ -105,6 +105,49 @@ await store.saveCuradoria(cid, cur);
 add("Curadoria persiste e relê (sobrevive à regeração)", (await store.loadCuradoria(cid)).confirmados.includes("All-Clad") && (await store.loadCuradoria(cid)).manuais.length === 1);
 add("Curadoria ausente → vazia honesta (não inventa)", (await store.loadCuradoria("inexistente")).manuais.length === 0);
 
+// ── 6. F2: .ics + PDF + preparo idempotente ──
+const { prospectToIcs } = await import("@/lib/prospects/ics");
+const { dossieToPdf } = await import("@/lib/prospects/pdf");
+const { prepararReunioes } = await import("@/lib/prospects/preparo");
+
+const reuniaoISO = new Date("2026-07-16T13:00:00.000Z").toISOString();
+const pReu: Prospect = { ...mk("Moovefy", "IcsCo", "https://icsco.com"), reuniaoEm: reuniaoISO, contato: "João" };
+await store.upsertProspect(pReu);
+
+// .ics
+const ics = prospectToIcs(pReu, "https://radar.formare.tech");
+add(
+  ".ics: VEVENT válido com DTSTART/URL/SUMMARY do prospect",
+  Boolean(ics) && ics!.includes("BEGIN:VEVENT") && ics!.includes("DTSTART:20260716T130000Z") && ics!.includes("SUMMARY:Reunião: IcsCo") && ics!.includes("/prospects/"),
+);
+add(".ics: sem data de reunião → null (não inventa evento)", prospectToIcs({ ...pReu, reuniaoEm: null }, "https://x") === null);
+
+// PDF (reusa o dossiê fake salvo antes? não — gera um mínimo)
+const dPdf: Dossie = {
+  prospectId: pReu.id, clientName: "Moovefy", nome: "IcsCo", siteUrl: "https://icsco.com", geradoEm: new Date().toISOString(),
+  perfil: { resumo: pontoFato("faz X", "https://icsco.com"), produtos: [], paginas_lidas: ["https://icsco.com"] },
+  concorrentes: [{ nome: "Rival", nota: pontoInferencia("briga", "https://b", "busca web") }],
+  sinais: [], encaixe: { brain_mode: "none", ganchos: [], dores: [], angulo: null }, municao: { perguntas: [pontoInferencia("pergunta?")], objecoes: [] }, observacoes: [],
+};
+const pdf = await dossieToPdf(dPdf, pReu, mergeConcorrentes(dPdf.concorrentes, CURADORIA_VAZIA));
+const head = Buffer.from(pdf.slice(0, 5)).toString("latin1");
+add("PDF: bytes válidos (%PDF)", head.startsWith("%PDF"), `${(pdf.length / 1024).toFixed(1)}KB · ${head}`);
+
+// preparo pré-reunião: injeta gerador/e-mail fake; conta idempotência
+process.env.RADAR_DATA_DIR && void 0;
+let geracoes = 0;
+let envios = 0;
+// mock do gerarDossie via saveDossie prévio (já tem dossiê → jaProntos, não gera)
+await store.saveDossie(dPdf);
+const now = new Date("2026-07-15T09:00:00.000Z"); // véspera da reunião (16/07)
+const r1 = await prepararReunioes(["Moovefy"], now, { sendPdfEmail: async () => { envios++; return "enviado"; } });
+add("Preparo (véspera): dossiê já pronto não re-gera; e-mail enviado 1x", r1.jaProntos === 1 && r1.preparados === 0 && r1.emails.length === 1 && r1.emails[0].envio === "enviado");
+const r2 = await prepararReunioes(["Moovefy"], now, { sendPdfEmail: async () => { envios++; return "enviado"; } });
+add("Preparo idempotente: 2ª passada NÃO reenvia o e-mail (pdfEnviadoEm)", r2.emails.length === 0, `envios totais=${envios}`);
+const foraJanela = await prepararReunioes(["Moovefy"], new Date("2026-07-10T09:00:00.000Z"), { sendPdfEmail: async () => "enviado" });
+add("Preparo: reunião fora da véspera não é preparada (janela D-1)", foraJanela.jaProntos === 0 && foraJanela.preparados === 0);
+void geracoes;
+
 // ── Resultado ──
 console.log("── Resultado ──");
 let ok = true;

@@ -30,6 +30,7 @@ const KIND_META: Record<DigestItem["kind"], { label: string; tip: string }> = {
   jogada: { label: "Relacionamento", tip: "Sinal de conta-chave cruzado com a sua oferta." },
   alerta: { label: "Alerta", tip: "Movimento de concorrente que casou uma regra sua." },
   relatorio: { label: "Relatório", tip: "Um relatório agendado saiu." },
+  reuniao: { label: "Reunião", tip: "Prospect com reunião marcada — o dossiê está no card." },
 };
 
 /** Rótulos estruturados da análise/ação por tipo (nada de parágrafo solto). */
@@ -39,10 +40,12 @@ const ANALISE_LABEL: Record<DigestItem["kind"], { corpo: string; acao: string }>
   jogada: { corpo: "Gatilho", acao: "Jogada" },
   alerta: { corpo: "Movimento", acao: "Ação" },
   relatorio: { corpo: "Sobre", acao: "Ação" },
+  reuniao: { corpo: "Dossiê", acao: "Contato" },
 };
 
 /** Onde cada tipo abre no painel (deep-link do inbox) — puro, client-safe. */
 function painelDe(item: DigestItem): string {
+  if (item.href) return item.href; // deep-link explícito (ex.: dossiê do prospect)
   const q = `?cliente=${encodeURIComponent(item.clientName)}`;
   switch (item.kind) {
     case "alerta":
@@ -53,6 +56,8 @@ function painelDe(item: DigestItem): string {
       return `/carteira${q}`;
     case "jogada":
       return `/contas${q}`;
+    case "reuniao":
+      return `/prospects${q}`;
     default:
       return `/${q}`;
   }

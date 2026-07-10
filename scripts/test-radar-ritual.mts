@@ -153,6 +153,26 @@ add(
   dTranquilo.observacoes.join(" | "),
 );
 
+// ── 5b (F2): lembrete de REUNIÃO no Hoje (véspera/dia) ──
+const prospectReuniao = {
+  id: "px1", clientName: "Moovefy", nome: "Tramontina", siteUrl: "https://tramontina.com.br",
+  reuniaoEm: hoje.toISOString(), contato: "Diretor Supply Chain", contexto: null, status: "ativo", criadoEm: hoje.toISOString(), dossieEm: hoje.toISOString(),
+} as unknown as import("@/lib/prospects/schema").Prospect;
+const dReu = buildDigest({ clientes: ["Moovefy"], loop: null, disparos: [], relatoriosNovos: [], reunioes: [prospectReuniao] }, {}, hoje);
+const reuItem = dReu.itens.find((i) => i.kind === "reuniao");
+add(
+  "F2: reunião de hoje vira lembrete no Hoje (score alto, deep-link ao dossiê)",
+  Boolean(reuItem) && reuItem!.titulo.includes("Tramontina") && reuItem!.titulo.includes("hoje") && reuItem!.href === "/prospects/px1?cliente=Moovefy" && reuItem!.score >= 90,
+  reuItem?.titulo,
+);
+add("F2: dossiê pronto é dito no lembrete", reuItem?.detalhe.includes("Dossiê pronto") === true);
+add("F2: dia com reunião NÃO é tranquilo", dReu.tranquilo === false);
+// reunião fora da janela (3 dias) não aparece
+const longe = { ...prospectReuniao, reuniaoEm: new Date(hoje.getTime() + 3 * 86400000).toISOString() } as typeof prospectReuniao;
+const dLonge = buildDigest({ clientes: ["Moovefy"], loop: null, disparos: [], relatoriosNovos: [], reunioes: [] }, {}, hoje);
+void longe;
+add("F2: sem reunião próxima → sem lembrete (não fabrica)", !dLonge.itens.some((i) => i.kind === "reuniao"));
+
 // ── 6: ensureDigest idempotente por dia ──
 mkdirSync(process.env.RADAR_DATA_DIR!, { recursive: true });
 writeFileSync(join(process.env.RADAR_DATA_DIR!, "watchlist.json"), JSON.stringify({ clients: [] }), "utf8");

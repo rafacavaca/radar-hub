@@ -24,10 +24,12 @@ import { loadDisparos } from "@/lib/diagnostico/alertas-store";
 import { sbGetDoc, sbSetDoc } from "@/lib/db/repo-org-docs";
 import { supabaseEnabled } from "@/lib/db/supabase";
 import { peekLoopResult, runRadarLoop, type RadarLoopResult } from "@/lib/loop";
+import { loadProspects } from "@/lib/prospects/store";
 import { loadReports, type Report } from "@/lib/reports";
 import { localDayKey } from "@/lib/schedules";
 import { loadWatchlist } from "@/lib/watchlist";
 import type { AlertaDisparo } from "@/lib/diagnostico/schema";
+import type { Prospect } from "@/lib/prospects/schema";
 
 /** Corte de relevância das leituras/jogadas (a régua das lentes já filtrou; isto separa o "forte"). */
 const CORTE_SCORE = 60;
@@ -36,7 +38,7 @@ const MAX_POR_CLIENTE = 6;
 /** Dias de digest guardados no modo clássico (o org_docs guarda 1 doc por dia). */
 const MAX_DIAS_JSON = 30;
 
-export type DigestItemKind = "leitura" | "gatilho" | "jogada" | "alerta" | "relatorio";
+export type DigestItemKind = "leitura" | "gatilho" | "jogada" | "alerta" | "relatorio" | "reuniao";
 
 export type DigestItem = {
   /** id ESTÁVEL (deriva do item de origem) — o estado do briefing aponta pra ele. */
@@ -59,6 +61,8 @@ export type DigestItem = {
   sinalKey?: string;
   /** a lente que produziu (só em kind=leitura) — rótulo curto + tooltip. */
   lens?: "comercial" | "produto" | "marketing";
+  /** deep-link explícito (ex.: dossiê de um prospect) — o card prefere isto. */
+  href?: string;
 };
 
 export type Digest = {
@@ -85,7 +89,22 @@ export type DigestMaterial = {
   disparos: AlertaDisparo[];
   /** relatórios agendados criados nas últimas 24h. */
   relatoriosNovos: Report[];
+  /** F2 — prospects com reunião HOJE ou AMANHÃ (lembrete do ritual). */
+  reunioes?: Prospect[];
 };
+
+/** Prospects com reunião HOJE ou AMANHÃ (local Brasil) — o lembrete do ritual. */
+function reunioesProximas(prospects: Prospect[], now: Date): Prospect[] {
+  const hoje = localDayKey(now);
+  const amanha = localDayKey(new Date(now.getTime() + 24 * 60 * 60 * 1000));
+  return prospects
+    .filter((p) => p.status === "ativo" && p.reuniaoEm)
+    .filter((p) => {
+      const dia = localDayKey(new Date(p.reuniaoEm as string));
+      return dia === hoje || dia === amanha;
+    })
+    .sort((a, b) => (a.reuniaoEm as string).localeCompare(b.reuniaoEm as string));
+}
 
 /** Junta o material do dia da org do contexto. Cache-only — barato e honesto. */
 export async function coletarMaterial(now: Date): Promise<DigestMaterial> {
@@ -95,7 +114,10 @@ export async function coletarMaterial(now: Date): Promise<DigestMaterial> {
   const disparos = (await Promise.all(clientes.map((c) => loadDisparos(c)))).flat();
   const desde = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const relatoriosNovos = (await loadReports()).filter((r) => r.kind === "agendado" && r.createdAt >= desde);
-  return { clientes, loop, disparos, relatoriosNovos };
+  // prospects de todos os clientes da org → reuniões próximas.
+  const prospects = (await Promise.all(clientes.map((c) => loadProspects(c)))).flat();
+  const reunioes = reunioesProximas(prospects, now);
+  return { clientes, loop, disparos, relatoriosNovos, reunioes };
 }
 
 // ── montagem (PURA — o smoke testa direto aqui) ─────────────────────────────
@@ -112,7 +134,7 @@ const REGRA_LABEL: Record<string, string> = {
   release_novo: "Release novo",
 };
 
-function candidatos(material: DigestMaterial): DigestItem[] {
+function candidatos(material: DigestMaterial, now: Date): DigestItem[] {
   const out: DigestItem[] = [];
   const loop = material.loop;
 
@@ -202,6 +224,27 @@ function candidatos(material: DigestMaterial): DigestItem[] {
     });
   }
 
+  // F2 — lembretes de reunião (o ritual do prospect no Hoje). Score alto: é
+  // TEMPO-SENSÍVEL. id por (prospect, dia) pra poder ser marcado no dia certo.
+  for (const p of material.reunioes ?? []) {
+    if (!p.reuniaoEm) continue;
+    const dia = localDayKey(new Date(p.reuniaoEm));
+    const quando = dia === localDayKey(now) ? "hoje" : "amanhã";
+    out.push({
+      id: `reu:${p.id}:${dia}`,
+      kind: "reuniao",
+      clientName: p.clientName,
+      titulo: `Reunião ${quando} — ${p.nome}`,
+      detalhe: p.dossieEm ? "Dossiê pronto — revise antes de entrar." : "Dossiê ainda não gerado — gere pra entrar preparado.",
+      acao: p.contato ? `Contato: ${p.contato}` : undefined,
+      origem: "Prospect",
+      sinalKey: `reu:${p.id}:${dia}`,
+      data: p.reuniaoEm,
+      score: 95,
+      href: `/prospects/${p.id}?cliente=${encodeURIComponent(p.clientName)}`,
+    });
+  }
+
   return out;
 }
 
@@ -265,7 +308,7 @@ export function buildDigest(
 
   // itens do dia: fora os processados (qualquer estado marcado sai da lista
   // do dia — o adiado reaparece pela seção própria quando vence).
-  const doDia = candidatos(material).filter((c) => !estados[c.id]);
+  const doDia = candidatos(material, now).filter((c) => !estados[c.id]);
 
   // cap por cliente com transparência (nunca corte silencioso).
   const porCliente = new Map<string, DigestItem[]>();

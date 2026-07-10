@@ -19,6 +19,9 @@ import { listOrgsAsCollector, runAsOrgCollector } from "@/lib/db/collector-org";
 import { supabaseEnabled } from "@/lib/db/supabase";
 import { ensureDigestMatinal } from "@/lib/digest";
 import { maybeSendDigestEmail } from "@/lib/digest-email";
+import { prepararReunioes } from "@/lib/prospects/preparo";
+import { sendDossiePdfEmail } from "@/lib/prospects/email";
+import { loadWatchlist } from "@/lib/watchlist";
 import { runDueSchedules } from "@/lib/schedules";
 import { runDueDiagnosticos } from "@/lib/diagnostico/schedule";
 
@@ -51,6 +54,16 @@ async function passada(now: Date, label: string): Promise<void> {
   if (matinal.acao === "gerado" && matinal.digest) {
     const envio = await maybeSendDigestEmail(matinal.digest, label);
     console.log(`[run-schedules ${now.toISOString()}] (${label}) e-mail do digest: ${envio}`);
+  }
+
+  // 4. Preparo pré-reunião (F2) — na véspera, gera o dossiê e manda o PDF por
+  //    e-mail. Só reuniões de AMANHÃ, dossiê gerado 1x, e-mail 1x (idempotente).
+  const clientes = (await loadWatchlist()).clients.map((c) => c.name);
+  const prep = await prepararReunioes(clientes, now, { sendPdfEmail: (p, pdf) => sendDossiePdfEmail(p, pdf, label) });
+  if (prep.preparados > 0 || prep.jaProntos > 0 || prep.emails.length > 0 || prep.erros.length > 0) {
+    console.log(
+      `[run-schedules ${now.toISOString()}] (${label}) prospects: dossiês preparados=${prep.preparados} já-prontos=${prep.jaProntos} e-mails=[${prep.emails.map((e) => `${e.nome}:${e.envio}`).join(", ")}] erros=${prep.erros.length}`,
+    );
   }
 }
 

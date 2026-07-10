@@ -40,6 +40,8 @@ export type Prospect = {
   criadoEm: string;
   /** quando o dossiê foi gerado pela última vez (null = ainda não). */
   dossieEm?: string | null;
+  /** F2 — quando o PDF foi enviado por e-mail na véspera (evita reenvio). */
+  pdfEnviadoEm?: string | null;
 };
 
 // ── seções do dossiê (cada uma honesta e escaneável) ────────────────────────

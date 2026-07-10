@@ -58,8 +58,18 @@ export default async function DossiePage({
         <ProspectLifecycle cliente={cliente} id={id} status={prospect.status} />
       </header>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <DossieActions cliente={cliente} id={id} temDossie={Boolean(dossie)} />
+        {prospect.reuniaoEm ? (
+          <a href={`/api/prospects/ics?cliente=${encodeURIComponent(cliente)}&id=${id}`} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100">
+            📅 Adicionar ao calendário
+          </a>
+        ) : null}
+        {dossie ? (
+          <a href={`/api/prospects/pdf?cliente=${encodeURIComponent(cliente)}&id=${id}`} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100">
+            ⬇ PDF
+          </a>
+        ) : null}
       </div>
 
       <div className="mt-6">
