@@ -29,6 +29,7 @@ const CONCORRENTES_SECTIONS: Section[] = [
   { label: "Briefing", href: "/", match: (p) => p === "/" },
   { label: "Feed", href: "/feed", match: (p) => p.startsWith("/feed") },
   { label: "Contas", href: "/contas", match: (p) => p.startsWith("/contas") },
+  { label: "Prospects", href: "/prospects", match: (p) => p.startsWith("/prospects") },
   { label: "Conhecimento", href: "/perguntar", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Concorrentes",
@@ -43,6 +44,7 @@ const CONCORRENTES_SECTIONS: Section[] = [
 const CARTEIRA_SECTIONS: Section[] = [
   { label: "Carteira", href: "/carteira", match: (p) => p.startsWith("/carteira") },
   { label: "Feed", href: "/feed", match: (p) => p.startsWith("/feed") },
+  { label: "Prospects", href: "/prospects", match: (p) => p.startsWith("/prospects") },
   { label: "Conhecimento", href: "/perguntar", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Hospitais",
