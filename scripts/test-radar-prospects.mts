@@ -22,10 +22,10 @@ import { join } from "node:path";
 process.env.RADAR_DATA_DIR = mkdtempSync(join(tmpdir(), "radar-prospects-"));
 delete process.env.RADAR_DB; // modo clássico (JSON isolado)
 
-const { pontoFato, pontoInferencia, pontoNaoEncontrado, NATUREZA_LABEL } = await import("@/lib/prospects/schema");
+const { pontoFato, pontoInferencia, pontoNaoEncontrado, NATUREZA_LABEL, mergeConcorrentes, CURADORIA_VAZIA } = await import("@/lib/prospects/schema");
 const store = await import("@/lib/prospects/store");
 
-import type { Dossie, Prospect } from "@/lib/prospects/schema";
+import type { ConcorrenteProspect, Dossie, Prospect } from "@/lib/prospects/schema";
 
 type Criterio = { nome: string; feito: boolean; detalhe?: string };
 const criterios: Criterio[] = [];
@@ -80,6 +80,30 @@ add("Dossiê salvo e relido íntegro (com fontes)", relido?.perfil.resumo.fonte_
 await store.removeProspect("Moovefy", id1);
 add("Remove apaga prospect E dossiê (efêmero, sem custo contínuo)", (await store.getProspect("Moovefy", id1)) === null && (await store.loadDossie(id1)) === null);
 add("Remove não vaza pra outro cliente", (await store.loadProspects("TAGAT Foodtech")).length === 1);
+
+// ── 5. CURADORIA de concorrentes (merge PURO — o ajuste do Rafael) ──
+const sugeridos: ConcorrenteProspect[] = [
+  { nome: "All-Clad", nota: pontoInferencia("premium", "https://b", "busca web") },
+  { nome: "Staub", nota: pontoInferencia("ferro fundido", "https://b", "busca web") },
+  { nome: "Lodge", nota: pontoInferencia("alternativa", "https://b", "busca web") },
+];
+// vendedor: indica um manual, confirma All-Clad, descarta Lodge; Staub fica pendente.
+const cur = { ...CURADORIA_VAZIA, manuais: [{ nome: "Rival Local", nota: "briga em SP" }], confirmados: ["All-Clad"], rejeitados: ["Lodge"] };
+const merged = mergeConcorrentes(sugeridos, cur);
+add("Curadoria: manual entra 1º, marcado 'você indicou'", merged[0]?.nome === "Rival Local" && merged[0]?.origem === "manual" && merged[0]?.estado === "manual");
+add("Curadoria: sugestão CONFIRMADA aparece marcada confirmado", merged.some((c) => c.nome === "All-Clad" && c.estado === "confirmado"));
+add("Curadoria: sugestão DESCARTADA some (Lodge fora)", !merged.some((c) => c.nome === "Lodge"));
+add("Curadoria: sugestão não-tocada fica PENDENTE (validar)", merged.some((c) => c.nome === "Staub" && c.estado === "pendente"));
+add("Curadoria: manual não é inferência (é 'você indicou', sem fingir fato de busca)", merged[0]?.nota.fonte_titulo === "você indicou" && !merged[0]?.nota.fonte_url);
+// dedup: se a mesma sugestão também foi indicada manual, não repete.
+const dedup = mergeConcorrentes(sugeridos, { ...CURADORIA_VAZIA, manuais: [{ nome: "staub" }] });
+add("Curadoria: sugestão que virou manual não duplica", dedup.filter((c) => c.nome.toLowerCase() === "staub").length === 1);
+// persistência org-scoped da curadoria
+await store.upsertProspect(mk("Moovefy", "Curated Co", "https://curated.com"));
+const cid = store.prospectId("Moovefy", "https://curated.com");
+await store.saveCuradoria(cid, cur);
+add("Curadoria persiste e relê (sobrevive à regeração)", (await store.loadCuradoria(cid)).confirmados.includes("All-Clad") && (await store.loadCuradoria(cid)).manuais.length === 1);
+add("Curadoria ausente → vazia honesta (não inventa)", (await store.loadCuradoria("inexistente")).manuais.length === 0);
 
 // ── Resultado ──
 console.log("── Resultado ──");

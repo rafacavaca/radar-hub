@@ -15,10 +15,11 @@ import { join } from "node:path";
 import { sbDeleteDoc, sbGetDoc, sbSetDoc } from "@/lib/db/repo-org-docs";
 import { supabaseEnabled } from "@/lib/db/supabase";
 import { normalizeSiteUrl } from "@/lib/discovery";
-import type { Dossie, Prospect } from "@/lib/prospects/schema";
+import { CURADORIA_VAZIA, type CuradoriaConcorrentes, type Dossie, type Prospect } from "@/lib/prospects/schema";
 
 const KIND_LISTA = "prospects";
 const KIND_DOSSIE = "prospect-dossie";
+const KIND_CURADORIA = "prospect-concorrentes";
 
 // ── JSON de fallback (modo clássico / testes) ───────────────────────────────
 
@@ -28,16 +29,16 @@ function dataDir(): string {
 function filePath(): string {
   return join(dataDir(), "prospects.json");
 }
-type JsonFile = { lista: Record<string, Prospect[]>; dossies: Record<string, Dossie> };
+type JsonFile = { lista: Record<string, Prospect[]>; dossies: Record<string, Dossie>; curadorias?: Record<string, CuradoriaConcorrentes> };
 
 function readJson(): JsonFile {
   const p = filePath();
-  if (!existsSync(p)) return { lista: {}, dossies: {} };
+  if (!existsSync(p)) return { lista: {}, dossies: {}, curadorias: {} };
   try {
     const parsed = JSON.parse(readFileSync(p, "utf8")) as JsonFile;
-    return { lista: parsed?.lista ?? {}, dossies: parsed?.dossies ?? {} };
+    return { lista: parsed?.lista ?? {}, dossies: parsed?.dossies ?? {}, curadorias: parsed?.curadorias ?? {} };
   } catch {
-    return { lista: {}, dossies: {} };
+    return { lista: {}, dossies: {}, curadorias: {} };
   }
 }
 function writeJson(f: JsonFile): void {
@@ -107,15 +108,17 @@ export async function patchProspect(clientName: string, id: string, patch: Parti
   return lista[idx];
 }
 
-/** Remove um prospect (e seu dossiê) da org. */
+/** Remove um prospect (e seu dossiê + curadoria) da org. */
 export async function removeProspect(clientName: string, id: string): Promise<void> {
   const lista = (await loadProspects(clientName)).filter((p) => p.id !== id);
   await saveLista(clientName, lista);
   if (supabaseEnabled()) {
     await sbDeleteDoc(KIND_DOSSIE, id).catch(() => {});
+    await sbDeleteDoc(KIND_CURADORIA, id).catch(() => {});
   } else {
     const f = readJson();
     delete f.dossies[id];
+    if (f.curadorias) delete f.curadorias[id];
     writeJson(f);
   }
 }
@@ -136,4 +139,27 @@ export async function saveDossie(d: Dossie): Promise<Dossie> {
     writeJson(f);
   }
   return d;
+}
+
+// ── curadoria de concorrentes (org-scoped; sobrevive à regeração) ───────────
+
+/** A curadoria de concorrentes de um prospect (ou a vazia). */
+export async function loadCuradoria(prospectId: string): Promise<CuradoriaConcorrentes> {
+  if (supabaseEnabled()) {
+    const c = await sbGetDoc<CuradoriaConcorrentes | null>(KIND_CURADORIA, prospectId, null);
+    return c ? { ...CURADORIA_VAZIA, ...c } : { ...CURADORIA_VAZIA };
+  }
+  return { ...CURADORIA_VAZIA, ...(readJson().curadorias?.[prospectId] ?? {}) };
+}
+
+/** Salva a curadoria (org-scoped). */
+export async function saveCuradoria(prospectId: string, c: CuradoriaConcorrentes): Promise<CuradoriaConcorrentes> {
+  if (supabaseEnabled()) {
+    await sbSetDoc(KIND_CURADORIA, prospectId, c);
+  } else {
+    const f = readJson();
+    f.curadorias = { ...(f.curadorias ?? {}), [prospectId]: c };
+    writeJson(f);
+  }
+  return c;
 }

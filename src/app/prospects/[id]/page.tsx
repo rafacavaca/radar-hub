@@ -11,7 +11,8 @@ import { DossieActions } from "@/components/prospects/dossie-actions";
 import { DossieView } from "@/components/prospects/dossie-view";
 import { ProspectLifecycle } from "@/components/prospects/prospect-lifecycle";
 import { formatDateTimePtBR } from "@/lib/format";
-import { getProspect, loadDossie } from "@/lib/prospects/store";
+import { getProspect, loadCuradoria, loadDossie } from "@/lib/prospects/store";
+import { mergeConcorrentes } from "@/lib/prospects/schema";
 import { loadWatchlist } from "@/lib/watchlist";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,9 @@ export default async function DossiePage({
 
   const prospect = await getProspect(cliente, id);
   if (!prospect) notFound();
-  const dossie = await loadDossie(id);
+  const [dossie, curadoria] = await Promise.all([loadDossie(id), loadCuradoria(id)]);
+  // mescla sugestões (do dossiê) + curadoria do vendedor (manual/confirmar/descartar).
+  const concorrentes = mergeConcorrentes(dossie?.concorrentes ?? [], curadoria);
 
   return (
     <section className="mx-auto max-w-[760px] px-4 py-6 sm:px-6 sm:py-8">
@@ -61,7 +64,9 @@ export default async function DossiePage({
 
       <div className="mt-6">
         {dossie ? (
-          <DossieView dossie={dossie} />
+          // concorrentes vão MESCLADOS (curadoria aplicada); zeramos os brutos no
+          // objeto passado ao cliente pra uma sugestão DESCARTADA nem chegar ao browser.
+          <DossieView dossie={{ ...dossie, concorrentes: [] }} cliente={cliente} prospectId={id} concorrentes={concorrentes} />
         ) : (
           <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
             <p className="text-base font-medium text-stone-700">Dossiê ainda não gerado.</p>

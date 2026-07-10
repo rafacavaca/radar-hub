@@ -61,6 +61,62 @@ export type ConcorrenteProspect = {
   nota: Ponto;
 };
 
+/**
+ * CURADORIA de concorrentes (feedback do Rafael): a descoberta automática nem
+ * sempre acerta. O vendedor INDICA concorrentes que conhece e VALIDA as
+ * sugestões (confirma/descarta). Vive à parte do dossiê (org_doc próprio) pra
+ * SOBREVIVER à regeração — curar não re-gasta crédito.
+ */
+export type ConcorrenteManual = { nome: string; nota?: string };
+export type CuradoriaConcorrentes = {
+  manuais: ConcorrenteManual[];
+  /** nomes de SUGESTÕES que o vendedor confirmou (mantém). */
+  confirmados: string[];
+  /** nomes de SUGESTÕES que o vendedor descartou (somem). */
+  rejeitados: string[];
+};
+
+export const CURADORIA_VAZIA: CuradoriaConcorrentes = { manuais: [], confirmados: [], rejeitados: [] };
+
+/** Concorrente já MESCLADO (sugestão + curadoria) — o que a tela mostra. */
+export type ConcorrenteExibido = ConcorrenteProspect & {
+  origem: "manual" | "sugerido";
+  /** manual = você indicou; confirmado = sugestão validada; pendente = validar. */
+  estado: "manual" | "confirmado" | "pendente";
+};
+
+function normNome(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+/**
+ * Mescla sugestões (do dossiê) com a curadoria (PURO — o smoke testa direto):
+ * manuais primeiro; sugestões rejeitadas somem; as demais entram marcadas como
+ * confirmadas ou pendentes (validar). Dedup: sugestão que virou manual não repete.
+ */
+export function mergeConcorrentes(
+  sugeridos: ConcorrenteProspect[],
+  curadoria: CuradoriaConcorrentes,
+): ConcorrenteExibido[] {
+  const rej = new Set(curadoria.rejeitados.map(normNome));
+  const conf = new Set(curadoria.confirmados.map(normNome));
+  const manuaisNorm = new Set(curadoria.manuais.map((m) => normNome(m.nome)));
+
+  const out: ConcorrenteExibido[] = curadoria.manuais.map((m) => ({
+    nome: m.nome,
+    nota: m.nota ? pontoFato(m.nota, undefined, "você indicou") : pontoFato("indicado por você", undefined, "você indicou"),
+    origem: "manual",
+    estado: "manual",
+  }));
+
+  for (const s of sugeridos) {
+    const n = normNome(s.nome);
+    if (rej.has(n) || manuaisNorm.has(n)) continue; // rejeitado ou já virou manual
+    out.push({ ...s, origem: "sugerido", estado: conf.has(n) ? "confirmado" : "pendente" });
+  }
+  return out;
+}
+
 /** Sinal público recente do prospect (movimento com data + fonte). */
 export type SinalProspect = {
   titulo: string;
