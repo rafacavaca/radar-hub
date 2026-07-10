@@ -84,3 +84,38 @@ export async function addMember(input: {
   if (error) throw new Error(`Falha ao vincular o membro: ${error.message}`);
   return { email, role, tempPassword: temp };
 }
+
+// ── config do DIGEST por org (ritual F1: quem recebe o e-mail matinal) ──────
+// Vive em org_docs (kind "org-config", key "digest") — a mesma doc que o cron
+// lê DENTRO do contexto da org. Aqui é escrita de admin (org_id explícito).
+
+const CFG_KIND = "org-config";
+const CFG_KEY = "digest";
+
+/** Define (ou remove, com email vazio) o destinatário do digest de uma org. */
+export async function setOrgDigestEmail(orgId: string, email: string): Promise<{ emailTo: string | null }> {
+  const clean = (email ?? "").trim().toLowerCase();
+  if (clean && (!clean.includes("@") || clean.length < 6)) throw new Error("Informe um e-mail válido (ou vazio para desligar).");
+  const sb = adminClient();
+  const { data } = await sb
+    .from("org_docs").select("data").eq("org_id", orgId).eq("kind", CFG_KIND).eq("key", CFG_KEY).maybeSingle();
+  const atual = ((data as { data?: Record<string, unknown> } | null)?.data ?? {}) as Record<string, unknown>;
+  const nova = { ...atual, emailTo: clean || undefined };
+  const { error } = await sb.from("org_docs").upsert(
+    { org_id: orgId, kind: CFG_KIND, key: CFG_KEY, data: nova, updated_at: new Date().toISOString() },
+    { onConflict: "org_id,kind,key" },
+  );
+  if (error) throw new Error(`Falha ao gravar o e-mail do digest: ${error.message}`);
+  return { emailTo: clean || null };
+}
+
+/** Destinatário do digest por org (pro painel de admin exibir). */
+export async function listOrgDigestEmails(): Promise<Record<string, string>> {
+  const sb = adminClient();
+  const { data } = await sb.from("org_docs").select("org_id, data").eq("kind", CFG_KIND).eq("key", CFG_KEY);
+  const out: Record<string, string> = {};
+  for (const row of (data ?? []) as Array<{ org_id: string; data?: { emailTo?: string } }>) {
+    if (row.data?.emailTo) out[row.org_id] = row.data.emailTo;
+  }
+  return out;
+}

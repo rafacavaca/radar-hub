@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import { supabaseConfigured, supabaseEnabled } from "@/lib/db/supabase";
 import { runAsAdmin } from "@/lib/db/admin-client";
 import { isSuperAdmin } from "@/lib/db/session";
-import { listMembers, listOrgs } from "@/lib/db/admin-ops";
+import { listMembers, listOrgDigestEmails, listOrgs } from "@/lib/db/admin-ops";
 import { AdminView } from "@/components/admin-view";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +22,14 @@ export default async function AdminPage() {
   if (supabaseEnabled() && !(await isSuperAdmin())) redirect("/");
 
   const orgs = await runAsAdmin(async () => {
-    const base = await listOrgs();
-    return Promise.all(base.map(async (o) => ({ ...o, members: await listMembers(o.id) })));
+    const [base, digestEmails] = await Promise.all([listOrgs(), listOrgDigestEmails()]);
+    return Promise.all(
+      base.map(async (o) => ({
+        ...o,
+        members: await listMembers(o.id),
+        digestEmail: digestEmails[o.id] ?? "",
+      })),
+    );
   });
 
   return (

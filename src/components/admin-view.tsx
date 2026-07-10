@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type Member = { user_id: string; email: string; role: string };
-type Org = { id: string; slug: string; name: string; members: Member[] };
+type Org = { id: string; slug: string; name: string; members: Member[]; digestEmail?: string };
 
 async function post(body: Record<string, unknown>): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const res = await fetch("/api/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -44,6 +44,36 @@ function NovaOrg() {
         </button>
       </div>
       {erro ? <p className="mt-2 text-xs text-red-600">{erro}</p> : null}
+    </div>
+  );
+}
+
+function DigestEmail({ orgId, atual }: { orgId: string; atual: string }) {
+  const router = useRouter();
+  const [email, setEmail] = useState(atual);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
+  async function submit() {
+    setBusy(true); setMsg(null);
+    const r = await post({ action: "set-digest-email", orgId, email: email.trim() });
+    setBusy(false);
+    if (!r.ok) { setMsg({ tipo: "erro", texto: r.error ?? "falha" }); return; }
+    setMsg({ tipo: "ok", texto: email.trim() ? "Digest matinal vai pra este e-mail." : "E-mail do digest desligado." });
+    router.refresh();
+  }
+  return (
+    <div className="mt-3 border-t border-stone-100 pt-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Digest matinal por e-mail</p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <input
+          value={email} onChange={(e) => setEmail(e.target.value)} placeholder="quem-recebe@agencia.com (vazio = desligado)" type="email"
+          className="min-w-0 flex-1 rounded-lg border border-stone-300 px-3 py-1.5 text-sm outline-none focus:border-stone-500"
+        />
+        <button onClick={submit} disabled={busy} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50">
+          {busy ? "…" : "Salvar"}
+        </button>
+      </div>
+      {msg ? <p className={`mt-2 text-xs ${msg.tipo === "ok" ? "text-emerald-700" : "text-red-600"}`}>{msg.texto}</p> : null}
     </div>
   );
 }
@@ -116,6 +146,7 @@ export function AdminView({ orgs }: { orgs: Org[] }) {
               ))}
             </ul>
             <AddMembro orgId={org.id} />
+            <DigestEmail orgId={org.id} atual={org.digestEmail ?? ""} />
           </div>
         ))}
       </div>

@@ -1,17 +1,20 @@
 /**
- * E-MAIL DO DIGEST (ritual F1) — PLACEHOLDER opt-in, como combinado:
- * o disparo só acontece quando o Rafael configurar o provedor (SUA VEZ):
+ * E-MAIL DO DIGEST (ritual F1) — opt-in. Destinatário POR ORG:
  *
- *   RESEND_API_KEY          — chave do Resend (https://resend.com)
- *   RADAR_DIGEST_EMAIL_TO   — destinatário do digest matinal
- *   RADAR_DIGEST_EMAIL_FROM — remetente verificado (ex.: "Radar <radar@formare.tech>")
- *   RADAR_DIGEST_EMAIL_ORG  — slug da org cujo digest vai por e-mail (default "formare")
+ *  1. o configurado no /admin (org_docs kind "org-config" key "digest",
+ *     campo emailTo) — cada agência recebe o PRÓPRIO digest, nunca o de outra
+ *     (a leitura é org-scoped: roda dentro do contexto da org no cron);
+ *  2. fallback: RADAR_DIGEST_EMAIL_TO (env global) SÓ para a org designada
+ *     (RADAR_DIGEST_EMAIL_ORG, default "formare") — o e-mail do Rafael.
  *
- * SEGURANÇA multi-tenant: o destinatário é UM (env global) — por isso o envio é
- * TRAVADO à org designada; digest de outra org NUNCA sai pra esse e-mail.
- * Sem config -> "sem-config" (log honesto, zero efeito). O render é puro.
+ * Envs: RESEND_API_KEY (obrigatória pro disparo) · RADAR_DIGEST_EMAIL_FROM
+ * (remetente verificado; até verificar o domínio, o default de teste do Resend
+ * só entrega pro dono da conta). Sem chave -> "sem-config"; sem destinatário
+ * -> "sem-destinatario" (log honesto, zero efeito). O render é puro.
  */
 
+import { sbGetDoc } from "@/lib/db/repo-org-docs";
+import { supabaseEnabled } from "@/lib/db/supabase";
 import type { Digest, DigestItem } from "@/lib/digest";
 
 function esc(s: string): string {
@@ -63,18 +66,28 @@ export function renderDigestEmailHTML(digest: Digest, appUrl: string): string {
   </td></tr></table></body></html>`;
 }
 
-export type EnvioDigest = "enviado" | "sem-config" | "org-nao-designada" | `erro: ${string}`;
+export type EnvioDigest = "enviado" | "sem-config" | "sem-destinatario" | `erro: ${string}`;
 
 /**
- * Envia o digest por e-mail SE o provedor estiver configurado E a org for a
- * designada. Nunca lança — devolve o desfecho pro log do cron.
+ * Envia o digest por e-mail: destinatário da PRÓPRIA org (config do /admin) ou,
+ * na org designada, o fallback global. Nunca lança — devolve o desfecho pro log.
  */
 export async function maybeSendDigestEmail(digest: Digest, orgSlug: string): Promise<EnvioDigest> {
   const key = process.env.RESEND_API_KEY;
-  const to = process.env.RADAR_DIGEST_EMAIL_TO;
-  if (!key || !to) return "sem-config";
-  const designada = process.env.RADAR_DIGEST_EMAIL_ORG || "formare";
-  if (orgSlug !== designada) return "org-nao-designada";
+  if (!key) return "sem-config";
+
+  // 1º o destinatário configurado NA org (leitura org-scoped, dentro do contexto);
+  // 2º o fallback global, só pra org designada (o e-mail do dono).
+  let to: string | undefined;
+  if (supabaseEnabled()) {
+    const cfg = await sbGetDoc<{ emailTo?: string } | null>("org-config", "digest", null);
+    to = cfg?.emailTo || undefined;
+  }
+  if (!to) {
+    const designada = process.env.RADAR_DIGEST_EMAIL_ORG || "formare";
+    to = orgSlug === designada ? process.env.RADAR_DIGEST_EMAIL_TO : undefined;
+  }
+  if (!to) return "sem-destinatario";
 
   const from = process.env.RADAR_DIGEST_EMAIL_FROM || "Radar <onboarding@resend.dev>";
   const appUrl = process.env.RADAR_APP_URL || "https://radar.formare.tech";
