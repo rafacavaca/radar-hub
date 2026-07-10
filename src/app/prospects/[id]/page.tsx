@@ -7,12 +7,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { ConcorrentesEditor } from "@/components/prospects/concorrentes-editor";
 import { DossieActions } from "@/components/prospects/dossie-actions";
-import { DossieView } from "@/components/prospects/dossie-view";
+import { DossieFrame } from "@/components/prospects/dossie-frame";
 import { ProspectLifecycle } from "@/components/prospects/prospect-lifecycle";
 import { formatDateTimePtBR } from "@/lib/format";
 import { getProspect, loadCuradoria, loadDossie } from "@/lib/prospects/store";
 import { mergeConcorrentes } from "@/lib/prospects/schema";
+import { dossieToHtml } from "@/lib/prospects/pdf-template";
 import { loadWatchlist } from "@/lib/watchlist";
 
 export const dynamic = "force-dynamic";
@@ -74,9 +76,19 @@ export default async function DossiePage({
 
       <div className="mt-6">
         {dossie ? (
-          // concorrentes vão MESCLADOS (curadoria aplicada); zeramos os brutos no
-          // objeto passado ao cliente pra uma sugestão DESCARTADA nem chegar ao browser.
-          <DossieView dossie={{ ...dossie, concorrentes: [] }} cliente={cliente} prospectId={id} concorrentes={concorrentes} />
+          <>
+            {/* TELA = PDF: o MESMO HTML (com a curadoria aplicada) num iframe isolado. */}
+            <DossieFrame html={dossieToHtml(dossie, prospect, concorrentes)} />
+            {/* curadoria de concorrentes (gaveta) — reflete no dossiê e no PDF ao salvar. */}
+            <details className="mt-4 rounded-lg border border-stone-200 bg-white">
+              <summary className="cursor-pointer px-4 py-2.5 text-[13px] font-medium text-stone-600 hover:text-stone-900">
+                ⚙ Curar concorrentes — indicar / validar (reflete no dossiê e no PDF)
+              </summary>
+              <div className="border-t border-stone-100 px-4 py-3.5">
+                <ConcorrentesEditor cliente={cliente} id={id} concorrentes={concorrentes} />
+              </div>
+            </details>
+          </>
         ) : (
           <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
             <p className="text-base font-medium text-stone-700">Dossiê ainda não gerado.</p>

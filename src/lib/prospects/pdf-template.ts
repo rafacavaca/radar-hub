@@ -1,21 +1,19 @@
 /**
- * TEMPLATE HTML/CSS do dossiê (F2 redesign) — o documento PREMIUM que o Chrome
- * headless imprime em PDF. Design system fiel: Archivo, papel quente #F6F4EF,
- * vermelho radar #B8443C de acento; SVG vetorial pros gráficos.
+ * TEMPLATE ÚNICO do dossiê (fiel à referência do Rafael) — o MESMO HTML serve a
+ * TELA (injetado) e o PDF (impresso pelo Chrome headless). Design system: Archivo,
+ * papel #F6F4EF, vermelho #B8443C de acento; hierarquia/tamanhos idênticos à ref.
  *
- * HONESTIDADE ELEGANTE: [fato]/[inferência]/[não encontrado] viram SELOS
- * discretos; fontes viram refs pequenas; sem dado é dito com classe. Beleza não
- * apaga proveniência — o vendedor repete isto na reunião.
+ * HONESTIDADE: selos [fato]/[inferência]/[validar] discretos + fonte em tudo
+ * (inclusive a faixa firmográfica, puxada de dados reais). Gráfico só com dado
+ * real: gauge de encaixe derivado; nada fabricado.
  *
- * Gráfico só com DADO REAL: o gauge de encaixe é derivado (marcado); a timeline
- * de sinais é vertical (não fabrica posição por data quando a data falta);
- * comparativo de concorrentes NÃO é forçado (prospect não tem métrica) — vira
- * lista curada e honesta.
+ * `@media print` tira o "sheet" (sombra/cantos) e o papel sangra o A4; o rodapé
+ * corrido (paginação) vem do puppeteer. Responsivo pra ler bem no celular.
  */
 
 import { formatDateShort, formatDateTimePtBR } from "@/lib/format";
-import { gaugeEncaixeSvg, nivelEncaixe } from "@/lib/prospects/svg";
-import { NATUREZA_LABEL, type ConcorrenteExibido, type Dossie, type Natureza, type Ponto, type Prospect } from "@/lib/prospects/schema";
+import { nivelEncaixe } from "@/lib/prospects/svg";
+import { type ConcorrenteExibido, type Dossie, type Natureza, type Prospect, type StatFirmo } from "@/lib/prospects/schema";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -27,228 +25,230 @@ function host(url: string): string {
     return url;
   }
 }
-function selo(nat: Natureza): string {
-  const cls = nat === "fato" ? "s-fato" : nat === "inferencia" ? "s-inf" : "s-ne";
-  return `<span class="selo ${cls}">${NATUREZA_LABEL[nat]}</span>`;
-}
-function src(url?: string, titulo?: string): string {
+function srcLink(url?: string, titulo?: string): string {
   if (!url) return "";
   return `<a class="src" href="${esc(url)}">${esc(titulo || host(url))}</a>`;
 }
-/** linha de ponto: texto + selo + fonte. */
-function pontoLinha(p: Ponto): string {
-  return `<div class="pl">${esc(p.texto)} ${selo(p.natureza)} ${src(p.fonte_url, p.fonte_titulo)}</div>`;
+function badge(nat: Natureza): string {
+  const cls = nat === "fato" ? "b-fato" : nat === "inferencia" ? "b-inf" : "b-ne";
+  const txt = nat === "fato" ? "fato" : nat === "inferencia" ? "inferência" : "não encontrado";
+  return `<span class="b ${cls}">${txt}</span>`;
 }
 
-const COR_TIPO: Record<string, string> = {
-  expansão: "#1f8a4c",
-  contratação: "#2a6fdb",
-  produto: "#7a5cc0",
-  rodada: "#c07a12",
-  parceria: "#3a9db0",
-  notícia: "#8c8578",
-};
+/** gauge semicircular idêntico à ref (viewBox 180×104, r76), preenchido por pct. */
+function gaugeSvg(pct: number, cor: string, mostra: boolean): string {
+  const f = Math.max(0, Math.min(1, pct / 100));
+  const x = (90 - 76 * Math.cos(Math.PI * f)).toFixed(1);
+  const y = (100 - 76 * Math.sin(Math.PI * f)).toFixed(1);
+  const grande = f > 0.5 ? 1 : 0;
+  return `<svg viewBox="0 0 180 104" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 100 A76 76 0 0 1 166 100" fill="none" stroke="#e6e1d8" stroke-width="16" stroke-linecap="round"/>
+    ${mostra ? `<path d="M14 100 A76 76 0 ${grande} 1 ${x} ${y}" fill="none" stroke="${cor}" stroke-width="16" stroke-linecap="round"/>` : ""}
+  </svg>`;
+}
 
-const RADAR_MARK = `<svg viewBox="0 0 40 40" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="17" fill="none" stroke="#B8443C" stroke-width="1.5" opacity="0.35"/><circle cx="20" cy="20" r="10" fill="none" stroke="#B8443C" stroke-width="1.5" opacity="0.55"/><circle cx="20" cy="20" r="3.5" fill="#B8443C"/><line x1="20" y1="20" x2="34" y2="9" stroke="#B8443C" stroke-width="1.5"/></svg>`;
+const TIPO_CLS: Record<string, string> = { expansão: "exp", parceria: "par", produto: "pro", contratação: "par", rodada: "pro", notícia: "pro" };
+const NIVEL_COR: Record<string, string> = { forte: "#3f7d52", médio: "#b98328", fraco: "#a9a196", "sem dado": "#a9a196" };
+
+/** produto "Nome — descrição" → {nome, desc, b2b}. */
+function splitProduto(texto: string): { nome: string; desc: string; b2b: boolean } {
+  const i = texto.indexOf(" — ");
+  const nome = i >= 0 ? texto.slice(0, i) : texto;
+  const desc = i >= 0 ? texto.slice(i + 3) : "";
+  return { nome, desc, b2b: /\b(PRO|Hospitality|B2B)\b/i.test(nome) };
+}
 
 export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: ConcorrenteExibido[]): string {
   const d = dossie;
   const nv = nivelEncaixe(d.encaixe);
-  const sinalQuente = d.sinais[0];
-  const meta = [prospect.reuniaoEm ? `Reunião: ${formatDateTimePtBR(prospect.reuniaoEm)}` : "", prospect.contato ? `Contato: ${esc(prospect.contato)}` : ""].filter(Boolean).join(" · ");
+  const cor = NIVEL_COR[nv.nivel];
+  const quente = d.sinais[0];
+  const firmo = d.perfil.firmografia ?? [];
 
-  // ── snapshot executivo ──
-  const snapshot = `
-  <section class="snap">
-    <div class="snap-l">
-      <div class="snap-row"><span class="snap-k">Perfil</span><span>${esc(d.perfil.resumo.texto)}</span></div>
-      ${sinalQuente ? `<div class="snap-row"><span class="snap-k">Sinal quente</span><span>${esc(sinalQuente.titulo)} ${src(sinalQuente.fonte_url, sinalQuente.fonte_titulo)}</span></div>` : ""}
-      ${d.encaixe.angulo ? `<div class="snap-row"><span class="snap-k">Ângulo</span><span class="snap-ang">${esc(d.encaixe.angulo.texto)}</span></div>` : ""}
-    </div>
-    <div class="snap-r">
-      ${gaugeEncaixeSvg(nv)}
-      <div class="gauge-cap">encaixe <span class="selo s-inf">derivado</span></div>
-      <div class="gauge-note">${esc(nv.nota)}</div>
-    </div>
-  </section>`;
+  const meta = [
+    prospect.reuniaoEm ? `Reunião: <b>${esc(formatDateTimePtBR(prospect.reuniaoEm))}</b>` : "",
+    prospect.contato ? `Contato: <b>${esc(prospect.contato)}</b>` : "",
+    `Gerado ${esc(formatDateTimePtBR(d.geradoEm))}`,
+  ].filter(Boolean).join("<br>");
 
-  // ── perfil ──
-  const stats = [
-    d.perfil.produtos.length ? `<div class="stat"><b>${d.perfil.produtos.length}</b><span>soluções</span></div>` : "",
-    d.perfil.paginas_lidas.length ? `<div class="stat"><b>${d.perfil.paginas_lidas.length}</b><span>páginas lidas</span></div>` : "",
-    d.perfil.porte?.texto ? `<div class="stat stat-w"><b>Porte</b><span>${esc(d.perfil.porte.texto)}</span></div>` : "",
-  ].filter(Boolean).join("");
-  const perfil = `
-  <section class="card">
-    <h2>Perfil da empresa</h2>
-    <p class="lead">${esc(d.perfil.resumo.texto)} ${selo(d.perfil.resumo.natureza)} ${src(d.perfil.resumo.fonte_url)}</p>
-    ${d.perfil.tagline?.texto ? `<p class="tagline">“${esc(d.perfil.tagline.texto)}”</p>` : ""}
-    ${stats ? `<div class="stats">${stats}</div>` : ""}
-    ${d.perfil.produtos.length ? `<div class="chips">${d.perfil.produtos.map((p) => `<span class="chip">${esc(p.texto)}</span>`).join("")}</div>` : ""}
-  </section>`;
-
-  // ── sinais (timeline vertical — honesta com/sem data) ──
-  const sinais = d.sinais.length
-    ? `<section class="card">
-        <h2>Sinais recentes <span class="cnt">${d.sinais.length}</span></h2>
-        <div class="tl">
-          ${d.sinais.map((s) => `
-            <div class="tl-item">
-              <span class="tl-dot" style="background:${COR_TIPO[s.tipo] ?? "#8c8578"}"></span>
-              <div class="tl-body">
-                <div class="tl-title">${esc(s.titulo)}</div>
-                <div class="tl-meta"><span class="tipo" style="color:${COR_TIPO[s.tipo] ?? "#8c8578"}">${esc(s.tipo)}</span>${s.data ? ` · ${formatDateShort(s.data)}` : ""} ${src(s.fonte_url, s.fonte_titulo)}</div>
-              </div>
-            </div>`).join("")}
-        </div>
-      </section>`
-    : `<section class="card"><h2>Sinais recentes</h2><p class="empty">Sem movimentos públicos recentes encontrados — sem dado, sem invenção.</p></section>`;
-
-  // ── concorrentes (curados — sem gráfico: prospect não tem métrica comparável) ──
-  const concHtml = concorrentes.length
-    ? `<section class="card">
-        <h2>Concorrentes dela <span class="cnt">${concorrentes.length}</span></h2>
-        <div class="conc">
-          ${concorrentes.map((c) => {
-            const badge = c.origem === "manual" ? `<span class="cb cb-man">você indicou</span>` : c.estado === "confirmado" ? `<span class="cb cb-ok">confirmado</span>` : `<span class="cb cb-val">validar</span>`;
-            return `<div class="conc-item"><div class="conc-h">${esc(c.nome)} ${badge}</div><div class="conc-n">${esc(c.nota.texto)} ${src(c.nota.fonte_url, c.nota.fonte_titulo)}</div></div>`;
-          }).join("")}
-        </div>
-        <p class="micro">Concorrentes de prospect vêm de busca (inferência) ou da sua indicação — sem métrica pública comparável, não forçamos um gráfico.</p>
-      </section>`
+  // ── faixa firmográfica (só com dado real; some se vazio) ──
+  const stats = firmo.length
+    ? `<div class="stats">${firmo.map((s: StatFirmo) => `
+        <div class="stat"><div class="n">${esc(s.valor)}</div><div class="l">${esc(s.label)}${s.natureza === "inferencia" ? ` <span class="inf">inf</span>` : ""}${s.fonte_url ? ` · ${srcLink(s.fonte_url)}` : ""}</div></div>`).join("")}</div>`
     : "";
 
-  // ── como nós encaixamos (seção-ouro) ──
-  const encaixe = `
-  <section class="card gold">
-    <h2 class="gold-h">Como nós encaixamos <span class="selo ${d.encaixe.brain_mode === "live" ? "s-fato" : "s-inf"}">${d.encaixe.brain_mode === "live" ? "Brain real" : d.encaixe.brain_mode === "fixture" ? "Brain rascunho" : "sem Brain"}</span></h2>
-    ${d.encaixe.angulo ? `<div class="ang"><span class="ang-k">Ângulo de abertura</span><p>${esc(d.encaixe.angulo.texto)}</p></div>` : ""}
-    ${d.encaixe.dores.length || d.encaixe.ganchos.length ? `
-      <div class="two">
-        <div class="two-col">
-          <div class="two-k dor-k">Dores prováveis</div>
-          ${d.encaixe.dores.length ? d.encaixe.dores.map((p) => `<div class="two-item dor">${esc(p.texto)}</div>`).join("") : `<div class="empty">— nenhuma dor clara mapeada</div>`}
-        </div>
-        <div class="two-col">
-          <div class="two-k gan-k">Como resolvemos</div>
-          ${d.encaixe.ganchos.length ? d.encaixe.ganchos.map((p) => `<div class="two-item gan">${esc(p.texto)}</div>`).join("") : `<div class="empty">— sem gancho da nossa oferta</div>`}
-        </div>
-      </div>` : `<p class="empty">Sem encaixe mapeado ${d.encaixe.brain_mode === "none" ? "— este cliente não tem Brain no Formare." : "— nada claro cruzou com a nossa oferta."}</p>`}
-  </section>`;
+  // ── perfil & portfólio ──
+  const sols = d.perfil.produtos.length
+    ? `<div class="sols">${d.perfil.produtos.map((p) => {
+        const { nome, desc, b2b } = splitProduto(p.texto);
+        return `<div class="solitem"><b>${esc(nome)}</b>${b2b ? `<span class="b2b">B2B</span>` : ""}${desc ? ` — ${esc(desc)}` : ""} ${srcLink(p.fonte_url)}</div>`;
+      }).join("")}</div>`
+    : "";
+
+  // ── concorrentes (curados) ──
+  const compBadge = (c: ConcorrenteExibido) =>
+    c.origem === "manual" ? `<span class="b b-man">você indicou</span>` : c.estado === "confirmado" ? `<span class="b b-ok">confirmado</span>` : `<span class="b b-val">validar</span>`;
+  const concSec = concorrentes.length
+    ? `<div class="sec">
+        <div class="sectitle">Concorrentes dela <span class="cnt">${concorrentes.length}</span></div>
+        <div class="comps">${concorrentes.map((c) => `<div class="comp"><span class="nm">${esc(c.nome)}</span> ${compBadge(c)}<br>${esc(c.nota.texto)} · ${srcLink(c.nota.fonte_url, c.nota.fonte_titulo)}</div>`).join("")}</div>
+        <div class="note">Concorrentes do prospect vêm de busca (inferência) ou da sua indicação — sem métrica pública comparável, não forçamos um gráfico. Valide os certos, descarte o ruído.</div>
+      </div>`
+    : "";
+
+  // ── sinais (timeline) ──
+  const sinaisSec = d.sinais.length
+    ? `<div class="sec">
+        <div class="sectitle">Sinais recentes <span class="cnt">${d.sinais.length}</span></div>
+        <div class="tl">${d.sinais.map((s) => {
+          const cls = TIPO_CLS[s.tipo] ?? "pro";
+          return `<div class="titem"><span class="d c-${cls}"></span><h4>${esc(s.titulo)}</h4><div class="sub"><span class="tag t-${cls}">${esc(s.tipo.toUpperCase())}</span>${s.data ? `${esc(formatDateShort(s.data))} · ` : ""}${srcLink(s.fonte_url, s.fonte_titulo)}</div></div>`;
+        }).join("")}</div>
+      </div>`
+    : `<div class="sec"><div class="sectitle">Sinais recentes</div><div class="empty">Sem movimentos públicos recentes encontrados — sem dado, sem invenção.</div></div>`;
+
+  // ── como nós encaixamos (ângulo já no herói; aqui só dor → resolve) ──
+  const brainTag = d.encaixe.brain_mode === "live" ? "BRAIN REAL" : d.encaixe.brain_mode === "fixture" ? "BRAIN RASCUNHO" : "SEM BRAIN";
+  const encaixeSec = `<div class="sec">
+    <div class="sectitle">Como nós encaixamos <span class="brainbadge">${brainTag}</span></div>
+    ${d.encaixe.dores.length || d.encaixe.ganchos.length ? `<div class="fit">
+      <div class="fitcol"><h5>DORES PROVÁVEIS</h5>${(d.encaixe.dores.length ? d.encaixe.dores.map((p) => `<div class="fitrow">${esc(p.texto)}</div>`) : [`<div class="empty">— nenhuma dor clara mapeada</div>`]).join("")}</div>
+      <div class="fitcol"><h5>COMO A ${esc(d.clientName.toUpperCase())} RESOLVE</h5>${(d.encaixe.ganchos.length ? d.encaixe.ganchos.map((p) => `<div class="sol">${esc(p.texto)}</div>`) : [`<div class="empty">— sem gancho da nossa oferta</div>`]).join("")}</div>
+    </div>` : `<div class="empty">Sem encaixe mapeado ${d.encaixe.brain_mode === "none" ? "— este cliente não tem Brain no Formare." : "— nada claro cruzou com a nossa oferta."}</div>`}
+  </div>`;
 
   // ── munição ──
-  const municao = (d.municao.perguntas.length || d.municao.objecoes.length)
-    ? `<section class="card">
-        <h2>Munição de reunião</h2>
-        ${d.municao.perguntas.length ? `<div class="mk">Perguntas pra fazer</div><ol class="perg">${d.municao.perguntas.map((p) => `<li>${esc(p.texto)}</li>`).join("")}</ol>` : ""}
-        ${d.municao.objecoes.length ? `<div class="mk">Objeções prováveis &amp; resposta</div><div class="objs">${d.municao.objecoes.map((o) => `<div class="obj"><div class="obj-q">“${esc(o.objecao)}”</div><div class="obj-a">→ ${esc(o.resposta)}</div></div>`).join("")}</div>` : ""}
-      </section>`
+  const municaoSec = (d.municao.perguntas.length || d.municao.objecoes.length)
+    ? `<div class="sec">
+        <div class="sectitle">Munição de reunião</div>
+        <div class="muni">
+          <div><h5>PERGUNTAS PRA FAZER</h5><ul>${d.municao.perguntas.slice(0, 4).map((p) => `<li class="q">${esc(p.texto)}</li>`).join("")}</ul></div>
+          <div><h5>OBJEÇÕES PROVÁVEIS &amp; RESPOSTA</h5><ul>${d.municao.objecoes.map((o) => `<li class="o"><b>“${esc(o.objecao)}”</b> — ${esc(o.resposta)}</li>`).join("")}</ul></div>
+        </div>
+      </div>`
     : "";
 
-  const obs = d.observacoes.length ? `<section class="card obs"><div class="mk">Transparência da base</div>${d.observacoes.map((o) => `<div class="obs-l">· ${esc(o)}</div>`).join("")}</section>` : "";
+  const obsSec = d.observacoes.length ? `<div class="sec"><div class="sectitle">Transparência da base</div>${d.observacoes.map((o) => `<div class="note" style="font-style:normal">· ${esc(o)}</div>`).join("")}</div>` : "";
 
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<base target="_blank">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  @page { size: A4; }
-  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  html, body { margin: 0; padding: 0; background: #F6F4EF; color: #14130f; font-family: Archivo, "Helvetica Neue", Arial, sans-serif; font-size: 10.5px; line-height: 1.5; }
-  .page { padding: 26px 34px 20px; }
-  a { color: inherit; text-decoration: none; }
-  h2 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: #8c8578; margin: 0 0 8px; }
-  .cnt { display: inline-block; background: #ece7dd; color: #8c8578; border-radius: 8px; padding: 0 6px; font-size: 9px; vertical-align: middle; }
-  /* selos de honestidade */
-  .selo { display: inline-block; border-radius: 8px; padding: 1px 6px; font-size: 8px; font-weight: 700; vertical-align: middle; }
-  .s-fato { background: #e7effb; color: #2a6fdb; } .s-inf { background: #f6ecd8; color: #c07a12; } .s-ne { background: #ece7dd; color: #8c8578; }
-  .src { font-size: 8.5px; color: #a89f8e; border-bottom: 1px dotted #cfc7b8; }
-  /* cabeçalho */
-  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #14130f; padding-bottom: 12px; margin-bottom: 14px; }
-  .brand { display: flex; align-items: center; gap: 8px; }
-  .brand b { font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
-  .kicker { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #B8443C; }
-  .pname { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; margin: 2px 0 0; }
-  .psite { font-size: 10px; color: #8c8578; }
-  .pmeta { font-size: 9px; color: #8c8578; text-align: right; }
-  /* snapshot */
-  .snap { display: flex; gap: 14px; background: #fff; border: 1px solid #e7e2d8; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; break-inside: avoid; }
-  .snap-l { flex: 1; }
-  .snap-row { display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid #f0ece3; }
-  .snap-row:last-child { border-bottom: 0; }
-  .snap-k { flex: 0 0 74px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #B8443C; padding-top: 1px; }
-  .snap-ang { font-weight: 600; }
-  .snap-r { flex: 0 0 168px; text-align: center; border-left: 1px solid #f0ece3; padding-left: 12px; }
-  .gauge-cap { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #8c8578; margin-top: -6px; }
-  .gauge-note { font-size: 8px; color: #a89f8e; margin-top: 2px; }
-  /* cards */
-  .card { background: #fff; border: 1px solid #e7e2d8; border-radius: 12px; padding: 13px 16px; margin-bottom: 12px; break-inside: avoid; }
-  .lead { font-size: 11.5px; margin: 0 0 6px; }
-  .tagline { border-left: 2px solid #e7e2d8; padding-left: 8px; color: #8c8578; font-style: italic; margin: 6px 0; }
-  .pl { padding: 2px 0; }
-  .stats { display: flex; gap: 18px; margin: 8px 0; }
-  .stat { display: flex; flex-direction: column; } .stat b { font-size: 16px; font-weight: 800; } .stat span { font-size: 8.5px; color: #8c8578; text-transform: uppercase; letter-spacing: .05em; }
-  .stat-w b { font-size: 9px; color: #B8443C; } .stat-w span { text-transform: none; letter-spacing: 0; color: #3a362e; }
-  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-  .chip { border: 1px solid #e7e2d8; background: #faf8f3; border-radius: 20px; padding: 3px 9px; font-size: 9.5px; }
-  /* timeline */
-  .tl { position: relative; padding-left: 4px; }
-  .tl-item { position: relative; padding: 0 0 10px 18px; border-left: 2px solid #e7e2d8; margin-left: 4px; }
-  .tl-item:last-child { border-left-color: transparent; padding-bottom: 0; }
-  .tl-dot { position: absolute; left: -6px; top: 2px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #F6F4EF; }
-  .tl-title { font-weight: 600; }
-  .tl-meta { font-size: 8.5px; color: #a89f8e; margin-top: 1px; }
-  .tl-meta .tipo { text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
-  /* concorrentes */
-  .conc { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
-  .conc-item { padding: 5px 0; }
-  .conc-h { font-weight: 700; }
-  .conc-n { font-size: 9px; color: #6b6559; }
-  .cb { display: inline-block; border-radius: 8px; padding: 0 5px; font-size: 7.5px; font-weight: 700; vertical-align: middle; }
-  .cb-man { background: #14130f; color: #fff; } .cb-ok { background: #e6f3ec; color: #1f8a4c; } .cb-val { background: #f6ecd8; color: #c07a12; }
-  .micro { font-size: 8px; color: #a89f8e; margin: 8px 0 0; }
-  /* encaixe (ouro) */
-  .gold { border-color: #edc9c5; background: linear-gradient(180deg, #fbf1f0 0%, #fff 42%); }
-  .gold-h { color: #B8443C; }
-  .ang { background: #fff; border-left: 3px solid #B8443C; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
-  .ang-k { font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #B8443C; }
-  .ang p { font-size: 12px; font-weight: 600; margin: 3px 0 0; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .two-k { font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
-  .dor-k { color: #a0526d; } .gan-k { color: #1f8a4c; }
-  .two-item { font-size: 9.5px; padding: 6px 9px; border-radius: 7px; margin-bottom: 5px; }
-  .two-item.dor { background: #fbf0f3; } .two-item.gan { background: #eef6f0; }
-  /* munição */
-  .mk { font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #8c8578; margin: 8px 0 5px; }
-  .perg { margin: 0; padding-left: 18px; } .perg li { padding: 2px 0; }
-  .objs { display: grid; gap: 5px; }
-  .obj { border: 1px solid #e7e2d8; border-radius: 8px; padding: 6px 10px; }
-  .obj-q { font-style: italic; color: #8c8578; } .obj-a { margin-top: 1px; }
-  .empty { color: #a89f8e; font-size: 9.5px; }
-  .obs { background: #f0ece3; }
-  .obs-l { font-size: 8.5px; color: #8c8578; }
+  :root{ --paper:#F6F4EF; --ink:#221f1a; --muted:#726b62; --faint:#a9a196; --red:#B8443C; --line:#e6e1d8; --green:#3f7d52; --amber:#b98328; --blue:#3b6ea5; }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ background:#e9e5dd; font-family:'Archivo',system-ui,sans-serif; color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; padding:32px 16px; }
+  .sheet{ max-width:860px; margin:0 auto; background:var(--paper); border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.10); overflow:hidden; }
+  a{ color:inherit; }
+  .topbar{ display:flex; justify-content:space-between; align-items:flex-start; padding:22px 52px; border-bottom:1px solid var(--line); }
+  .brand{ display:flex; align-items:center; gap:9px; font-weight:700; letter-spacing:.3px; }
+  .brand .dot{ width:12px; height:12px; border-radius:50%; background:var(--red); }
+  .brand .kicker{ font-size:12px; letter-spacing:2px; color:var(--muted); font-weight:600; margin-left:6px; }
+  .meta{ text-align:right; font-size:13px; color:var(--muted); line-height:1.7; }
+  .meta b{ color:var(--ink); font-weight:600; }
+  .hero{ display:grid; grid-template-columns:1fr 200px; gap:34px; align-items:center; padding:40px 52px 34px; }
+  .company{ font-size:40px; font-weight:800; letter-spacing:-.5px; line-height:1.05; }
+  .site{ font-size:14px; color:var(--muted); margin-top:4px; }
+  .hotlabel{ display:inline-block; font-size:12px; font-weight:700; letter-spacing:1.5px; color:var(--red); margin:22px 0 8px; }
+  .headline{ font-size:25px; font-weight:700; letter-spacing:-.3px; line-height:1.25; }
+  .angle{ font-size:16px; color:#3c372f; margin-top:14px; max-width:52ch; }
+  .angle b{ font-weight:700; }
+  .gauge{ text-align:center; }
+  .gauge svg{ width:180px; height:104px; display:block; margin:0 auto; }
+  .gauge .val{ font-size:22px; font-weight:800; letter-spacing:.5px; margin-top:-8px; }
+  .gauge .cap{ font-size:12px; color:var(--muted); margin-top:3px; }
+  .gauge .cap b{ color:var(--ink); }
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .stat{ background:var(--paper); padding:16px 20px; }
+  .stat .n{ font-size:22px; font-weight:800; letter-spacing:-.3px; }
+  .stat .l{ font-size:12px; color:var(--muted); letter-spacing:.4px; margin-top:2px; }
+  .stat .inf{ background:#faf1df; color:var(--amber); font-size:9px; font-weight:700; padding:0 4px; border-radius:3px; }
+  .sec{ padding:28px 52px; }
+  .sec + .sec{ border-top:1px solid var(--line); }
+  .sectitle{ font-size:13px; font-weight:700; letter-spacing:1.8px; color:var(--muted); text-transform:uppercase; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+  .sectitle .cnt{ background:#efeae1; color:var(--muted); font-size:12px; font-weight:700; border-radius:20px; padding:1px 9px; }
+  .sectitle .brainbadge{ margin-left:auto; background:#e7f0e9; color:var(--green); font-size:11px; font-weight:700; letter-spacing:.5px; padding:3px 10px; border-radius:20px; }
+  .lead{ font-size:15px; color:#3c372f; margin-bottom:16px; }
+  .sols{ display:grid; grid-template-columns:1fr 1fr; gap:10px 22px; }
+  .solitem{ font-size:14.5px; line-height:1.45; }
+  .solitem .b2b{ font-size:10.5px; font-weight:700; color:var(--blue); letter-spacing:.5px; margin-left:5px; }
+  .comps{ display:grid; grid-template-columns:1fr 1fr; gap:14px 22px; }
+  .comp{ font-size:14.5px; line-height:1.45; } .comp .nm{ font-weight:700; }
+  .note{ font-size:12.5px; color:var(--faint); margin-top:14px; font-style:italic; }
+  .tl{ position:relative; padding-left:26px; }
+  .tl:before{ content:""; position:absolute; left:6px; top:6px; bottom:6px; width:2px; background:var(--line); }
+  .titem{ position:relative; margin-bottom:18px; } .titem:last-child{ margin-bottom:0; }
+  .titem .d{ position:absolute; left:-26px; top:4px; width:12px; height:12px; border-radius:50%; border:2px solid var(--paper); }
+  .titem h4{ font-size:16.5px; font-weight:600; line-height:1.35; }
+  .titem .sub{ font-size:13px; color:var(--muted); margin-top:2px; }
+  .tag{ font-size:11px; font-weight:700; letter-spacing:.8px; margin-right:8px; }
+  .src{ color:var(--red); text-decoration:none; }
+  .c-exp{ background:var(--green); } .t-exp{ color:var(--green); }
+  .c-par{ background:var(--blue); } .t-par{ color:var(--blue); }
+  .c-pro{ background:var(--amber); } .t-pro{ color:var(--amber); }
+  .fit{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .fitcol h5{ font-size:12px; font-weight:700; letter-spacing:1px; color:var(--muted); margin-bottom:10px; }
+  .fitrow{ font-size:14.5px; line-height:1.5; margin-bottom:12px; padding-left:16px; position:relative; }
+  .fitrow:before{ content:""; position:absolute; left:0; top:9px; width:6px; height:6px; border-radius:50%; background:var(--faint); }
+  .sol{ background:#f2f7f3; border-radius:6px; padding:11px 13px; margin-bottom:10px; font-size:14.5px; line-height:1.5; }
+  .muni{ display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+  .muni h5{ font-size:12px; font-weight:700; letter-spacing:1px; color:var(--muted); margin-bottom:12px; }
+  .muni ul{ list-style:none; }
+  .muni li{ font-size:14.5px; line-height:1.5; margin-bottom:11px; padding-left:18px; position:relative; }
+  .muni .q:before{ content:"?"; position:absolute; left:0; color:var(--red); font-weight:800; }
+  .muni .o:before{ content:"!"; position:absolute; left:2px; color:var(--amber); font-weight:800; }
+  .b{ font-size:10.5px; font-weight:700; letter-spacing:.5px; padding:2px 7px; border-radius:4px; vertical-align:middle; margin-left:7px; }
+  .b-fato{ background:#eef0ee; color:#5a6b5c; } .b-inf{ background:#faf1df; color:var(--amber); } .b-ne{ background:#efeae1; color:var(--muted); }
+  .b-val{ background:#faf1df; color:var(--amber); font-size:10px; padding:1px 6px; }
+  .b-ok{ background:#e7f0e9; color:var(--green); font-size:10px; padding:1px 6px; }
+  .b-man{ background:#221f1a; color:#fff; font-size:10px; padding:1px 6px; }
+  .empty{ font-size:14px; color:var(--faint); }
+  .foot{ padding:16px 52px; border-top:1px solid var(--line); display:flex; justify-content:space-between; font-size:12px; color:var(--faint); }
+  @media (max-width:640px){
+    body{ padding:0; } .sheet{ border-radius:0; box-shadow:none; }
+    .topbar,.hero,.sec,.foot{ padding-left:20px; padding-right:20px; }
+    .hero{ grid-template-columns:1fr; gap:18px; } .company{ font-size:32px; } .headline{ font-size:21px; }
+    .stats{ grid-template-columns:1fr 1fr; } .sols,.comps,.fit,.muni{ grid-template-columns:1fr; gap:12px; }
+  }
+  @media print{
+    body{ background:var(--paper); padding:0; } .sheet{ max-width:none; border-radius:0; box-shadow:none; }
+    .foot{ display:none; } .sec,.hero,.snap{ break-inside:avoid; }
+    @page{ size:A4; margin:0; }
+  }
 </style></head>
-<body><div class="page">
-  <div class="head">
+<body><div class="sheet">
+  <div class="topbar"><div class="brand"><span class="dot"></span>Radar <span class="kicker">DOSSIÊ DE PROSPECT</span></div><div class="meta">${meta}</div></div>
+  <div class="hero">
     <div>
-      <div class="brand">${RADAR_MARK}<b>Radar</b><span class="kicker">Dossiê de Prospect</span></div>
-      <div class="pname">${esc(d.nome)}</div>
-      <div class="psite">${esc(d.siteUrl.replace(/^https?:\/\//, ""))}</div>
+      <div class="company">${esc(d.nome)}</div>
+      <div class="site">${esc(d.siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</div>
+      ${quente ? `<div class="hotlabel">▲ SINAL MAIS QUENTE</div><div class="headline">${esc(quente.titulo)}</div>` : ""}
+      ${d.encaixe.angulo ? `<p class="angle"><b>Seu ângulo:</b> ${esc(d.encaixe.angulo.texto)}</p>` : ""}
     </div>
-    <div class="pmeta">${meta ? esc(meta).replace(/ · /g, "<br>") : ""}${meta ? "<br>" : ""}gerado ${formatDateTimePtBR(d.geradoEm)}</div>
+    <div class="gauge">
+      ${gaugeSvg(nv.pct, cor, nv.nivel !== "sem dado")}
+      <div class="val" style="color:${cor}">${nv.nivel === "sem dado" ? "SEM DADO" : `ENCAIXE ${nv.nivel.toUpperCase()}`}</div>
+      <div class="cap"><b>${d.encaixe.brain_mode === "live" ? "Brain real" : d.encaixe.brain_mode === "fixture" ? "Brain rascunho" : "sem Brain"}</b>${nv.nivel !== "sem dado" ? ` · ${esc(nv.nota.replace(/^.*?, /, ""))}` : ""}</div>
+    </div>
   </div>
-  ${snapshot}
-  ${perfil}
-  ${sinais}
-  ${concHtml}
-  ${encaixe}
-  ${municao}
-  ${obs}
+  ${stats}
+  <div class="sec">
+    <div class="sectitle">Perfil &amp; portfólio ${badge(d.perfil.resumo.natureza)}</div>
+    <div class="lead">${esc(d.perfil.resumo.texto)} ${srcLink(d.perfil.resumo.fonte_url)}</div>
+    ${sols}
+  </div>
+  ${concSec}
+  ${sinaisSec}
+  ${encaixeSec}
+  ${municaoSec}
+  ${obsSec}
+  <div class="foot"><span>Radar · Dossiê de Prospect — fonte e data em cada insight</span><span>${esc(d.nome)}</span></div>
 </div></body></html>`;
 }
 
-/** rodapé corrido (paginação + nota de honestidade). */
+/** rodapé corrido do PDF (paginação + nota de honestidade). */
 export function dossieFooterHtml(): string {
-  return `<div style="width:100%;font-family:Archivo,sans-serif;font-size:8px;color:#8c8578;background:#F6F4EF;padding:5px 34px;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact;">
+  return `<div style="width:100%;font-family:Archivo,sans-serif;font-size:8px;color:#a9a196;padding:5px 34px;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact;">
     <span>Radar · Dossiê de Prospect — fonte e data em cada insight</span>
     <span>pág <span class="pageNumber"></span>/<span class="totalPages"></span></span>
   </div>`;

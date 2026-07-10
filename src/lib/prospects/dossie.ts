@@ -35,7 +35,9 @@ import {
   type Ponto,
   type Prospect,
   type SinalProspect,
+  type StatFirmo,
 } from "@/lib/prospects/schema";
+import type { Page } from "@/lib/diagnostico/lente1";
 import type { Campo, Posicionamento } from "@/lib/diagnostico/schema";
 
 function hostDe(url: string): string {
@@ -64,7 +66,12 @@ function campoParaPonto(c: Campo | undefined | null): Ponto | null {
   return pontoFato(c.valor, c.fonte_url);
 }
 
-function montarPerfil(nome: string, pos: Posicionamento, paginas: string[]): PerfilProspect {
+function montarPerfil(
+  nome: string,
+  pos: Posicionamento,
+  paginas: string[],
+  extra: { descricao: Ponto | null; firmografia: StatFirmo[] },
+): PerfilProspect {
   const produtos: Ponto[] = pos.produtos.slice(0, 8).map((p) =>
     pontoFato(p.descricao ? `${p.nome} — ${p.descricao}` : p.nome, p.fonte_url),
   );
@@ -77,7 +84,9 @@ function montarPerfil(nome: string, pos: Posicionamento, paginas: string[]): Per
       ? pontoInferencia(`cita ~${nClientes} cliente(s) no site`, pos.provas.clientes_citados[0]?.fonte_url)
       : null;
 
+  // descrição limpa (do extrator) tem prioridade; senão o posicionamento; senão honesto.
   const resumo =
+    extra.descricao ??
     campoParaPonto(pos.posicionamento) ??
     campoParaPonto(pos.proposito) ??
     (produtos.length > 0
@@ -90,8 +99,65 @@ function montarPerfil(nome: string, pos: Posicionamento, paginas: string[]): Per
     posicionamento: campoParaPonto(pos.posicionamento),
     produtos,
     porte,
+    firmografia: extra.firmografia,
     paginas_lidas: paginas,
   };
+}
+
+// ── FIRMOGRAFIA + descrição (a faixa de números da capa) ────────────────────
+
+const FIRMO_SYSTEM =
+  "Você extrai a FIRMOGRAFIA de uma empresa a partir do conteúdo do site dela e de notícias. Produza: " +
+  "(1) uma DESCRIÇÃO de 1-2 frases do que a empresa faz (setor + o que oferece), factual; " +
+  "(2) até 4 ESTATÍSTICAS firmográficas de peso, cada uma valor CURTO (ex.: '1911', '6', '924+', '3 países') + rótulo curto (ex.: 'Fundação', 'Sub-marcas', 'SKUs', 'Mercados novos') + o índice [n] da fonte que a embasa. " +
+  "REGRAS DE HONESTIDADE (o vendedor repete na reunião): só o que estiver EVIDENCIADO nas fontes; NUNCA invente número; IGNORE números promocionais/campanha (ex.: 'aniversário de 8 anos da loja', 'X% off') — não são firmografia. " +
+  "Marque cada stat: fato (dito na fonte) ou inferencia (contado/derivado, ex.: nº de mercados a partir das notícias). Se não achar firmografia real, devolva stats vazio (honesto). " +
+  'Responda SÓ JSON: {"descricao":"...","descricaoFonte":n,"stats":[{"valor":"...","label":"...","fonte":n,"natureza":"fato"|"inferencia"}]}';
+
+async function montarFirmografia(
+  nome: string,
+  pages: Page[],
+  sinais: SinalProspect[],
+): Promise<{ descricao: Ponto | null; firmografia: StatFirmo[] }> {
+  // fontes numeradas: páginas do site + notícias (o LLM referencia por índice → anti-invenção).
+  const fontes: Array<{ url: string; titulo: string }> = [
+    ...pages.slice(0, 6).map((p) => ({ url: p.url, titulo: p.label })),
+    ...sinais.map((s) => ({ url: s.fonte_url, titulo: s.fonte_titulo ?? s.titulo })),
+  ];
+  if (fontes.length === 0) return { descricao: null, firmografia: [] };
+  const bloco =
+    pages.slice(0, 6).map((p, i) => `[${i + 1}] (site: ${p.label}) ${p.markdown.slice(0, 900)}`).join("\n\n") +
+    "\n\n" +
+    sinais.map((s, i) => `[${pages.slice(0, 6).length + i + 1}] (notícia) ${s.titulo}`).join("\n");
+
+  let raw = "";
+  try {
+    raw = await completeViaGateway({
+      system: FIRMO_SYSTEM,
+      prompt: `EMPRESA: ${nome}\nFONTES:\n${bloco}\n\nDescrição + firmografia, honesto.`,
+    });
+  } catch {
+    return { descricao: null, firmografia: [] };
+  }
+  const parsed = parseJson<{ descricao?: unknown; descricaoFonte?: unknown; stats?: Array<{ valor?: unknown; label?: unknown; fonte?: unknown; natureza?: unknown }> }>(raw);
+  const fonteDe = (i: unknown): { url?: string; titulo?: string } => (typeof i === "number" && fontes[i - 1] ? fontes[i - 1] : {});
+
+  const descTxt = typeof parsed?.descricao === "string" ? parsed.descricao.trim() : "";
+  const descFonte = fonteDe(parsed?.descricaoFonte);
+  const descricao = descTxt ? pontoFato(descTxt, descFonte.url, descFonte.titulo) : null;
+
+  const firmografia: StatFirmo[] = (parsed?.stats ?? [])
+    .map((s): StatFirmo | null => {
+      const valor = typeof s?.valor === "string" ? s.valor.trim() : typeof s?.valor === "number" ? String(s.valor) : "";
+      const label = typeof s?.label === "string" ? s.label.trim() : "";
+      if (!valor || !label) return null;
+      const f = fonteDe(s?.fonte);
+      return { valor, label, natureza: s?.natureza === "inferencia" ? "inferencia" : "fato", fonte_url: f.url };
+    })
+    .filter((x): x is StatFirmo => x !== null)
+    .slice(0, 4);
+
+  return { descricao, firmografia };
 }
 
 // ── 2. CONCORRENTES (searchWeb + LLM, inferência marcada) ───────────────────
@@ -281,23 +347,29 @@ export async function gerarDossie(p: Prospect): Promise<Dossie> {
       const siteHost = hostDe(siteUrl);
       const observacoes: string[] = [];
 
-      // 1. Perfil (Lente 1) — base pra todo o resto.
-      let perfil: PerfilProspect;
-      try {
-        const { posicionamento, paginas } = await runWithUsage({ feature: "lente_1" }, () => runLente1(p.nome, siteUrl));
-        perfil = montarPerfil(p.nome, posicionamento, paginas);
-        if (perfil.paginas_lidas.length === 0) observacoes.push("perfil: não consegui ler o site do prospect (bloqueio/erro).");
-      } catch (err) {
-        observacoes.push(`perfil: falha ao ler o site (${(err as Error).message}).`);
-        perfil = { resumo: pontoNaoEncontrado("não foi possível ler o site do prospect"), produtos: [], paginas_lidas: [] };
-      }
-      const perfilTxt = perfilParaTexto(perfil);
-
-      // 2+3. Concorrentes e Sinais (buscas independentes) em paralelo.
-      const [conc, sin] = await Promise.all([montarConcorrentes(p.nome, siteHost), montarSinais(p.nome)]);
+      // 1. Lente 1 (posicionamento + páginas cruas) + 2+3 buscas, em paralelo.
+      const [lente1, conc, sin] = await Promise.all([
+        runWithUsage({ feature: "lente_1" }, () => runLente1(p.nome, siteUrl)).catch((err) => {
+          observacoes.push(`perfil: falha ao ler o site (${(err as Error).message}).`);
+          return null;
+        }),
+        montarConcorrentes(p.nome, siteHost),
+        montarSinais(p.nome),
+      ]);
       if (conc.obs) observacoes.push(conc.obs);
       if (sin.obs) observacoes.push(sin.obs);
       const sinaisTxt = sin.lista.map((s) => `- ${s.titulo} (${s.tipo}${s.data ? `, ${s.data}` : ""})`).join("\n");
+
+      // 1b. Firmografia + descrição (a faixa de números da capa) — do site + notícias.
+      let perfil: PerfilProspect;
+      if (lente1) {
+        const firmo = await montarFirmografia(p.nome, lente1.pages, sin.lista);
+        perfil = montarPerfil(p.nome, lente1.posicionamento, lente1.paginas, firmo);
+        if (perfil.paginas_lidas.length === 0) observacoes.push("perfil: não consegui ler o site do prospect (bloqueio/erro).");
+      } else {
+        perfil = { resumo: pontoNaoEncontrado("não foi possível ler o site do prospect"), produtos: [], paginas_lidas: [], firmografia: [] };
+      }
+      const perfilTxt = perfilParaTexto(perfil);
 
       // 4. Encaixe (Brain) — o cruzamento com a nossa oferta.
       const { encaixe, obs: obsEnc } = await montarEncaixe(p.clientName, p.nome, perfilTxt, sinaisTxt);

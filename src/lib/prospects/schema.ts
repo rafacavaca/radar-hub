@@ -46,6 +46,14 @@ export type Prospect = {
 
 // ── seções do dossiê (cada uma honesta e escaneável) ────────────────────────
 
+/** Uma estatística firmográfica da faixa de números (fundação, sub-marcas…). */
+export type StatFirmo = {
+  valor: string; // ex.: "1911", "6", "924+"
+  label: string; // ex.: "Fundação", "Sub-marcas"
+  natureza: Natureza; // fato (do site/fonte) ou inferência (contado/derivado)
+  fonte_url?: string;
+};
+
 /** Perfil da empresa (reusa a Lente 1 — posicionamento, com fonte). */
 export type PerfilProspect = {
   resumo: Ponto; // o que a empresa faz (1-2 frases)
@@ -53,6 +61,8 @@ export type PerfilProspect = {
   posicionamento?: Ponto | null;
   produtos: Ponto[]; // soluções nomeadas
   porte?: Ponto | null; // sinais de tamanho (big numbers, clientes citados)
+  /** faixa de números firmográficos (fundação, sub-marcas, mercados, SKUs…). */
+  firmografia?: StatFirmo[];
   paginas_lidas: string[]; // transparência: o que o Radar leu
 };
 
