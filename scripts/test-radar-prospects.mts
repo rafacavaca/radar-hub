@@ -148,6 +148,45 @@ const foraJanela = await prepararReunioes(["Moovefy"], new Date("2026-07-10T09:0
 add("Preparo: reunião fora da véspera não é preparada (janela D-1)", foraJanela.jaProntos === 0 && foraJanela.preparados === 0);
 void geracoes;
 
+// ── 7. F3: promover a conta-chave (sem duplicar) + arquivar ──
+const { promoverProspect } = await import("@/lib/prospects/promover");
+const wl = await import("@/lib/watchlist");
+
+// cliente novo + prospect pra promover (watchlist isolada no RADAR_DATA_DIR)
+await wl.addClient("PromoCo Cliente");
+const pProm: Prospect = { ...mk("PromoCo Cliente", "AlvoReal", "https://alvoreal.com"), status: "ativo" };
+await store.upsertProspect(pProm);
+const fakeDiscover = async () => [{ kind: "blog" as const, url: "https://alvoreal.com/blog" }];
+
+const prom1 = await promoverProspect("PromoCo Cliente", pProm.id, { discover: fakeDiscover });
+const wlAfter = await wl.loadWatchlist();
+const conta = wlAfter.clients.find((c) => c.name === "PromoCo Cliente")?.competitors.find((c) => c.id === prom1.contaId);
+add("F3: promover cria conta-chave (pillar conta-chave) na watchlist", Boolean(conta) && conta!.pillar === "conta-chave" && conta!.siteUrl === "https://alvoreal.com", `conta=${conta?.id} pillar=${conta?.pillar}`);
+add("F3: prospect vira 'promovido' (dossiê segue acessível)", (await store.getProspect("PromoCo Cliente", pProm.id))?.status === "promovido");
+add("F3: fontes descobertas entram (blog)", (conta?.sources ?? []).some((s) => s.kind === "blog"));
+
+// re-promover: idempotente, NÃO duplica
+const prom2 = await promoverProspect("PromoCo Cliente", pProm.id, { discover: fakeDiscover });
+const nConta = (await wl.loadWatchlist()).clients.find((c) => c.name === "PromoCo Cliente")?.competitors.filter((c) => c.id === prom1.contaId).length;
+add("F3: re-promover é no-op (jaExistia, sem 2ª cópia)", prom2.jaExistia === true && nConta === 1, `cópias=${nConta}`);
+
+// dedupe por SITE (mesmo site, nome diferente) → não duplica
+const pMesmoSite: Prospect = { ...mk("PromoCo Cliente", "Alvo Real SA", "https://www.alvoreal.com/"), status: "ativo" };
+await store.upsertProspect(pMesmoSite);
+const prom3 = await promoverProspect("PromoCo Cliente", pMesmoSite.id, { discover: fakeDiscover });
+add("F3: dedupe por SITE (mesmo domínio ≠ nome) não cria 2ª entidade", prom3.jaExistia === true);
+
+// fallback: descoberta vazia → registra com o site como notícias
+const pFallback: Prospect = { ...mk("PromoCo Cliente", "SemFontes", "https://semfontes.com"), status: "ativo" };
+await store.upsertProspect(pFallback);
+const prom4 = await promoverProspect("PromoCo Cliente", pFallback.id, { discover: async () => [] });
+const contaFb = (await wl.loadWatchlist()).clients.find((c) => c.name === "PromoCo Cliente")?.competitors.find((c) => c.id === prom4.contaId);
+add("F3: descoberta vazia → fallback registra o site (notícias)", (contaFb?.sources ?? []).some((s) => s.kind === "noticias"), `fontes=${contaFb?.sources.map((s) => s.kind).join(",")}`);
+
+// arquivar / reativar
+await store.patchProspect("PromoCo Cliente", pFallback.id, { status: "arquivado" });
+add("F3: arquivar (esfriar) tira da lista ativa", (await store.loadProspects("PromoCo Cliente")).filter((p) => p.status !== "arquivado").every((p) => p.id !== pFallback.id));
+
 // ── Resultado ──
 console.log("── Resultado ──");
 let ok = true;
