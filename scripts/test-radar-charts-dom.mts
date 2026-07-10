@@ -53,7 +53,9 @@ g.ResizeObserver = FakeRO;
 const React = (await import("react")).default;
 const { createRoot } = await import("react-dom/client");
 const { ReportChart } = await import("@/components/charts/report-charts");
+const { BattlecardView } = await import("@/components/battlecard-card");
 import type { BarrasChart, DispersaoChart } from "@/lib/diagnostico/report-charts";
+import type { Battlecard, Movimento, Posicionamento } from "@/lib/diagnostico/schema";
 
 type Criterio = { nome: string; feito: boolean; detalhe?: string };
 const criterios: Criterio[] = [];
@@ -131,6 +133,54 @@ const barras: BarrasChart = {
   add("BARRAS: valores na ponta (72/100 e 42/100)", texto.includes("72/100") && texto.includes("42/100"));
   add("BARRAS: null vira 'sem dado' (nunca barra inventada)", texto.includes("sem dado"));
   add("BARRAS: escala defasada → referência visível", texto.includes("defasada") && texto.includes("referência"));
+}
+
+// ── 3. BATTLECARD (F3) — view pura: seções, destaque, honestidade ──
+const battlecard: Battlecard = {
+  quem_sao: "Especialista canadense em automação para avicultura, forte em hardware.",
+  forcas: [{ texto: "Hardware proprietário consolidado", fonte_url: "https://intelia.com/produtos" }],
+  fraquezas: [
+    { texto: "Suporte lento segundo reviews", fonte_url: "https://g2.com/intelia", citacao: "levaram semanas para responder" },
+  ],
+  como_ganhar: [
+    {
+      fraqueza: "Suporte lento",
+      fonte_url: "https://g2.com/intelia",
+      nosso_diferencial: "Suporte em português com SLA de 4h",
+      resposta: "Pergunte ao cliente quanto tempo ele espera hoje por um retorno técnico.",
+    },
+    { fraqueza: "Sem módulo fiscal BR", nosso_diferencial: null, resposta: null },
+  ],
+  objecoes: [{ objecao: "A Intelia é referência global", resposta: "Global sim — mas sem operação local nem suporte em português." }],
+  brain_mode: "live",
+  gerado_em: "2026-07-10T12:00:00.000Z",
+  tipo: "derivado",
+};
+const posicionamento = {
+  tagline: { valor: "BEYOND FARMS", fonte_url: "https://intelia.com", data_coleta: "2026-07-10", tipo: "fato", status: "encontrado" },
+  proposito: { valor: null, data_coleta: "2026-07-10", tipo: "fato", status: "nao_encontrado" },
+  posicionamento: { valor: "Fornecedor de soluções para produção avícola", fonte_url: "https://intelia.com", data_coleta: "2026-07-10", tipo: "fato", status: "encontrado" },
+  diferenciais: [],
+  produtos: [],
+  provas: { clientes_citados: [], depoimentos: { valor: null, data_coleta: "2026-07-10", tipo: "fato", status: "nao_encontrado" }, premiacoes: [], big_numbers: [] },
+} as unknown as Posicionamento;
+const movimentos: Movimento[] = [
+  { campo: "posicionamento.tagline", campo_label: "Tagline", de: "BEYOND DATA", para: "BEYOND FARMS", tipo: "mudança", data_deteccao: "2026-07-10T07:00:00.000Z", severidade: "alta", fonte_url_para: "https://intelia.com" },
+];
+{
+  const host = await render(React.createElement(BattlecardView, { b: battlecard, concorrenteNome: "Intelia", posicionamento, movimentos }));
+  const texto = host.textContent ?? "";
+  add(
+    "BATTLECARD: todas as seções da spec presentes",
+    ["Quem são", "Como se posicionam", "Forças (deles)", "Fraquezas (deles)", "Como ganhar deles", "Objeções & respostas", "Mudanças recentes"].every((s) => texto.includes(s)),
+  );
+  add("BATTLECARD: 'Como ganhar' cruza fraqueza→diferencial→frase pronta", texto.includes("Suporte em português com SLA de 4h") && texto.includes("Pergunte ao cliente"));
+  add("BATTLECARD: sem cobertura do Brain é DITO (nunca forçado)", texto.includes("sem diferencial nosso mapeado"));
+  add("BATTLECARD: fato × opinião marcados (selos presentes)", texto.includes("fato") && texto.includes("opinião"));
+  add("BATTLECARD: citação de review e fontes visíveis", texto.includes("levaram semanas") && host.querySelectorAll("a[href]").length >= 3);
+  add("BATTLECARD: mudança recente com de→para e data", texto.includes("BEYOND DATA") && texto.includes("BEYOND FARMS") && texto.includes("Tagline"));
+  const dark = (host.innerHTML.match(/bg-stone-9\d\d/g) ?? []).length;
+  add("BATTLECARD: zero dark (papel quente, fiel ao design system)", dark === 0, `bg-stone-9xx=${dark}`);
 }
 
 // ── Resultado ──

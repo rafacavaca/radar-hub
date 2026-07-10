@@ -166,6 +166,8 @@ export default async function DiagnosticoPage({
                       competitorId={c.id}
                       concorrenteNome={c.name}
                       battlecard={diag.battlecard ?? null}
+                      posicionamento={diag.posicionamento}
+                      movimentos={diag.movimentos}
                     />
                   </>
                 ) : (
