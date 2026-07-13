@@ -127,8 +127,8 @@ function Cartao({
             ) : null}
           </div>
 
-          <p className="mt-3 flex items-center gap-1.5 text-[13px] text-stone-500">
-            <span aria-hidden>🕑</span> {quando} · <span className="font-medium text-stone-700">próxima: {proxima}</span>
+          <p className="mt-3 text-[13px] text-stone-500">
+            {quando} · <span className="font-medium text-stone-700">próxima: {proxima}</span>
           </p>
         </div>
       ) : (

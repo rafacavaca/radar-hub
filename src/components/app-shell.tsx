@@ -103,6 +103,15 @@ function GearIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+function TodayIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="16" rx="2" />
+      <path d="M3 9h18M8 2.5v4M16 2.5v4" />
+    </svg>
+  );
+}
+
 export function AppShell({
   clients,
   modes,
@@ -221,11 +230,11 @@ export function AppShell({
             <span
               aria-hidden
               className={
-                "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[13px] " +
+                "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md " +
                 (pathname === "/hoje" ? "bg-stone-900 text-white" : "bg-stone-200 text-stone-600")
               }
             >
-              ☀
+              <TodayIcon />
             </span>
             {!collapsed ? <span>Hoje</span> : null}
             {!collapsed ? <HojeBadge /> : null}
@@ -288,7 +297,7 @@ export function AppShell({
               (pathname === "/automacoes" ? "bg-stone-100 font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
             }
           >
-            <span aria-hidden>⚙</span>
+            <GearIcon />
             {!collapsed ? "Automações" : null}
           </Link>
           {isAdmin ? (

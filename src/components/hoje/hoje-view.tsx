@@ -141,8 +141,7 @@ export function HojeView({
 
       {tranquilo ? (
         <div className="mt-8 rounded-xl border border-dashed border-stone-300 bg-white/60 px-8 py-16 text-center">
-          <p aria-hidden className="text-2xl">☀</p>
-          <p className="mt-2 text-lg font-medium text-stone-800">Dia tranquilo.</p>
+          <p className="text-lg font-medium text-stone-800">Dia tranquilo.</p>
           <p className="mt-1 text-sm text-stone-500">
             Nada requer atenção agora — nenhum movimento forte, alerta novo ou item adiado.
           </p>

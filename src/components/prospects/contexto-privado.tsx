@@ -21,6 +21,7 @@ function tamanho(bytes?: number): string {
 export function ContextoPrivado({ cliente, id, itens }: { cliente: string; id: string; itens: ContextoItem[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [aberto, setAberto] = useState(itens.length > 0); // recolhido quando vazio
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
   const [nota, setNota] = useState("");
@@ -78,13 +79,31 @@ export function ContextoPrivado({ cliente, id, itens }: { cliente: string; id: s
   }
 
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-4 sm:p-5">
-      <div className="flex items-center gap-2">
-        <span aria-hidden>🔒</span>
-        <h2 className="text-[15px] font-semibold text-stone-900">Contexto privado</h2>
-        <span className="rounded-full bg-[#efe7f6] px-2 py-0.5 text-[10px] font-semibold text-[#6b4a9c]">confidencial · interno</span>
-      </div>
-      <p className="mt-0.5 text-sm text-stone-500">
+    <section className="rounded-xl border border-stone-200 bg-white">
+      {/* cabeçalho clicável — recolhido por padrão, expande o conteúdo */}
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left sm:px-5"
+      >
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-[15px] font-semibold text-stone-900">Contexto privado</span>
+          <span className="rounded-full bg-[#efe7f6] px-2 py-0.5 text-[10px] font-semibold text-[#6b4a9c]">confidencial</span>
+          {itens.length > 0 ? <span className="rounded-full bg-stone-100 px-1.5 text-[11px] font-semibold text-stone-500">{itens.length}</span> : null}
+        </span>
+        <span aria-hidden className={"text-stone-400 transition-transform " + (aberto ? "rotate-90" : "")}>▸</span>
+      </button>
+
+      {!aberto ? (
+        <p className="px-4 pb-3 text-sm text-stone-500 sm:px-5">
+          {itens.length > 0
+            ? `${itens.length} item(ns) de contexto interno alimentam o dossiê. Clique para ver ou adicionar.`
+            : "Anexe a proposta que enviou, um portfólio, um edital, ou escreva o que ouviu numa reunião — fica isolado na sua agência e afia o dossiê."}
+        </p>
+      ) : (
+      <div className="border-t border-stone-100 px-4 py-4 sm:px-5">
+      <p className="text-sm text-stone-500">
         O que você sabe e não está publicado: a proposta que enviou, o portfólio do prospect, um edital,
         algo ouvido numa reunião. Fica isolado na sua agência e afia o dossiê.
       </p>
@@ -145,7 +164,7 @@ export function ContextoPrivado({ cliente, id, itens }: { cliente: string; id: s
             <li key={c.id} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-stone-800">
-                  <span aria-hidden>{c.tipo === "nota" ? "📝" : "📎"}</span>
+                  <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-500">{c.tipo === "nota" ? "nota" : "arquivo"}</span>
                   {c.temArquivo ? (
                     <a href={`/api/prospects/arquivo?cliente=${encodeURIComponent(cliente)}&id=${id}&item=${c.id}`} target="_blank" rel="noreferrer" className="truncate underline-offset-2 hover:underline">
                       {c.nome}
@@ -161,13 +180,15 @@ export function ContextoPrivado({ cliente, id, itens }: { cliente: string; id: s
                 </p>
                 <p className="mt-0.5 text-[11px] text-stone-400">{[tamanho(c.tamanho), formatDateShort(c.criadoEm)].filter(Boolean).join(" · ")}</p>
               </div>
-              <button onClick={() => remover(c.id)} disabled={busy} title="Remover" className="shrink-0 rounded-md px-1.5 py-1 text-xs text-stone-400 hover:bg-stone-100 hover:text-red-600 disabled:opacity-50">
-                ×
+              <button onClick={() => remover(c.id)} disabled={busy} title="Remover" className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-stone-400 hover:bg-stone-100 hover:text-red-600 disabled:opacity-50">
+                Remover
               </button>
             </li>
           ))}
         </ul>
       ) : null}
+      </div>
+      )}
     </section>
   );
 }

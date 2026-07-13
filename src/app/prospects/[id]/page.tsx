@@ -66,12 +66,12 @@ export default async function DossiePage({
         <DossieActions cliente={cliente} id={id} temDossie={Boolean(dossie)} />
         {prospect.reuniaoEm ? (
           <a href={`/api/prospects/ics?cliente=${encodeURIComponent(cliente)}&id=${id}`} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100">
-            📅 Adicionar ao calendário
+            Adicionar ao calendário
           </a>
         ) : null}
         {dossie ? (
           <a href={`/api/prospects/pdf?cliente=${encodeURIComponent(cliente)}&id=${id}`} className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100">
-            ⬇ PDF
+            Baixar PDF
           </a>
         ) : null}
       </div>
@@ -89,7 +89,7 @@ export default async function DossiePage({
             {/* curadoria de concorrentes (gaveta) — reflete no dossiê e no PDF ao salvar. */}
             <details className="mt-4 rounded-lg border border-stone-200 bg-white">
               <summary className="cursor-pointer px-4 py-2.5 text-[13px] font-medium text-stone-600 hover:text-stone-900">
-                ⚙ Curar concorrentes — indicar / validar (reflete no dossiê e no PDF)
+                Curar concorrentes — indicar / validar (reflete no dossiê e no PDF)
               </summary>
               <div className="border-t border-stone-100 px-4 py-3.5">
                 <ConcorrentesEditor cliente={cliente} id={id} concorrentes={concorrentes} />

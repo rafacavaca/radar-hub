@@ -110,11 +110,11 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
   // ── contexto privado (CONFIDENCIAL — do vendedor: arquivos/notas). interno. ──
   const ctxSec = contexto.length
     ? `<div class="sec">
-        <div class="sectitle">Contexto privado <span class="cnt">${contexto.length}</span><span class="privbadge">🔒 confidencial</span></div>
+        <div class="sectitle">Contexto privado <span class="cnt">${contexto.length}</span><span class="privbadge">confidencial</span></div>
         <div class="ctx">
           ${contexto.map((c) => {
             const corpo = c.legivel ? (c.resumo || c.texto).slice(0, 600) : "não foi possível ler o texto — OCR chega na F2 (nada é inventado).";
-            return `<div class="ctxitem"><div class="ctxh">${c.tipo === "nota" ? "📝" : "📎"} ${esc(c.nome)} <span class="b b-int">interno</span></div><div class="ctxb">${esc(corpo)}${c.legivel && (c.resumo || c.texto).length > 600 ? "…" : ""}</div></div>`;
+            return `<div class="ctxitem"><div class="ctxh"><span class="ctxtag">${c.tipo === "nota" ? "nota" : "arquivo"}</span> ${esc(c.nome)} <span class="b b-int">interno</span></div><div class="ctxb">${esc(corpo)}${c.legivel && (c.resumo || c.texto).length > 600 ? "…" : ""}</div></div>`;
           }).join("")}
         </div>
         <p class="micro">Fonte interna (arquivo/nota do vendedor) — confiança alta, mas <b>confidencial</b>. Não apresentar como público.</p>
@@ -218,6 +218,7 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
   .ctx{ display:grid; gap:10px; }
   .ctxitem{ border:1px solid #e6e1d8; border-left:3px solid #7a5cc0; border-radius:0 8px 8px 0; background:#faf8fc; padding:10px 13px; }
   .ctxh{ font-size:14px; font-weight:700; }
+  .ctxtag{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#6b4a9c; background:#efe7f6; border-radius:4px; padding:1px 6px; }
   .ctxb{ font-size:13px; line-height:1.5; color:#3c372f; margin-top:3px; }
   .b-val{ background:#faf1df; color:var(--amber); font-size:10px; padding:1px 6px; }
   .b-ok{ background:#e7f0e9; color:var(--green); font-size:10px; padding:1px 6px; }

@@ -41,7 +41,7 @@ function itemHTML(item: DigestItem, voltou: boolean): string {
 export function renderDigestEmailHTML(digest: Digest, appUrl: string): string {
   const corpo = digest.tranquilo
     ? `<tr><td style="padding:28px 0;text-align:center;color:#57534e;font-size:14px">
-         ☀ <b>Dia tranquilo.</b><br/>Nada exige tua atenção agora.
+         <b>Dia tranquilo.</b><br/>Nada exige tua atenção agora.
        </td></tr>`
     : [
         ...digest.adiados.map((i) => itemHTML(i, true)),
