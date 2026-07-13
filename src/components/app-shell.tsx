@@ -158,6 +158,8 @@ export function AppShell({
       : (clients[0] ?? "");
   const mode = modes?.[cliente] ?? "concorrentes";
   const sections = mode === "carteira" ? CARTEIRA_SECTIONS : CONCORRENTES_SECTIONS;
+  // telas da AGÊNCIA (não de um cliente) — sem o cabeçalho/abas de cliente.
+  const orgLevel = pathname === "/hoje" || pathname === "/automacoes";
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-stone-50">
@@ -271,9 +273,24 @@ export function AppShell({
           </ul>
         </nav>
 
-        {/* rodapé — "+ Novo cliente" é GLOBAL (ação da agência) + Administração */}
+        {/* rodapé — "+ Novo cliente" é GLOBAL (ação da agência) + Automações + Administração */}
         <div className="space-y-2 border-t border-stone-200 p-3">
           <NewClientButton clients={clients} collapsed={collapsed} />
+          <Link
+            href="/automacoes"
+            aria-current={pathname === "/automacoes" ? "page" : undefined}
+            title={collapsed ? "Automações" : undefined}
+            className={
+              (collapsed
+                ? "flex justify-center rounded-md py-1.5 "
+                : "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ") +
+              "transition-colors " +
+              (pathname === "/automacoes" ? "bg-stone-100 font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
+            }
+          >
+            <span aria-hidden>⚙</span>
+            {!collapsed ? "Automações" : null}
+          </Link>
           {isAdmin ? (
             collapsed ? (
               <Link
@@ -314,9 +331,9 @@ export function AppShell({
       </aside>
 
       {/* CONTEÚDO — topbar do cliente (fixo) + tabs + página (rola).
-          /hoje é da agência: sem cabeçalho de cliente (a página tem o próprio). */}
+          /hoje e /automacoes são da agência: sem cabeçalho de cliente. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {pathname === "/hoje" ? (
+        {orgLevel ? (
           <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
         ) : (
         <header className="shrink-0 border-b border-stone-200 bg-stone-50">
@@ -379,7 +396,7 @@ export function AppShell({
         </header>
         )}
 
-        {pathname !== "/hoje" ? (
+        {!orgLevel ? (
           <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
         ) : null}
       </div>

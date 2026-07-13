@@ -10,7 +10,6 @@ import { redirect } from "next/navigation";
 
 import { loadDisparos, loadRegras } from "@/lib/diagnostico/alertas-store";
 import { loadDiagConfig } from "@/lib/diagnostico/config";
-import { loadAlvosDaVarredura, loadDiagSchedule } from "@/lib/diagnostico/schedule";
 import { loadDiagnosticos } from "@/lib/diagnostico/store";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
@@ -26,7 +25,6 @@ import { DiagConfigEditor } from "@/components/diag-config-editor";
 import { DiagnosticoRunButton } from "@/components/diagnostico-run-button";
 import { FichaDiagnostico } from "@/components/ficha-diagnostico";
 import { PainelComparativo } from "@/components/painel-diagnostico";
-import { VarreduraSchedule } from "@/components/varredura-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +44,8 @@ export default async function DiagnosticoPage({
   if (client.mode === "carteira") redirect(`/carteira?cliente=${encodeURIComponent(cliente)}`);
 
   const concorrentes = client.competitors.filter((c) => pillarOf(c, client.mode) === "concorrente");
-  const [diagnosticos, schedule, alvos, regras, disparos, cobertura] = await Promise.all([
+  const [diagnosticos, regras, disparos, cobertura] = await Promise.all([
     loadDiagnosticos(cliente),
-    loadDiagSchedule(cliente),
-    loadAlvosDaVarredura(cliente),
     loadRegras(cliente),
     loadDisparos(cliente),
     loadCobertura(cliente),
@@ -87,10 +83,6 @@ export default async function DiagnosticoPage({
         + canais de cada concorrente, com fonte e data. O que o site não diz aparece como “não
         encontrado” (honesto). Rode sob demanda.
       </p>
-
-      <div className="mt-4">
-        <VarreduraSchedule cliente={cliente} config={schedule} alvos={alvos.length} />
-      </div>
 
       <div className="mt-6">
         <AlertasDiagnostico cliente={cliente} regrasIniciais={regras} disparos={disparos} />

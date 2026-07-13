@@ -17,6 +17,7 @@ import { config } from "dotenv";
 import { markAdminProcess } from "@/lib/db/admin-client";
 import { listOrgsAsCollector, runAsOrgCollector } from "@/lib/db/collector-org";
 import { supabaseEnabled } from "@/lib/db/supabase";
+import { automacaoDevida, loadAutomacoes, marcarRodou } from "@/lib/automacoes";
 import { ensureDigestMatinal } from "@/lib/digest";
 import { maybeSendDigestEmail } from "@/lib/digest-email";
 import { prepararReunioes } from "@/lib/prospects/preparo";
@@ -27,33 +28,41 @@ import { runDueDiagnosticos } from "@/lib/diagnostico/schedule";
 
 config({ path: ".env.local" });
 
-/** Uma passada completa (relatórios + diagnóstico + digest matinal) no contexto atual. */
+/**
+ * Uma passada completa no contexto (org). AS VARREDURAS QUE RODAM SOZINHAS
+ * (digest matinal + varredura de concorrentes) só acontecem se LIGADAS no painel
+ * de Automações e devidas hoje (default OFF — nada roda sem o Rafael ligar).
+ * Relatórios agendados e dossiês de reunião seguem opt-in POR ITEM.
+ */
 async function passada(now: Date, label: string): Promise<void> {
-  // 1. Relatórios agendados (F10).
+  const auto = await loadAutomacoes();
+
+  // 1. Relatórios agendados (F10) — opt-in por item (só roda o que foi criado).
   const result = await runDueSchedules(now);
-  console.log(
-    `[run-schedules ${now.toISOString()}] (${label}) relatórios: rodados=${result.ran} pulados=${result.skipped} erros=${result.errors.length}`,
-  );
-  for (const r of result.reports) console.log(`  ✓ "${r.titulo}" (${r.reportId})`);
-  for (const e of result.errors) console.log(`  ✗ ${e.scheduleId}: ${e.error}`);
+  if (result.ran > 0 || result.errors.length > 0) {
+    console.log(`[run-schedules ${now.toISOString()}] (${label}) relatórios: rodados=${result.ran} erros=${result.errors.length}`);
+  }
 
-  // 2. Varredura agendada do diagnóstico (0a) — gera movimentos/alertas sozinha.
-  const diag = await runDueDiagnosticos(now);
-  console.log(
-    `[run-schedules ${now.toISOString()}] (${label}) diagnóstico: clientes=${diag.clientesRodados} concorrentes=${diag.concorrentesVarridos} com-movimento=${diag.comMovimento} erros=${diag.erros.length}`,
-  );
-  for (const d of diag.detalhe) console.log(`  ✓ ${d.clientName}/${d.competitorId}: ${d.movimentosNovos} movimento(s) novo(s)`);
-  for (const e of diag.erros) console.log(`  ✗ ${e.clientName}/${e.competitorId}: ${e.error}`);
+  // 2. Varredura de concorrentes (diagnóstico) — SÓ se ligada no painel e devida.
+  if (automacaoDevida(auto.diagnostico, now)) {
+    const diag = await runDueDiagnosticos(now, { ignorarAgenda: true });
+    await marcarRodou("diagnostico", now);
+    console.log(`[run-schedules ${now.toISOString()}] (${label}) varredura: clientes=${diag.clientesRodados} concorrentes=${diag.concorrentesVarridos} com-movimento=${diag.comMovimento} erros=${diag.erros.length}`);
+  } else {
+    console.log(`[run-schedules ${now.toISOString()}] (${label}) varredura: ${auto.diagnostico.enabled ? "não é o dia" : "desligada"}`);
+  }
 
-  // 3. Digest matinal (ritual F1) — a partir das 6h locais, 1x por dia; e-mail
-  //    é opt-in (placeholder: sem provedor configurado, só registra).
-  const matinal = await ensureDigestMatinal(now);
-  console.log(
-    `[run-schedules ${now.toISOString()}] (${label}) digest: ${matinal.acao}${matinal.digest ? ` · itens=${matinal.digest.itens.length} adiados=${matinal.digest.adiados.length}${matinal.digest.tranquilo ? " · dia tranquilo" : ""}` : ""}`,
-  );
-  if (matinal.acao === "gerado" && matinal.digest) {
-    const envio = await maybeSendDigestEmail(matinal.digest, label);
-    console.log(`[run-schedules ${now.toISOString()}] (${label}) e-mail do digest: ${envio}`);
+  // 3. Resumo do dia (digest matinal) — SÓ se ligado no painel e devido; e-mail opt-in.
+  if (automacaoDevida(auto.digest, now)) {
+    const matinal = await ensureDigestMatinal(now);
+    if (matinal.acao !== "cedo") await marcarRodou("digest", now); // antes das 6h, tenta de novo depois
+    console.log(`[run-schedules ${now.toISOString()}] (${label}) digest: ${matinal.acao}${matinal.digest ? ` · itens=${matinal.digest.itens.length}${matinal.digest.tranquilo ? " · dia tranquilo" : ""}` : ""}`);
+    if (matinal.acao === "gerado" && matinal.digest) {
+      const envio = await maybeSendDigestEmail(matinal.digest, label);
+      console.log(`[run-schedules ${now.toISOString()}] (${label}) e-mail do digest: ${envio}`);
+    }
+  } else {
+    console.log(`[run-schedules ${now.toISOString()}] (${label}) digest: ${auto.digest.enabled ? "não é o dia" : "desligado"}`);
   }
 
   // 4. Preparo pré-reunião (F2) — na véspera, gera o dossiê e manda o PDF por

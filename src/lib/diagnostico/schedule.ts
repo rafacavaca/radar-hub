@@ -153,10 +153,14 @@ type Runner = (input: { clientName: string; competitorId: string; name: string; 
  *
  * ORG-AWARE: config, alvos e a marca de "rodou hoje" vêm dos dispatchers — no
  * cron roda dentro de runAsOrgCollector (tudo da org do contexto).
+ *
+ * `ignorarAgenda`: quando o PAINEL de Automações já decidiu que hoje é dia
+ * (cadência global), o cron passa `true` — a varredura roda pra todos os
+ * clientes com ficha, sem depender do toggle por-cliente (que foi aposentado).
  */
 export async function runDueDiagnosticos(
   now: Date,
-  opts: { runner?: Runner; clients?: string[] } = {},
+  opts: { runner?: Runner; clients?: string[]; ignorarAgenda?: boolean } = {},
 ): Promise<DiagScheduleRunResult> {
   const runner = opts.runner ?? runDiagnosticoReal;
   const nomes = opts.clients ?? (await loadWatchlist()).clients.map((c) => c.name);
@@ -170,7 +174,7 @@ export async function runDueDiagnosticos(
 
   for (const clientName of nomes) {
     const cfg = await loadDiagSchedule(clientName);
-    if (!dueNow(cfg, now)) continue;
+    if (!opts.ignorarAgenda && !dueNow(cfg, now)) continue;
     const alvos = await loadAlvosDaVarredura(clientName);
     if (alvos.length === 0) {
       await persistDiagRan(clientName, cfg, now); // marca mesmo sem alvo (não fica "vencido" o dia todo)
