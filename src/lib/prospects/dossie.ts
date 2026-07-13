@@ -18,6 +18,7 @@
  */
 
 import { fetchClientBrain } from "@/lib/brain";
+import { loadContexto } from "@/lib/prospects/contexto";
 import { runLente1 } from "@/lib/diagnostico/lente1";
 import { normalizeSiteUrl } from "@/lib/discovery";
 import { searchWeb } from "@/lib/firecrawl";
@@ -26,6 +27,7 @@ import { runWithUsage } from "@/lib/usage/context";
 import {
   pontoFato,
   pontoInferencia,
+  pontoInterno,
   pontoNaoEncontrado,
   type ConcorrenteProspect,
   type Dossie,
@@ -247,6 +249,7 @@ const ENCAIXE_SYSTEM =
   "Tarefa: cruzar os dois e produzir, ANCORADO no que foi dado (nunca genérico, nunca inventado): " +
   "ganchos de conversa (por que falar com eles agora), dores prováveis DELES que a nossa oferta endereça, e um ângulo de abertura (1 frase). " +
   "Se a nossa oferta não tiver relação clara com o alvo, DIGA (ganchos vazios) em vez de forçar. " +
+  "Se houver CONTEXTO PRIVADO (documentos/notas internas do vendedor), USE-O pra afiar o ângulo/ganchos (ex.: o que o prospect pediu, preço, escopo) — e QUANDO um gancho/dor/ângulo vier DAÍ, comece a frase com [interno]. NUNCA apresente o privado como público. " +
   'Responda SÓ JSON: {"ganchos":["..."],"dores":["..."],"angulo":"..."}';
 
 async function montarEncaixe(
@@ -254,6 +257,7 @@ async function montarEncaixe(
   nome: string,
   perfilTxt: string,
   sinaisTxt: string,
+  contextoTxt: string,
 ): Promise<{ encaixe: EncaixeProspect; obs?: string }> {
   const brain = await fetchClientBrain(clientName);
   const vazio: EncaixeProspect = { brain_mode: brain.mode, ganchos: [], dores: [], angulo: null };
@@ -265,14 +269,22 @@ async function montarEncaixe(
   try {
     raw = await completeViaGateway({
       system: ENCAIXE_SYSTEM,
-      prompt: `(A) PERFIL DO ALVO — ${nome}:\n${perfilTxt}\n\nSINAIS RECENTES:\n${sinaisTxt || "(sem sinais)"}\n\n(B) NOSSA OFERTA/ICP (Brain):\n${brain.context}\n\nCruze e responda, ancorado.`,
+      prompt:
+        `(A) PERFIL DO ALVO — ${nome}:\n${perfilTxt}\n\nSINAIS RECENTES:\n${sinaisTxt || "(sem sinais)"}\n\n` +
+        (contextoTxt ? `(C) CONTEXTO PRIVADO (interno, confidencial):\n${contextoTxt}\n\n` : "") +
+        `(B) NOSSA OFERTA/ICP (Brain):\n${brain.context}\n\nCruze e responda, ancorado.`,
     });
   } catch {
     return { encaixe: vazio, obs: "encaixe: análise indisponível nesta geração." };
   }
   const parsed = parseJson<{ ganchos?: unknown[]; dores?: unknown[]; angulo?: unknown }>(raw);
-  // encaixe é INFERÊNCIA (cruzamento) ancorada no Brain — marcada como tal.
-  const nat = (t: string): Ponto => pontoInferencia(t, undefined, brain.mode === "live" ? "cruzamento com o Brain" : "cruzamento (Brain de rascunho)");
+  // ponto do encaixe: [interno] no início → veio do contexto privado (natureza interno);
+  // senão INFERÊNCIA (cruzamento) ancorada no Brain — marcada como tal.
+  const nat = (t: string): Ponto => {
+    const s = t.trim();
+    if (/^\[interno\]/i.test(s)) return pontoInterno(s.replace(/^\[interno\]\s*/i, ""), "contexto privado");
+    return pontoInferencia(s, undefined, brain.mode === "live" ? "cruzamento com o Brain" : "cruzamento (Brain de rascunho)");
+  };
   return {
     encaixe: {
       brain_mode: brain.mode,
@@ -289,15 +301,19 @@ async function montarEncaixe(
 const MUNICAO_SYSTEM =
   "Você prepara um vendedor para uma reunião. A partir do PERFIL do alvo e do ENCAIXE com a nossa oferta, gere: " +
   "3-5 PERGUNTAS boas de descoberta (abertas, específicas ao contexto do alvo) e 2-3 OBJEÇÕES prováveis com uma resposta curta cada. " +
+  "Se houver CONTEXTO PRIVADO (o que o vendedor já sabe: proposta enviada, edital, notas de reunião), use-o pra deixar perguntas/objeções mais afiadas e específicas. " +
   "Ancorado no material; nada genérico. " +
   'Responda SÓ JSON: {"perguntas":["..."],"objecoes":[{"objecao":"...","resposta":"..."}]}';
 
-async function montarMunicao(nome: string, perfilTxt: string, encaixeTxt: string): Promise<MunicaoProspect> {
+async function montarMunicao(nome: string, perfilTxt: string, encaixeTxt: string, contextoTxt: string): Promise<MunicaoProspect> {
   let raw = "";
   try {
     raw = await completeViaGateway({
       system: MUNICAO_SYSTEM,
-      prompt: `ALVO: ${nome}\nPERFIL:\n${perfilTxt}\n\nENCAIXE COM A NOSSA OFERTA:\n${encaixeTxt || "(sem encaixe mapeado)"}\n\nGere a munição, ancorada.`,
+      prompt:
+        `ALVO: ${nome}\nPERFIL:\n${perfilTxt}\n\nENCAIXE COM A NOSSA OFERTA:\n${encaixeTxt || "(sem encaixe mapeado)"}\n\n` +
+        (contextoTxt ? `CONTEXTO PRIVADO (interno):\n${contextoTxt}\n\n` : "") +
+        `Gere a munição, ancorada.`,
     });
   } catch {
     return { perguntas: [], objecoes: [] };
@@ -371,12 +387,23 @@ export async function gerarDossie(p: Prospect): Promise<Dossie> {
       }
       const perfilTxt = perfilParaTexto(perfil);
 
-      // 4. Encaixe (Brain) — o cruzamento com a nossa oferta.
-      const { encaixe, obs: obsEnc } = await montarEncaixe(p.clientName, p.nome, perfilTxt, sinaisTxt);
+      // 3b. CONTEXTO PRIVADO (arquivos/notas do vendedor) — funde o confidencial
+      // com o público. Org-scoped (isolamento); só o texto/resumo entra no prompt.
+      const contexto = await loadContexto(p.id);
+      const contextoTxt = contexto
+        .filter((c) => c.legivel && (c.resumo || c.texto))
+        .map((c) => `[${c.tipo === "nota" ? "nota interna" : `arquivo: ${c.nome}`}] ${(c.resumo ?? c.texto).slice(0, 3000)}`)
+        .join("\n\n");
+      if (contexto.some((c) => !c.legivel)) {
+        observacoes.push(`contexto privado: ${contexto.filter((c) => !c.legivel).map((c) => c.nome).join(", ")} sem texto legível (não inventamos; OCR na F2).`);
+      }
+
+      // 4. Encaixe (Brain + contexto privado) — o cruzamento com a nossa oferta.
+      const { encaixe, obs: obsEnc } = await montarEncaixe(p.clientName, p.nome, perfilTxt, sinaisTxt, contextoTxt);
       if (obsEnc) observacoes.push(obsEnc);
 
-      // 5. Munição — depende de perfil + encaixe.
-      const municao = await montarMunicao(p.nome, perfilTxt, encaixeParaTexto(encaixe));
+      // 5. Munição — depende de perfil + encaixe + contexto privado.
+      const municao = await montarMunicao(p.nome, perfilTxt, encaixeParaTexto(encaixe), contextoTxt);
 
       return {
         prospectId: p.id,

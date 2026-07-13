@@ -26,17 +26,28 @@ const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 console.log("\n=== Checklist de isolamento (multi-tenant, RLS) ===\n");
 
-// ── ITEM ESTÁTICO (roda SEMPRE, mesmo sem chaves): nenhuma rota/página de
-//    usuário importa o adminClient (service_role ignora RLS). ──
+// ── ITEM ESTÁTICO (roda SEMPRE, mesmo sem chaves): nenhuma rota/página do
+//    CAMINHO DO USUÁRIO CHAMA o adminClient (service_role ignora RLS).
+//    - casa USO REAL: `adminClient(` ou a env SERVICE_ROLE_KEY — não comentários;
+//    - exclui a superfície de ADMIN (/admin, /api/admin), que É a exceção
+//      deliberada (gated por super_admin), e o não-código (comentários //, *). ──
 try {
-  const hits = execSync(
-    "grep -rInE 'adminClient|SERVICE_ROLE' src/app 2>/dev/null || true",
+  const raw = execSync(
+    "grep -rInE 'adminClient\\(|SUPABASE_SERVICE_ROLE_KEY' src/app 2>/dev/null || true",
     { cwd: process.cwd(), encoding: "utf8" },
   ).trim();
+  const hits = raw
+    .split("\n")
+    .filter(Boolean)
+    .filter((l) => !/\/(api\/)?admin\//.test(l)) // superfície de admin: exceção gated
+    .filter((l) => {
+      const corpo = l.replace(/^[^:]+:\d+:/, "").trim(); // tira "arquivo:linha:"
+      return !corpo.startsWith("*") && !corpo.startsWith("//") && !corpo.startsWith("/*");
+    });
   reg(
-    "Nenhuma rota/página de usuário usa service_role (grep src/app)",
-    hits ? "falhou" : "ok",
-    hits ? `encontrado:\n${hits}` : "src/app limpo",
+    "Nenhuma rota do usuário CHAMA service_role (grep src/app, exclui /admin gated)",
+    hits.length ? "falhou" : "ok",
+    hits.length ? `encontrado:\n${hits.join("\n")}` : "caminho do usuário limpo",
   );
 } catch (e) {
   reg("Checagem estática de service_role", "falhou", (e as Error).message);
@@ -79,6 +90,9 @@ async function runLive(): Promise<void> {
     await admin.from("signals").insert({ id: `sig-${tag}`, org_id: orgId, client_id: `cli-${tag}`, data: { segredo: `sinal-${tag}` } });
     await admin.from("diagnostics").insert({ id: `dia-${tag}`, org_id: orgId, client_id: `cli-${tag}`, competitor_id: `cmp-${tag}`, data: { tag } });
     await admin.from("reports").insert({ id: `rep-${tag}`, org_id: orgId, client_id: `cli-${tag}`, data: { tag } });
+    // CONTEXTO PRIVADO (confidencial): texto extraído + bytes do arquivo, em org_docs.
+    await admin.from("org_docs").insert({ org_id: orgId, kind: "prospect-contexto", key: `px-${tag}`, data: [{ id: `ci-${tag}`, tipo: "arquivo", nome: `proposta-${tag}.pdf`, texto: `SEGREDO-${tag}: proposta confidencial`, legivel: true, temArquivo: true, criadoEm: "2026-07-13T00:00:00Z" }] });
+    await admin.from("org_docs").insert({ org_id: orgId, kind: "prospect-arquivo", key: `ci-${tag}`, data: { mime: "application/pdf", nome: `proposta-${tag}.pdf`, b64: Buffer.from(`bytes-confidenciais-${tag}`).toString("base64") } });
   };
   await seed(aId, "A");
   await seed(bId, "B");
@@ -113,6 +127,18 @@ async function runLive(): Promise<void> {
   const asB = createClient(URL!, ANON!, { global: { headers: { Authorization: `Bearer ${tokenB}` } }, auth: { persistSession: false } });
   const { data: bVeA } = await asB.from("signals").select("*").eq("id", "sig-A");
   reg("Invertido: B não vê o sinal de A", (bVeA ?? []).length === 0 ? "ok" : "falhou", `${(bVeA ?? []).length} linha(s)`);
+
+  // 5b) CONTEXTO PRIVADO (o guardrail nº1 desta feature): A não vê o arquivo/texto de B.
+  const { data: bCtx } = await asA.from("org_docs").select("*").eq("kind", "prospect-contexto");
+  const { data: bArq } = await asA.from("org_docs").select("*").eq("kind", "prospect-arquivo");
+  const ctxVazou = (bCtx ?? []).some((r) => (r as { org_id: string }).org_id === bId) || (bArq ?? []).some((r) => (r as { org_id: string }).org_id === bId);
+  // deep-link direto no arquivo confidencial de B (por key)
+  const { data: bArqDireto } = await asA.from("org_docs").select("*").eq("kind", "prospect-arquivo").eq("key", "ci-B");
+  reg(
+    "Contexto privado: A não vê arquivo/texto de B (nem por deep-link) — sem URL pública",
+    !ctxVazou && (bArqDireto ?? []).length === 0 ? "ok" : "falhou",
+    ctxVazou || (bArqDireto ?? []).length > 0 ? "PERIGO: vazou contexto confidencial" : "confidencial isolado por org",
+  );
 
   // 6) coletor grava no org certo (função controlada, org explícito) e não vaza
   process.env.RADAR_ADMIN_CONTEXT = "1";

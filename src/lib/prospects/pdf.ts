@@ -6,9 +6,9 @@
 
 import { dossieFooterHtml, dossieToHtml } from "@/lib/prospects/pdf-template";
 import { htmlToPdf } from "@/lib/prospects/render-pdf";
-import type { ConcorrenteExibido, Dossie, Prospect } from "@/lib/prospects/schema";
+import type { ConcorrenteExibido, ContextoItem, Dossie, Prospect } from "@/lib/prospects/schema";
 
-export async function dossieToPdf(dossie: Dossie, prospect: Prospect, concorrentes: ConcorrenteExibido[]): Promise<Uint8Array> {
-  const html = dossieToHtml(dossie, prospect, concorrentes);
+export async function dossieToPdf(dossie: Dossie, prospect: Prospect, concorrentes: ConcorrenteExibido[], contexto: ContextoItem[] = []): Promise<Uint8Array> {
+  const html = dossieToHtml(dossie, prospect, concorrentes, contexto);
   return htmlToPdf(html, { footerHtml: dossieFooterHtml() });
 }

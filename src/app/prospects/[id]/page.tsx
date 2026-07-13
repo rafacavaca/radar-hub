@@ -8,10 +8,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ConcorrentesEditor } from "@/components/prospects/concorrentes-editor";
+import { ContextoPrivado } from "@/components/prospects/contexto-privado";
 import { DossieActions } from "@/components/prospects/dossie-actions";
 import { DossieFrame } from "@/components/prospects/dossie-frame";
 import { ProspectLifecycle } from "@/components/prospects/prospect-lifecycle";
 import { formatDateTimePtBR } from "@/lib/format";
+import { loadContexto } from "@/lib/prospects/contexto";
 import { getProspect, loadCuradoria, loadDossie } from "@/lib/prospects/store";
 import { mergeConcorrentes } from "@/lib/prospects/schema";
 import { dossieToHtml } from "@/lib/prospects/pdf-template";
@@ -34,7 +36,7 @@ export default async function DossiePage({
 
   const prospect = await getProspect(cliente, id);
   if (!prospect) notFound();
-  const [dossie, curadoria] = await Promise.all([loadDossie(id), loadCuradoria(id)]);
+  const [dossie, curadoria, contexto] = await Promise.all([loadDossie(id), loadCuradoria(id), loadContexto(id)]);
   // mescla sugestões (do dossiê) + curadoria do vendedor (manual/confirmar/descartar).
   const concorrentes = mergeConcorrentes(dossie?.concorrentes ?? [], curadoria);
 
@@ -74,11 +76,16 @@ export default async function DossiePage({
         ) : null}
       </div>
 
+      {/* CONTEXTO PRIVADO (confidencial) — sobe arquivo/nota antes ou depois de gerar. */}
+      <div className="mt-6">
+        <ContextoPrivado cliente={cliente} id={id} itens={contexto} />
+      </div>
+
       <div className="mt-6">
         {dossie ? (
           <>
-            {/* TELA = PDF: o MESMO HTML (com a curadoria aplicada) num iframe isolado. */}
-            <DossieFrame html={dossieToHtml(dossie, prospect, concorrentes)} />
+            {/* TELA = PDF: o MESMO HTML (curadoria + contexto privado) num iframe isolado. */}
+            <DossieFrame html={dossieToHtml(dossie, prospect, concorrentes, contexto)} />
             {/* curadoria de concorrentes (gaveta) — reflete no dossiê e no PDF ao salvar. */}
             <details className="mt-4 rounded-lg border border-stone-200 bg-white">
               <summary className="cursor-pointer px-4 py-2.5 text-[13px] font-medium text-stone-600 hover:text-stone-900">

@@ -12,6 +12,7 @@
 
 import { dossieToPdf } from "@/lib/prospects/pdf";
 import { gerarDossie } from "@/lib/prospects/dossie";
+import { loadContexto } from "@/lib/prospects/contexto";
 import { mergeConcorrentes } from "@/lib/prospects/schema";
 import { getProspect, loadCuradoria, loadDossie, loadProspects, patchProspect, saveDossie } from "@/lib/prospects/store";
 import { localDayKey } from "@/lib/schedules";
@@ -60,8 +61,8 @@ export async function prepararReunioes(
       if (opts.sendPdfEmail) {
         const atual = await getProspect(p.clientName, p.id);
         if (atual && !atual.pdfEnviadoEm) {
-          const curadoria = await loadCuradoria(p.id);
-          const pdf = await dossieToPdf(dossie, atual, mergeConcorrentes(dossie.concorrentes, curadoria));
+          const [curadoria, contexto] = await Promise.all([loadCuradoria(p.id), loadContexto(p.id)]);
+          const pdf = await dossieToPdf(dossie, atual, mergeConcorrentes(dossie.concorrentes, curadoria), contexto);
           const envio = await opts.sendPdfEmail(atual, pdf);
           res.emails.push({ nome: p.nome, envio });
           if (envio === "enviado") await patchProspect(p.clientName, p.id, { pdfEnviadoEm: now.toISOString() });

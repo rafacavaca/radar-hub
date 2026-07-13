@@ -13,7 +13,7 @@
 
 import { formatDateShort, formatDateTimePtBR } from "@/lib/format";
 import { nivelEncaixe } from "@/lib/prospects/svg";
-import { type ConcorrenteExibido, type Dossie, type Natureza, type Prospect, type StatFirmo } from "@/lib/prospects/schema";
+import { type ConcorrenteExibido, type ContextoItem, type Dossie, type Natureza, type Prospect, type StatFirmo } from "@/lib/prospects/schema";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -30,7 +30,7 @@ function srcLink(url?: string, titulo?: string): string {
   return `<a class="src" href="${esc(url)}">${esc(titulo || host(url))}</a>`;
 }
 function badge(nat: Natureza): string {
-  const cls = nat === "fato" ? "b-fato" : nat === "inferencia" ? "b-inf" : "b-ne";
+  const cls = nat === "fato" ? "b-fato" : nat === "inferencia" ? "b-inf" : nat === "interno" ? "b-int" : "b-ne";
   const txt = nat === "fato" ? "fato" : nat === "inferencia" ? "inferência" : "não encontrado";
   return `<span class="b ${cls}">${txt}</span>`;
 }
@@ -58,7 +58,7 @@ function splitProduto(texto: string): { nome: string; desc: string; b2b: boolean
   return { nome, desc, b2b: /\b(PRO|Hospitality|B2B)\b/i.test(nome) };
 }
 
-export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: ConcorrenteExibido[]): string {
+export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: ConcorrenteExibido[], contexto: ContextoItem[] = []): string {
   const d = dossie;
   const nv = nivelEncaixe(d.encaixe);
   const cor = NIVEL_COR[nv.nivel];
@@ -107,13 +107,27 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
       </div>`
     : `<div class="sec"><div class="sectitle">Sinais recentes</div><div class="empty">Sem movimentos públicos recentes encontrados — sem dado, sem invenção.</div></div>`;
 
+  // ── contexto privado (CONFIDENCIAL — do vendedor: arquivos/notas). interno. ──
+  const ctxSec = contexto.length
+    ? `<div class="sec">
+        <div class="sectitle">Contexto privado <span class="cnt">${contexto.length}</span><span class="privbadge">🔒 confidencial</span></div>
+        <div class="ctx">
+          ${contexto.map((c) => {
+            const corpo = c.legivel ? (c.resumo || c.texto).slice(0, 600) : "não foi possível ler o texto — OCR chega na F2 (nada é inventado).";
+            return `<div class="ctxitem"><div class="ctxh">${c.tipo === "nota" ? "📝" : "📎"} ${esc(c.nome)} <span class="b b-int">interno</span></div><div class="ctxb">${esc(corpo)}${c.legivel && (c.resumo || c.texto).length > 600 ? "…" : ""}</div></div>`;
+          }).join("")}
+        </div>
+        <p class="micro">Fonte interna (arquivo/nota do vendedor) — confiança alta, mas <b>confidencial</b>. Não apresentar como público.</p>
+      </div>`
+    : "";
+
   // ── como nós encaixamos (ângulo já no herói; aqui só dor → resolve) ──
   const brainTag = d.encaixe.brain_mode === "live" ? "BRAIN REAL" : d.encaixe.brain_mode === "fixture" ? "BRAIN RASCUNHO" : "SEM BRAIN";
   const encaixeSec = `<div class="sec">
     <div class="sectitle">Como nós encaixamos <span class="brainbadge">${brainTag}</span></div>
     ${d.encaixe.dores.length || d.encaixe.ganchos.length ? `<div class="fit">
-      <div class="fitcol"><h5>DORES PROVÁVEIS</h5>${(d.encaixe.dores.length ? d.encaixe.dores.map((p) => `<div class="fitrow">${esc(p.texto)}</div>`) : [`<div class="empty">— nenhuma dor clara mapeada</div>`]).join("")}</div>
-      <div class="fitcol"><h5>COMO A ${esc(d.clientName.toUpperCase())} RESOLVE</h5>${(d.encaixe.ganchos.length ? d.encaixe.ganchos.map((p) => `<div class="sol">${esc(p.texto)}</div>`) : [`<div class="empty">— sem gancho da nossa oferta</div>`]).join("")}</div>
+      <div class="fitcol"><h5>DORES PROVÁVEIS</h5>${(d.encaixe.dores.length ? d.encaixe.dores.map((p) => `<div class="fitrow">${esc(p.texto)}${p.natureza === "interno" ? badge("interno") : ""}</div>`) : [`<div class="empty">— nenhuma dor clara mapeada</div>`]).join("")}</div>
+      <div class="fitcol"><h5>COMO A ${esc(d.clientName.toUpperCase())} RESOLVE</h5>${(d.encaixe.ganchos.length ? d.encaixe.ganchos.map((p) => `<div class="sol">${esc(p.texto)}${p.natureza === "interno" ? badge("interno") : ""}</div>`) : [`<div class="empty">— sem gancho da nossa oferta</div>`]).join("")}</div>
     </div>` : `<div class="empty">Sem encaixe mapeado ${d.encaixe.brain_mode === "none" ? "— este cliente não tem Brain no Formare." : "— nada claro cruzou com a nossa oferta."}</div>`}
   </div>`;
 
@@ -199,6 +213,12 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
   .muni .o:before{ content:"!"; position:absolute; left:2px; color:var(--amber); font-weight:800; }
   .b{ font-size:10.5px; font-weight:700; letter-spacing:.5px; padding:2px 7px; border-radius:4px; vertical-align:middle; margin-left:7px; }
   .b-fato{ background:#eef0ee; color:#5a6b5c; } .b-inf{ background:#faf1df; color:var(--amber); } .b-ne{ background:#efeae1; color:var(--muted); }
+  .b-int{ background:#efe7f6; color:#6b4a9c; } /* interno · confidencial */
+  .privbadge{ margin-left:auto; background:#efe7f6; color:#6b4a9c; font-size:11px; font-weight:700; letter-spacing:.5px; padding:3px 10px; border-radius:20px; }
+  .ctx{ display:grid; gap:10px; }
+  .ctxitem{ border:1px solid #e6e1d8; border-left:3px solid #7a5cc0; border-radius:0 8px 8px 0; background:#faf8fc; padding:10px 13px; }
+  .ctxh{ font-size:14px; font-weight:700; }
+  .ctxb{ font-size:13px; line-height:1.5; color:#3c372f; margin-top:3px; }
   .b-val{ background:#faf1df; color:var(--amber); font-size:10px; padding:1px 6px; }
   .b-ok{ background:#e7f0e9; color:var(--green); font-size:10px; padding:1px 6px; }
   .b-man{ background:#221f1a; color:#fff; font-size:10px; padding:1px 6px; }
@@ -239,6 +259,7 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
   </div>
   ${concSec}
   ${sinaisSec}
+  ${ctxSec}
   ${encaixeSec}
   ${municaoSec}
   ${obsSec}

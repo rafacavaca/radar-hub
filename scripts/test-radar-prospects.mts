@@ -187,6 +187,53 @@ add("F3: descoberta vazia → fallback registra o site (notícias)", (contaFb?.s
 await store.patchProspect("PromoCo Cliente", pFallback.id, { status: "arquivado" });
 add("F3: arquivar (esfriar) tira da lista ativa", (await store.loadProspects("PromoCo Cliente")).filter((p) => p.status !== "arquivado").every((p) => p.id !== pFallback.id));
 
+// ── 8. CONTEXTO PRIVADO (extração + nota + ilegível + render 'interno') ──
+const ctx = await import("@/lib/prospects/contexto");
+const { dossieToHtml } = await import("@/lib/prospects/pdf-template");
+const { PDFDocument, StandardFonts } = await import("pdf-lib");
+
+const pCtx: Prospect = { ...mk("Moovefy", "CtxCo", "https://ctxco.com"), status: "ativo" };
+await store.upsertProspect(pCtx);
+
+// PDF "proposta" com texto real → extrai
+const doc = await PDFDocument.create();
+const pg = doc.addPage([320, 200]);
+const font = await doc.embedFont(StandardFonts.Helvetica);
+pg.drawText("Proposta Moovefy: SFA offline, 3 modulos, R$ 45.000/ano, go-live 6 semanas", { x: 16, y: 150, size: 10, font });
+const propostaBytes = await doc.save();
+const { item: arq, erro } = await ctx.addArquivo(pCtx.id, "Moovefy", "proposta.pdf", "application/pdf", new Uint8Array(propostaBytes));
+add("Contexto: PDF extraído (legível, texto real capturado)", arq.legivel && arq.texto.includes("R$ 45.000") && arq.tipo === "arquivo" && arq.temArquivo && !erro, `texto="${arq.texto.slice(0, 40)}"`);
+
+// bytes recuperáveis (rota de download) + remoção
+const bytes = await ctx.loadArquivoBytes(arq.id);
+add("Contexto: bytes guardados e recuperáveis (download autenticado)", Boolean(bytes) && bytes!.bytes.length > 0 && bytes!.mime === "application/pdf");
+
+// nota livre
+const nota = await ctx.addNota(pCtx.id, "Na reunião, o diretor disse que o orçamento é R$ 50k e a dor é integração com o ERP SAP.");
+add("Contexto: nota incorporada (interno, sem arquivo)", nota.tipo === "nota" && nota.legivel && !nota.temArquivo && nota.texto.includes("SAP"));
+
+// ilegível: PDF sem texto → legivel=false, não inventa
+const vazio = await PDFDocument.create();
+vazio.addPage([200, 200]); // página em branco, sem texto
+const { item: img, erro: erroImg } = await ctx.addArquivo(pCtx.id, "Moovefy", "escaneado.pdf", "application/pdf", new Uint8Array(await vazio.save()));
+add("Contexto: PDF sem texto → 'não foi possível ler' (não inventa)", img.legivel === false && Boolean(erroImg) && img.texto === "");
+
+// lista + render da seção no dossiê (selo 'interno' + o conteúdo do arquivo)
+const itensCtx = await ctx.loadContexto(pCtx.id);
+add("Contexto: lista traz os 3 itens (proposta, nota, escaneado)", itensCtx.length === 3);
+const dossieCtx: Dossie = {
+  prospectId: pCtx.id, clientName: "Moovefy", nome: "CtxCo", siteUrl: "https://ctxco.com", geradoEm: new Date().toISOString(),
+  perfil: { resumo: pontoFato("faz X", "https://ctxco.com"), produtos: [], paginas_lidas: [] },
+  concorrentes: [], sinais: [], encaixe: { brain_mode: "live", ganchos: [], dores: [], angulo: null }, municao: { perguntas: [], objecoes: [] }, observacoes: [],
+};
+const html = dossieToHtml(dossieCtx, pCtx, [], itensCtx);
+add("Dossiê renderiza 'Contexto privado' com selo interno + fonte do arquivo", html.includes("Contexto privado") && html.includes("b-int") && html.includes("proposta.pdf") && html.includes("R$ 45.000"));
+add("Dossiê marca o ilegível honestamente (não foi possível ler)", html.includes("não foi possível ler"));
+
+// remover (ação do usuário) apaga item E bytes
+await ctx.removeContexto(pCtx.id, arq.id);
+add("Contexto: remover apaga item E bytes", (await ctx.loadContexto(pCtx.id)).every((i) => i.id !== arq.id) && (await ctx.loadArquivoBytes(arq.id)) === null);
+
 // ── Resultado ──
 console.log("── Resultado ──");
 let ok = true;

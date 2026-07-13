@@ -5,6 +5,8 @@
  * do cliente. Então todo campo carrega `natureza`:
  *   - "fato"          → coletado de uma fonte pública (com URL);
  *   - "inferencia"    → derivado/interpretado (marcado como tal, nunca disfarçado);
+ *   - "interno"       → veio do CONTEXTO PRIVADO do vendedor (arquivo/nota) —
+ *                       confiança alta, mas CONFIDENCIAL; nunca fingir que é público;
  *   - "nao_encontrado"→ o Radar não achou (dito, não inventado).
  * Uma alucinação aqui é o vendedor passando vergonha numa reunião.
  *
@@ -12,7 +14,7 @@
  * geração debita crédito, medido como feature `prospect_dossie`).
  */
 
-export type Natureza = "fato" | "inferencia" | "nao_encontrado";
+export type Natureza = "fato" | "inferencia" | "interno" | "nao_encontrado";
 
 /** Uma linha do dossiê: um ponto + de onde veio + o que é. */
 export type Ponto = {
@@ -183,9 +185,39 @@ export function pontoInferencia(texto: string, fonte_url?: string, fonte_titulo?
 export function pontoNaoEncontrado(texto: string): Ponto {
   return { texto, natureza: "nao_encontrado" };
 }
+/** ponto do contexto PRIVADO (arquivo/nota) — interno, confidencial, sem URL. */
+export function pontoInterno(texto: string, fonte_titulo?: string): Ponto {
+  return { texto, natureza: "interno", fonte_titulo };
+}
 
 export const NATUREZA_LABEL: Record<Natureza, string> = {
   fato: "fato",
   inferencia: "inferência",
+  interno: "interno",
   nao_encontrado: "não encontrado",
+};
+
+// ── CONTEXTO PRIVADO (dado confidencial do vendedor) ────────────────────────
+// GUARDRAIL Nº1: isolado por ORG (mesmo RLS/org_docs). Nunca vaza entre agências.
+// Arquivo bruto e texto extraído ficam org-scoped; download só por rota autenticada.
+
+export type ContextoTipo = "arquivo" | "nota";
+
+export type ContextoItem = {
+  id: string;
+  prospectId: string;
+  tipo: ContextoTipo;
+  /** nome do arquivo, ou "Nota interna". */
+  nome: string;
+  mime?: string;
+  tamanho?: number; // bytes (arquivo)
+  /** texto extraído (arquivo) ou o corpo da nota — o que alimenta o dossiê. */
+  texto: string;
+  /** resumo (quando o texto é longo demais — gerado 1x no upload). */
+  resumo?: string;
+  /** false quando não deu pra ler (PDF escaneado/imagem) — honesto, sem inventar. */
+  legivel: boolean;
+  /** há bytes guardados pra baixar? (nota = false). */
+  temArquivo: boolean;
+  criadoEm: string;
 };

@@ -8,6 +8,7 @@ import { type NextRequest } from "next/server";
 
 import { mergeConcorrentes } from "@/lib/prospects/schema";
 import { dossieToPdf } from "@/lib/prospects/pdf";
+import { loadContexto } from "@/lib/prospects/contexto";
 import { getProspect, loadCuradoria, loadDossie } from "@/lib/prospects/store";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +20,11 @@ export async function GET(req: NextRequest) {
 
   const prospect = await getProspect(cliente, id);
   if (!prospect) return new Response("prospect não encontrado", { status: 404 });
-  const [dossie, curadoria] = await Promise.all([loadDossie(id), loadCuradoria(id)]);
+  const [dossie, curadoria, contexto] = await Promise.all([loadDossie(id), loadCuradoria(id), loadContexto(id)]);
   if (!dossie) return new Response("gere o dossiê antes de baixar o PDF", { status: 400 });
 
   const concorrentes = mergeConcorrentes(dossie.concorrentes, curadoria);
-  const pdf = await dossieToPdf(dossie, prospect, concorrentes);
+  const pdf = await dossieToPdf(dossie, prospect, concorrentes, contexto);
   const nome = prospect.nome.replace(/[^\w-]+/g, "-").toLowerCase();
   return new Response(Buffer.from(pdf), {
     headers: {
