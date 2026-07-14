@@ -61,8 +61,9 @@ for (const t of TABELAS) {
 }
 // usuários de auth (só id/email/criado — SEM senha; a senha é recriada por convite)
 const { data: usersData } = await sb.auth.admin.listUsers({ page: 1, perPage: 1000 });
-dump._auth_users = (usersData?.users ?? []).map((u) => ({ id: u.id, email: u.email, created_at: u.created_at }));
-console.log(`  auth.users: ${dump._auth_users.length} (id/email, sem senha)`);
+const authUsers = (usersData?.users ?? []).map((u) => ({ id: u.id, email: u.email, created_at: u.created_at }));
+dump._auth_users = authUsers;
+console.log(`  auth.users: ${authUsers.length} (id/email, sem senha)`);
 
 mkdirSync(DIR, { recursive: true });
 const arquivo = join(DIR, `radar-${DATA}.json.gz`);
