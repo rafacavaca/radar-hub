@@ -25,6 +25,7 @@ import {
   composeReport,
   removeReport,
   ensureShareTokenAsync,
+  revokeShareTokenAsync,
   loadReport,
   loadReports,
   persistReport,
@@ -137,7 +138,14 @@ export async function POST(req: NextRequest) {
       const reportId = typeof body.reportId === "string" ? body.reportId.trim() : "";
       if (!reportId) return badRequest("reportId obrigatório");
       const report = await ensureShareTokenAsync(reportId);
-      return NextResponse.json({ data: { shareToken: report.shareToken, path: `/r/${report.shareToken}` } });
+      return NextResponse.json({ data: { shareToken: report.shareToken, path: `/r/${report.shareToken}`, expiresAt: report.shareExpiresAt } });
+    }
+
+    if (action === "revoke-share") {
+      const reportId = typeof body.reportId === "string" ? body.reportId.trim() : "";
+      if (!reportId) return badRequest("reportId obrigatório");
+      await revokeShareTokenAsync(reportId); // limpa o token — o link para de funcionar na hora
+      return NextResponse.json({ data: { revoked: true } });
     }
 
     if (action === "compose-conta") {

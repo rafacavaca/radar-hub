@@ -16,7 +16,7 @@
  * implícito, RADAR_DATA_DIR pra teste isolado). Nunca lança na leitura.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -44,6 +44,10 @@ export type Report = {
   charts?: ChartSpec[];
   /** token público do link compartilhável (gerado sob demanda). */
   shareToken?: string;
+  /** validade do link público (ISO). Depois disso, negado. */
+  shareExpiresAt?: string;
+  /** link revogado manualmente (o token é limpo; este selo é pro histórico/UI). */
+  shareRevoked?: boolean;
   /** o pedido/pergunta que originou (transparência). */
   origem?: string;
   createdAt: string;
@@ -161,32 +165,81 @@ export async function removeReport(id: string): Promise<void> {
   deleteReport(id);
 }
 
-/** Leitura PÚBLICA por share-token (capability). Supabase(RPC) ou JSON. */
-export async function loadReportByShareToken(token: string): Promise<Report | null> {
-  return supabaseEnabled() ? sbGetReportByShareToken(token) : getReportByShareToken(token);
+/** Validade padrão do link público (dias). Configurável via RADAR_SHARE_TTL_DAYS. */
+export function shareTtlDays(): number {
+  const n = Number(process.env.RADAR_SHARE_TTL_DAYS);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 30;
 }
 
-/** Garante o token público do link, na org da sessão (ou JSON). */
+/** O link está EXPIRADO ou REVOGADO? Checagem de app — instantânea no acesso normal. */
+export function shareLinkInvalid(r: Report): boolean {
+  if (r.shareRevoked) return true;
+  if (!r.shareExpiresAt) return false;
+  return new Date(r.shareExpiresAt).getTime() <= Date.now();
+}
+
+/** Token novo ALEATÓRIO (128 bits, imprevisível) + validade. Usado ao criar/renovar. */
+function novoTokenComValidade(r: Report): void {
+  r.shareToken = randomBytes(16).toString("hex"); // 32 hex = 128 bits (o sha1(id) era adivinhável)
+  r.shareExpiresAt = new Date(Date.now() + shareTtlDays() * 86_400_000).toISOString();
+  r.shareRevoked = false;
+}
+
+/**
+ * Leitura PÚBLICA por share-token (capability). Nega (null) se o link estiver
+ * EXPIRADO ou REVOGADO — nunca serve conteúdo antigo. (No banco, revogar LIMPA o
+ * token, então a RPC nem acha; a checagem de expiração aqui cobre o acesso normal
+ * — a migração 003 leva a expiração pra dentro da RPC, à prova de bypass direto.)
+ */
+export async function loadReportByShareToken(token: string): Promise<Report | null> {
+  const r = supabaseEnabled() ? await sbGetReportByShareToken(token) : getReportByShareToken(token);
+  if (!r || shareLinkInvalid(r)) return null;
+  return r;
+}
+
+/** Garante o token público do link (cria OU renova se expirado/revogado), na org da sessão. */
 export async function ensureShareTokenAsync(id: string): Promise<Report> {
   if (!supabaseEnabled()) return ensureShareToken(id);
   const r = await sbGetReport(id);
   if (!r) throw new Error("Relatório não encontrado.");
-  if (!r.shareToken) {
-    r.shareToken = createHash("sha1").update(`share:${id}:${r.createdAt}`).digest("hex").slice(0, 24);
+  if (!r.shareToken || shareLinkInvalid(r)) {
+    novoTokenComValidade(r);
     await sbSaveReport(r);
   }
   return r;
 }
 
-/** Garante (e persiste) um token público pro link compartilhável. */
+/** Garante (e persiste) um token público — cria OU renova se expirado/revogado. */
 export function ensureShareToken(id: string): Report {
   const file = readFile();
   const r = file.reports.find((x) => x.id === id);
   if (!r) throw new Error("Relatório não encontrado.");
-  if (!r.shareToken) {
-    r.shareToken = createHash("sha1").update(`share:${id}:${r.createdAt}`).digest("hex").slice(0, 24);
+  if (!r.shareToken || shareLinkInvalid(r)) {
+    novoTokenComValidade(r);
     writeFile(file);
   }
+  return r;
+}
+
+/** REVOGA o link: LIMPA o token (a RPC não acha mais → à prova de bypass) + selo. */
+export async function revokeShareTokenAsync(id: string): Promise<Report> {
+  if (!supabaseEnabled()) return revokeShareToken(id);
+  const r = await sbGetReport(id);
+  if (!r) throw new Error("Relatório não encontrado.");
+  r.shareToken = undefined;
+  r.shareRevoked = true;
+  await sbSaveReport(r);
+  return r;
+}
+
+/** REVOGA o link (modo JSON). */
+export function revokeShareToken(id: string): Report {
+  const file = readFile();
+  const r = file.reports.find((x) => x.id === id);
+  if (!r) throw new Error("Relatório não encontrado.");
+  r.shareToken = undefined;
+  r.shareRevoked = true;
+  writeFile(file);
   return r;
 }
 

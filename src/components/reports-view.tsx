@@ -31,6 +31,8 @@ type Report = {
   fontes: Fonte[];
   charts?: ChartSpec[];
   shareToken?: string;
+  shareExpiresAt?: string;
+  shareRevoked?: boolean;
   origem?: string;
   createdAt: string;
 };
@@ -398,9 +400,10 @@ function ReportCard({ report }: { report: Report }) {
 
 function ReportActions({ report }: { report: Report }) {
   const router = useRouter();
-  const [busy, setBusy] = useState<null | "formare" | "delete" | "share">(null);
+  const [busy, setBusy] = useState<null | "formare" | "delete" | "share" | "revoke">(null);
   const [sent, setSent] = useState<null | { url?: string }>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(report.shareToken ? `/r/${report.shareToken}` : null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(report.shareExpiresAt ?? null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -419,13 +422,40 @@ function ReportActions({ report }: { report: Report }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "share", reportId: report.id }),
       });
-      const payload = (await res.json().catch(() => null)) as { data?: { path?: string }; error?: string } | null;
+      const payload = (await res.json().catch(() => null)) as { data?: { path?: string; expiresAt?: string }; error?: string } | null;
       if (!res.ok || !payload?.data?.path) {
         setError(payload?.error ?? "Não deu pra gerar o link.");
         return;
       }
       setShareUrl(payload.data.path);
+      setExpiresAt(payload.data.expiresAt ?? null);
       await copiar(payload.data.path);
+    } catch {
+      setError("Falha de conexão. Tente de novo.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function revogar() {
+    if (busy) return;
+    if (!window.confirm("Revogar o link? Quem tiver o link atual perde o acesso na hora.")) return;
+    setBusy("revoke");
+    setError(null);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke-share", reportId: report.id }),
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(payload?.error ?? "Não deu pra revogar.");
+        return;
+      }
+      setShareUrl(null);
+      setExpiresAt(null);
+      setCopied(false);
     } catch {
       setError("Falha de conexão. Tente de novo.");
     } finally {
@@ -540,6 +570,24 @@ function ReportActions({ report }: { report: Report }) {
       >
         {busy === "share" ? "Gerando…" : copied ? "✓ link copiado" : shareUrl ? "Copiar link" : "Link compartilhável"}
       </button>
+
+      {shareUrl ? (
+        <>
+          {expiresAt ? (
+            <span className="text-[11px] text-stone-400">
+              expira {new Date(expiresAt).toLocaleDateString("pt-BR")}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={revogar}
+            disabled={busy !== null}
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50"
+          >
+            {busy === "revoke" ? "Revogando…" : "Revogar link"}
+          </button>
+        </>
+      ) : null}
 
       <button
         type="button"
