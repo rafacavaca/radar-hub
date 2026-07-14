@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AtualizarDigest } from "@/components/atualizar-digest";
+import { LimparFalhas } from "@/components/hoje/limpar-falhas";
 import { SignalCard } from "@/components/hoje/signal-card";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatDateTimePtBR } from "@/lib/format";
@@ -112,6 +113,7 @@ export function HojeView({
 
   const novos = grupos.filter((g) => unseen.has(g.key)).length;
   const movimentos = grupos.filter((g) => g.head.kind === "alerta").length;
+  const falhas = observacoes.filter((o) => o.startsWith("Falha de coleta:")).length;
 
   return (
     <section className="mx-auto max-w-[860px] px-5 py-8 sm:px-6">
@@ -175,7 +177,10 @@ export function HojeView({
 
       {observacoes.length > 0 ? (
         <div className="mt-8 rounded-xl border border-stone-200 bg-stone-100/60 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Transparência da base</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Transparência da base</p>
+            <LimparFalhas quantidade={falhas} />
+          </div>
           <ul className="mt-1.5 space-y-1 text-[13px] text-stone-500">
             {observacoes.map((o, i) => (
               <li key={i}>· {o}</li>

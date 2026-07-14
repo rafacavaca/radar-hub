@@ -191,6 +191,20 @@ export async function peekLoopResult(): Promise<RadarLoopResult | null> {
 }
 
 /**
+ * Remove as FALHAS de coleta do resultado do dia, preservando tudo o que deu
+ * certo (items/leituras/eventos). Usado pelo botão "Limpar falhas" da
+ * Transparência da base (Hoje): a coleta boa fica, o ruído de falha some.
+ * Por org (o cache é org-scoped). Retorna quantas falhas foram removidas.
+ */
+export async function clearLoopFailures(): Promise<number> {
+  const cached = await loadLoopCache();
+  const n = cached?.failures?.length ?? 0;
+  if (!cached || n === 0) return 0;
+  await persistLoopCache({ ...cached, failures: [] });
+  return n;
+}
+
+/**
  * Ingestão LinkedIn (extensão "Enviar ao Radar"): a porta é um segredo ÚNICO,
  * então no modo org só a org DESIGNADA (RADAR_INGEST_ORG_ID) lê o arquivo — as
  * demais ficam vazias, honesto. Ingestão por-org (token por org) é passo futuro.
