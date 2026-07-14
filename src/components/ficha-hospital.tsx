@@ -95,7 +95,7 @@ export function FichaHospital({
       {fit.length > 0 ? (
         <div className="border-b border-stone-100 px-4 py-3 sm:px-5">
           <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-stone-400">
-            Fit por linha
+            Aderência por linha
           </p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {fit.map(([linha, nivel]) => (
@@ -113,7 +113,7 @@ export function FichaHospital({
       {/* gatilhos */}
       <div className="px-4 py-4 sm:px-5">
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-400">
-          Gatilhos {gatilhos.length > 0 ? `(${gatilhos.length})` : ""}
+          Oportunidades {gatilhos.length > 0 ? `(${gatilhos.length})` : ""}
         </p>
         {gatilhos.length === 0 ? (
           <p className="rounded-md border border-dashed border-stone-200 bg-stone-50/60 px-3 py-3 text-sm text-stone-500">
@@ -141,7 +141,7 @@ export function FichaHospital({
 
                 <div className="mt-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                    Gatilho
+                    Oportunidade
                   </p>
                   <p className="mt-0.5 text-sm leading-relaxed text-stone-700">{g.gatilho}</p>
                 </div>

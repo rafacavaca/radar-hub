@@ -151,17 +151,17 @@ const TEMPLATES: { label: string; build: (cliente: string) => string }[] = [
   {
     label: "Comparativo de concorrentes",
     build: (c) =>
-      `Comparativo dos concorrentes vigiados: posicionamento, lançamentos e mudanças recentes — e onde ${c} se diferencia.`,
+      `Comparativo dos concorrentes monitorados: posicionamento, lançamentos e mudanças recentes — e onde ${c} se diferencia.`,
   },
   {
     label: "Panorama comercial",
     build: (c) =>
-      `Relatório na ótica comercial: movimentos que geram risco ou oportunidade de venda para ${c}, com ação para o time comercial.`,
+      `Relatório na área comercial: movimentos que geram risco ou oportunidade de venda para ${c}, com ação para o time comercial.`,
   },
   {
     label: "Oportunidades de produto",
     build: (c) =>
-      `Relatório na ótica de produto: tendências e lançamentos do mercado versus o roadmap de ${c} — o que já temos, o que está parado e os gaps.`,
+      `Relatório na área de produto: tendências e lançamentos do mercado versus o roadmap de ${c} — o que já temos, o que está parado e os gaps.`,
   },
 ];
 
@@ -217,7 +217,7 @@ function Composer({ clients }: { clients: string[] }) {
         </h2>
       </div>
       <p className="mt-1 text-sm text-stone-500">
-        Descreva em linguagem natural o que você quer — o Radar reúne o material coletado + o Brain
+        Descreva em linguagem natural o que você quer — o Radar reúne o material coletado + a base de conhecimento
         do cliente e redige. Honesto: só usa o que coletou.
       </p>
 

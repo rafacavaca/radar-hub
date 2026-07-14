@@ -40,7 +40,7 @@ const VOCAB: Record<
     nomeLabel: "Nome do concorrente",
     placeholder: "Ex.: RD Station",
     addCta: "Adicionar à vigilância",
-    emptyRow: "Nenhum concorrente vigiado ainda. Adicione o primeiro abaixo.",
+    emptyRow: "Nenhum concorrente monitorado ainda. Adicione o primeiro abaixo.",
     hint: 'Digite nome + site e clique em "Descobrir fontes". Adicionou alguém? Vá ao Briefing e use "Rodar agora" para varrer já.',
   },
   "conta-chave": {
@@ -49,7 +49,7 @@ const VOCAB: Record<
     nomeLabel: "Nome da conta",
     placeholder: "Ex.: Frigorífico Bom Gosto",
     addCta: "Adicionar conta-chave",
-    emptyRow: "Nenhuma conta-chave vigiada ainda. Adicione a primeira abaixo.",
+    emptyRow: "Nenhuma conta-chave monitorada ainda. Adicione a primeira abaixo.",
     hint: 'Digite nome + site e clique em "Descobrir fontes". Adicionou? Vá em Contas → Fichas e use "Rodar" pra varrer já.',
   },
 };
@@ -337,7 +337,7 @@ function AddCompetitorFlow({ clientName, pillar }: { clientName: string; pillar:
     >
       {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-stone-500">{vocab.nomeLabel}</span>
           <input
@@ -368,7 +368,7 @@ function AddCompetitorFlow({ clientName, pillar }: { clientName: string; pillar:
       {candidates !== null && candidates.length > 0 ? (
         <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/60 p-3.5">
           <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-            Fontes encontradas — confirme o que vigiar
+            Fontes encontradas — confirme o que monitorar
           </p>
           <ul className="mt-2 space-y-2">
             {candidates.map((c, index) => (

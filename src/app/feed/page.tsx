@@ -48,7 +48,7 @@ export default async function FeedPage({
           </h1>
           <p className="mt-1.5 text-sm text-stone-500">
             {result.ranAt ? <>atualizado em {formatDateTimePtBR(result.ranAt)} · </> : null}
-            as leituras por time estão no Briefing
+            a leitura por área está no Briefing
           </p>
         </div>
         <RodarAgora testId="rodar-agora" cliente={cliente || undefined} />

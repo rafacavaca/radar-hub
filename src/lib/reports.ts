@@ -211,7 +211,7 @@ export function deleteReport(id: string): void {
 
 const REPORT_SYSTEM =
   "Você é o RADAR, redigindo um RELATÓRIO de inteligência de mercado para o dono da agência Formare. " +
-  "Escreva um documento claro e apresentável, em pt-BR, a partir APENAS do MATERIAL fornecido (itens coletados + o Brain do cliente). " +
+  "Escreva um documento claro e apresentável, em pt-BR, a partir APENAS do MATERIAL fornecido (itens coletados + a base de conhecimento do cliente). " +
   "FORMATO: responda em MARKDOWN PURO (NÃO use JSON, NÃO embrulhe em ```). " +
   "A PRIMEIRA linha é o título como cabeçalho markdown de nível 1, ex.: '# Inteligência competitiva — <cliente>'. " +
   "Depois: um resumo executivo de 2-3 linhas, seções com '## ', listas e **negrito**, e uma seção final de recomendações. " +
@@ -301,7 +301,7 @@ export async function composeReport(
 
   const prompt = `CLIENTE DO RELATÓRIO: ${clientName}
 
-O QUE O BRAIN SABE DE ${clientName.toUpperCase()}:
+O QUE A BASE DE CONHECIMENTO SABE DE ${clientName.toUpperCase()}:
 ${brain.context}
 
 MATERIAL COLETADO (itens de inteligência — cite por [n]):

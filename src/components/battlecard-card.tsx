@@ -25,9 +25,9 @@ import { formatDateShort, formatDateTimePtBR } from "@/lib/format";
 import { SourceRef } from "@/components/signal-meta";
 
 const BRAIN_LABEL: Record<Battlecard["brain_mode"], { texto: string; cor: string }> = {
-  live: { texto: "diferenciais do Brain real", cor: "bg-emerald-50 text-emerald-700" },
-  fixture: { texto: "diferenciais de rascunho local — confirmar no Brain", cor: "bg-amber-50 text-amber-800" },
-  none: { texto: "Brain sem dados deste cliente — sem 'como ganhar'", cor: "bg-stone-100 text-stone-500" },
+  live: { texto: "diferenciais da base real", cor: "bg-emerald-50 text-emerald-700" },
+  fixture: { texto: "diferenciais de rascunho local — confirmar na base", cor: "bg-amber-50 text-amber-800" },
+  none: { texto: "Base sem dados deste cliente — sem 'como ganhar'", cor: "bg-stone-100 text-stone-500" },
 };
 
 /** Selo fato/opinião — mesma linguagem dos gráficos (um estilo por tipo). */
@@ -75,7 +75,7 @@ export function BattlecardView({
       </span>
 
       {/* QUEM SÃO · COMO SE POSICIONAM — a abertura editorial */}
-      <div className="mt-4 grid gap-5 sm:grid-cols-2">
+      <div className="mt-4 grid gap-5 md:grid-cols-2">
         {b.quem_sao ? (
           <div>
             <SecaoTitulo selo="opiniao">Quem são</SecaoTitulo>
@@ -99,7 +99,7 @@ export function BattlecardView({
       </div>
 
       {/* FORÇAS × FRAQUEZAS — itens curtos, fonte em cada um */}
-      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+      <div className="mt-5 grid gap-5 md:grid-cols-2">
         <div className="rounded-lg border border-stone-200 bg-stone-50/60 p-4">
           <SecaoTitulo selo="opiniao">Forças (deles)</SecaoTitulo>
           <ul className="mt-2 space-y-2">
@@ -161,7 +161,7 @@ export function BattlecardView({
                 </>
               ) : (
                 <p className="mt-1.5 text-sm italic text-stone-400">
-                  sem diferencial nosso mapeado para esta fraqueza — alimentar o Brain
+                  sem diferencial nosso mapeado para esta fraqueza — alimentar a base
                 </p>
               )}
             </div>
@@ -278,7 +278,7 @@ export function BattlecardCard({
 
       {!b ? (
         <p className="px-4 py-4 text-sm text-stone-500 sm:px-5">
-          Sem battlecard ainda — gera a partir do diagnóstico salvo + Brain (rápido, sem nova varredura).
+          Sem battlecard ainda — gera a partir do diagnóstico salvo + base de conhecimento (rápido, sem nova varredura).
         </p>
       ) : (
         <>

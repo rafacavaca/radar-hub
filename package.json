@@ -49,6 +49,7 @@
     "smoke:cobertura": "tsx scripts/test-radar-cobertura.mts",
     "smoke:dodge": "tsx scripts/test-radar-dodge.mts",
     "smoke:custo": "tsx scripts/test-radar-custo.mts",
+    "smoke:firecrawl": "tsx scripts/test-firecrawl-keys.mts",
     "demo:custo": "tsx scripts/demo-custo-moovefy.mts",
     "test:isolation": "tsx scripts/test-isolation.mts",
     "migrate:supabase": "tsx scripts/migrate-to-supabase.mts",

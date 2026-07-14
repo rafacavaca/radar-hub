@@ -28,6 +28,7 @@ import {
 } from "@/lib/usage/aggregate";
 import { getPrecos } from "@/lib/usage/precos";
 import { readUsageEvents } from "@/lib/usage/store";
+import { statusChaves } from "@/lib/firecrawl-keys";
 import { supabaseEnabled } from "@/lib/db/supabase";
 import { isSuperAdmin } from "@/lib/db/session";
 
@@ -51,6 +52,12 @@ function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
+}
+
+/** YYYY-MM-DD → DD/MM (curto, pro rótulo de renovação). */
+function fmtDiaMes(iso: string): string {
+  const [, m, d] = iso.split("-");
+  return m && d ? `${d}/${m}` : iso;
 }
 
 function Kpi({ rotulo, valor, sub }: { rotulo: string; valor: string; sub?: string }) {
@@ -120,6 +127,12 @@ export default async function CustoPage({ searchParams }: { searchParams: Promis
   const modelos = porModelo(eventos);
   const dias = porDia(eventos);
 
+  // Chaves Firecrawl (rodízio) — independe dos eventos; sempre mostra.
+  const chavesFC = statusChaves();
+  const emUsoSlot = chavesFC.find((c) => !c.esgotada)?.slot;
+  const fcRestante = chavesFC.reduce((s, c) => s + c.restante, 0);
+  const fcQuota = chavesFC.reduce((s, c) => s + c.quota, 0);
+
   const linkPeriodo = (d: number | null) => {
     const q = new URLSearchParams();
     q.set("dias", d == null ? "tudo" : String(d));
@@ -162,6 +175,55 @@ export default async function CustoPage({ searchParams }: { searchParams: Promis
           Estimativa por tabela de preço — <span className="font-medium text-stone-600">não é fatura</span>. Claude roda por
           subscrição (marginal real ≈ 0 até o teto do plano); o valor é o equivalente-API, a base honesta pra decidir preço.
         </p>
+
+        {/* Chaves Firecrawl — o rodízio das contas de coleta (cada ~1000/mês) */}
+        {chavesFC.length > 0 ? (
+          <section className="mt-5 rounded-xl border border-stone-200 bg-white">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-100 px-4 py-3">
+              <div>
+                <h2 className="text-sm font-semibold text-stone-900">Chaves Firecrawl</h2>
+                <p className="mt-0.5 text-xs text-stone-500">
+                  Rodízio automático — usa uma até a cota, aí passa pra próxima. Cada conta renova no próprio dia.
+                </p>
+              </div>
+              <span className="shrink-0 text-xs font-medium tabular-nums text-stone-500">
+                {fcRestante} de {fcQuota} disponíveis no ciclo
+              </span>
+            </div>
+            <ul className="divide-y divide-stone-100">
+              {chavesFC.map((c) => {
+                const pct = c.quota > 0 ? (c.usados / c.quota) * 100 : 0;
+                return (
+                  <li key={c.slot} className="px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-sm font-medium text-stone-800">
+                        {c.label}
+                        {c.slot === emUsoSlot ? <span className="ml-2 text-[11px] font-normal text-red-600">em uso</span> : null}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-stone-500">
+                        {c.usados} / {c.quota} · renova {fmtDiaMes(c.proximaRenovacao)}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone-100">
+                      <div
+                        className={"h-full rounded-full " + (c.esgotada ? "bg-stone-400" : "bg-red-400")}
+                        style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
+                      />
+                    </div>
+                    {c.esgotada ? (
+                      <p className="mt-1 text-[11px] text-amber-600">
+                        Sem cota — aguardando renovação{c.renovaDia ? ` (dia ${c.renovaDia})` : ""}.
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="border-t border-stone-100 px-4 py-2 text-[11px] text-stone-400">
+              Contagem local (estimativa). O limite real é a recusa da API (HTTP 402) — ela dispara o rodízio na hora.
+            </p>
+          </section>
+        ) : null}
 
         {eventos.length === 0 ? (
           <div className="mt-8 rounded-xl border border-dashed border-stone-300 bg-white p-10 text-center">

@@ -8,8 +8,10 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { currentOrgId } from "@/lib/db/session";
 import { gerarDossie } from "@/lib/prospects/dossie";
 import { getProspect, patchProspect, saveDossie } from "@/lib/prospects/store";
+import { LIMITES, rateLimit, respostaRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120; // a montagem reusa scrape + várias chamadas de LLM
@@ -22,6 +24,11 @@ export async function POST(req: NextRequest) {
 
   const prospect = await getProspect(cliente, id);
   if (!prospect) return NextResponse.json({ error: "prospect não encontrado" }, { status: 404 });
+
+  // Ação cara (Firecrawl + várias chamadas de LLM) — trava loop por org.
+  const org = (await currentOrgId()) ?? "anon";
+  const rl = rateLimit(`dossie:${org}`, LIMITES.dossie.limit, LIMITES.dossie.windowMs);
+  if (rl.limited) return respostaRateLimit(rl);
 
   try {
     const dossie = await gerarDossie(prospect);

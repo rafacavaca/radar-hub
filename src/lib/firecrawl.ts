@@ -14,11 +14,20 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { marcarEsgotada, ordemDeTentativa, registrarUso } from "@/lib/firecrawl-keys";
 import { recordColetaUsage } from "@/lib/usage/store";
 
 const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape";
 const FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v2/search";
 const CACHE_DIR = join(process.cwd(), ".cache", "firecrawl");
+
+/**
+ * Status HTTP da API do Firecrawl que dizem "ESTA chave não serve agora" —
+ * rotaciona pra próxima em vez de falhar: 401/403 (chave inválida), 402 (sem
+ * crédito = cota do mês), 429 (rate limit). Bloqueio do SITE-ALVO não vem como
+ * status da API (vem dentro de um 200 com success:false), então não confunde.
+ */
+const STATUS_ROTACIONA = new Set([401, 402, 403, 429]);
 
 /** O que devolvemos ao chamador — forma estável, independente da API. */
 export type ScrapeResult = {
@@ -118,54 +127,70 @@ export async function scrape(url: string, opts: ScrapeOptions = {}): Promise<Scr
     if (cached) return cached;
   }
 
-  const apiKey = process.env.FIRECRAWL_API_KEY;
-  if (!apiKey) {
+  const chaves = ordemDeTentativa();
+  if (chaves.length === 0) {
     throw new Error(
-      "FIRECRAWL_API_KEY ausente. Defina-a em .env.local (o runner a carrega via dotenv).",
+      "Nenhuma chave Firecrawl configurada. Defina FIRECRAWL_API_KEY em .env.local (o runner a carrega via dotenv).",
     );
   }
 
-  const t0 = Date.now();
-  let response: Response;
-  try {
-    response = await fetch(FIRECRAWL_SCRAPE_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ url, formats, onlyMainContent, ...(waitFor ? { waitFor } : {}) }),
-    });
-  } catch (err) {
-    throw new Error(`Firecrawl: falha de rede ao raspar ${url}: ${(err as Error).message}`);
+  // Rotação: tenta as chaves em ordem; na recusa por cota/chave, marca esgotada
+  // e passa pra próxima. Erro real (rede, site-alvo) NÃO rotaciona — falha logo.
+  let ultimoDetalhe = "";
+  for (const chave of chaves) {
+    const t0 = Date.now();
+    let response: Response;
+    try {
+      response = await fetch(FIRECRAWL_SCRAPE_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${chave.key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url, formats, onlyMainContent, ...(waitFor ? { waitFor } : {}) }),
+      });
+    } catch (err) {
+      throw new Error(`Firecrawl: falha de rede ao raspar ${url}: ${(err as Error).message}`);
+    }
+
+    if (STATUS_ROTACIONA.has(response.status)) {
+      marcarEsgotada(chave.id);
+      ultimoDetalhe = `${chave.label}: HTTP ${response.status}`;
+      continue;
+    }
+
+    let payload: FirecrawlResponse;
+    try {
+      payload = (await response.json()) as FirecrawlResponse;
+    } catch {
+      throw new Error(`Firecrawl: resposta não-JSON (HTTP ${response.status}) ao raspar ${url}`);
+    }
+
+    if (!response.ok || !payload.success || !payload.data) {
+      const detail = payload?.error ?? `HTTP ${response.status}`;
+      throw new Error(`Firecrawl: falha ao raspar ${url} — ${detail}`);
+    }
+
+    const result: ScrapeResult = {
+      markdown: payload.data.markdown ?? "",
+      links: payload.data.links ?? [],
+      title: payload.data.metadata?.title,
+      description: payload.data.metadata?.description,
+      statusCode: payload.data.metadata?.statusCode,
+      screenshot: payload.data.screenshot,
+    };
+
+    writeCache(url, result);
+    // medição (item 1): 1 página raspada = 1 crédito. Só conta o HIT REAL de API
+    // (o retorno por cache acima não gasta crédito e não é medido). Fire-and-forget.
+    registrarUso(chave.id);
+    recordColetaUsage({ unidades: 1, tipo: "pagina", latenciaMs: Date.now() - t0 });
+    return result;
   }
 
-  let payload: FirecrawlResponse;
-  try {
-    payload = (await response.json()) as FirecrawlResponse;
-  } catch {
-    throw new Error(`Firecrawl: resposta não-JSON (HTTP ${response.status}) ao raspar ${url}`);
-  }
-
-  if (!response.ok || !payload.success || !payload.data) {
-    const detail = payload?.error ?? `HTTP ${response.status}`;
-    throw new Error(`Firecrawl: falha ao raspar ${url} — ${detail}`);
-  }
-
-  const result: ScrapeResult = {
-    markdown: payload.data.markdown ?? "",
-    links: payload.data.links ?? [],
-    title: payload.data.metadata?.title,
-    description: payload.data.metadata?.description,
-    statusCode: payload.data.metadata?.statusCode,
-    screenshot: payload.data.screenshot,
-  };
-
-  writeCache(url, result);
-  // medição (item 1): 1 página raspada = 1 crédito. Só conta o HIT REAL de API
-  // (o retorno por cache acima não gasta crédito e não é medido). Fire-and-forget.
-  recordColetaUsage({ unidades: 1, tipo: "pagina", latenciaMs: Date.now() - t0 });
-  return result;
+  throw new Error(
+    `Firecrawl: todas as ${chaves.length} chave(s) sem cota ao raspar ${url} (${ultimoDetalhe}). Aguarde a renovação ou adicione outra chave.`,
+  );
 }
 
 export type SearchHit = { url: string; title: string; description?: string };
@@ -177,29 +202,47 @@ export type SearchHit = { url: string; title: string; description?: string };
  * resposta estranha: devolve [] e o chamador segue sem a rede de segurança.
  */
 export async function searchWeb(query: string, limit = 6): Promise<SearchHit[]> {
-  const apiKey = process.env.FIRECRAWL_API_KEY;
-  if (!apiKey) return [];
+  const chaves = ordemDeTentativa();
+  if (chaves.length === 0) return [];
 
-  const t0 = Date.now();
-  try {
-    const response = await fetch(FIRECRAWL_SEARCH_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ query, limit }),
-      signal: AbortSignal.timeout(20000),
-    });
+  // Mesma rotação do scrape, mas best-effort: rede/timeout/resposta estranha ⇒
+  // desiste (devolve []); só cota (STATUS_ROTACIONA) rotaciona pra próxima chave.
+  for (const chave of chaves) {
+    const t0 = Date.now();
+    let response: Response;
+    try {
+      response = await fetch(FIRECRAWL_SEARCH_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${chave.key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query, limit }),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch {
+      return [];
+    }
+
+    if (STATUS_ROTACIONA.has(response.status)) {
+      marcarEsgotada(chave.id);
+      continue;
+    }
     if (!response.ok) return [];
-    const payload = (await response.json()) as {
+
+    let payload: {
       success?: boolean;
       data?: { web?: Array<{ url?: string; title?: string; description?: string }> } | Array<{ url?: string; title?: string; description?: string }>;
     };
+    try {
+      payload = await response.json();
+    } catch {
+      return [];
+    }
     const rows = Array.isArray(payload.data) ? payload.data : (payload.data?.web ?? []);
     // medição (item 1): 1 busca web = 1 crédito. Fire-and-forget.
+    registrarUso(chave.id);
     recordColetaUsage({ unidades: 1, tipo: "busca", latenciaMs: Date.now() - t0 });
     return rows
       .filter((r) => typeof r?.url === "string")
       .map((r) => ({ url: r.url as string, title: (r.title ?? "").trim(), description: r.description }));
-  } catch {
-    return [];
   }
+  return [];
 }

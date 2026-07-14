@@ -245,6 +245,24 @@ export function buildGeneralItems(readings: LensReading[]): IntelligenceItem[] {
   return byScoreDesc(items);
 }
 
+/**
+ * O resultado do dia veio "MORTO": o Radar coletou sinais mas a ANÁLISE inteira
+ * falhou (gateway/coleta caíram na rodada que gerou o cache). Distingue:
+ *   - dia calmo   → 0 outputs, 0 falhas  → NÃO é morto (vazio legítimo);
+ *   - parcial     → algum output + falhas → NÃO é morto (mostra o que tem);
+ *   - MORTO       → 0 outputs analíticos E houve falhas → a UI avisa (honesto)
+ *                   em vez de renderizar um vazio que parece calmaria.
+ * Sem isto, um soluço noturno do gateway "envenena o dia" silenciosamente.
+ */
+export function analiseFalhou(result: RadarLoopResult): boolean {
+  const outputs =
+    result.items.length +
+    (result.readings?.length ?? 0) +
+    (result.salesReadings?.length ?? 0) +
+    (result.relationshipPlays?.length ?? 0);
+  return outputs === 0 && (result.failures?.length ?? 0) > 0;
+}
+
 /** ids das entidades no pilar "conta-chave" de um cliente (partição do loop). */
 function contaChaveIds(client: WatchClient | undefined): Set<string> {
   const ids = new Set<string>();

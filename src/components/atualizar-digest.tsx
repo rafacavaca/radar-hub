@@ -9,6 +9,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { GenerateIcon } from "@/components/icons";
+
 export function AtualizarDigest() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -35,8 +37,9 @@ export function AtualizarDigest() {
         type="button"
         onClick={atualizar}
         disabled={busy}
-        className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-700 transition-colors hover:border-stone-900 hover:text-stone-900 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-700 transition-colors hover:border-stone-900 hover:text-stone-900 disabled:opacity-50"
       >
+        <GenerateIcon className={"h-3.5 w-3.5 " + (busy ? "animate-pulse" : "")} />
         {busy ? "Atualizando…" : "Atualizar"}
       </button>
       {erro ? <span className="text-[12px] text-red-600">{erro}</span> : null}

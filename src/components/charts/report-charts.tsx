@@ -461,7 +461,7 @@ export function ReportChart({ chart }: { chart: ChartSpec }) {
 export function ReportCharts({ charts }: { charts: ChartSpec[] }) {
   if (charts.length === 0) return null;
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2">
       {charts.map((c, i) => (
         <div key={i} className={c.tipo === "dispersao" || c.tipo === "grade" ? "sm:col-span-2" : ""}>
           <ReportChart chart={c} />

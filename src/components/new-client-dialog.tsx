@@ -16,15 +16,15 @@ import { useEffect, useState, type FormEvent } from "react";
 const INPUT_CLASS =
   "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none";
 
-function PlusIcon() {
+function PlusIcon({ className = "h-[18px] w-[18px]" }: { className?: string }) {
   return (
     <svg
       aria-hidden
       viewBox="0 0 24 24"
-      className="h-4 w-4"
+      className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.75"
       strokeLinecap="round"
     >
       <path d="M12 5v14M5 12h14" />
@@ -59,7 +59,7 @@ export function NewClientButton({
           type="button"
           data-testid="new-client"
           onClick={() => setOpen(true)}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 hover:text-stone-900"
+          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 hover:text-stone-900"
         >
           <PlusIcon />
           Novo cliente
@@ -223,8 +223,8 @@ function NewClientDialog({ clients, onClose }: { clients: string[]; onClose: () 
           </label>
 
           <p className="mt-3 text-xs text-stone-400">
-            O cliente novo nasce com as 3 lentes padrão e sem concorrentes — depois é só adicionar
-            quem vigiar na aba Concorrentes.
+            O cliente novo nasce com as 3 áreas padrão e sem concorrentes — depois é só adicionar
+            quem monitorar na aba Concorrentes.
           </p>
 
           <div className="mt-4 flex items-center justify-end gap-2">

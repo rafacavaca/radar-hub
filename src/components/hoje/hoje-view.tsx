@@ -26,7 +26,7 @@ const SEEN_KEY = "radar:hoje:seen";
 function CompBar({ grupos }: { grupos: DigestGroup[] }) {
   const KIND_ORDER = ["alerta", "gatilho", "jogada", "leitura", "relatorio"] as const;
   const KIND_LABEL: Record<string, string> = {
-    alerta: "Alertas", gatilho: "Gatilhos", jogada: "Relacionamento", leitura: "Leituras", relatorio: "Relatórios",
+    alerta: "Alertas", gatilho: "Oportunidades", jogada: "Relacionamento", leitura: "Leituras", relatorio: "Relatórios",
   };
   // tom: alerta = acento vermelho (o urgente); resto = escala de tinta.
   const KIND_FILL: Record<string, string> = {
@@ -119,6 +119,7 @@ export function HojeView({
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Hoje</p>
           <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-stone-900 first-letter:uppercase">{tituloDia}</h1>
+          <p className="mt-1 text-[13px] text-stone-500">O que mudou desde ontem e o que precisa de você hoje.</p>
           <p className="mt-1 text-[12px] text-stone-400">
             Digest de {formatDateTimePtBR(geradoEm)} · {clientesCount} cliente(s) na base
           </p>
@@ -129,7 +130,7 @@ export function HojeView({
       {/* COCKPIT — bate o olho e sabe se o dia tem fogo */}
       {!tranquilo ? (
         <div className="mt-5 rounded-xl border border-stone-200 bg-white px-5 py-4">
-          <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:flex md:flex-wrap md:items-center md:gap-x-10 md:gap-y-3">
             <Metric n={grupos.length} label="Requer atenção" tip="Sinais que ainda não foram processados hoje." />
             <Metric n={novos} label="Novos" tip="Sinais novos desde a sua última visita." accent />
             <Metric n={movimentos} label="Movimentos" tip="Alertas de diagnóstico de concorrentes na base." />

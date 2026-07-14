@@ -109,7 +109,7 @@ export function PainelComparativo({ diagnosticos }: { diagnosticos: DiagnosticoC
         </table>
       </div>
       <p className="mt-2 text-[11px] text-stone-400">
-        Ranking pela régua de maturidade (opinião da Lente 4). Fato e opinião distinguidos; cada
+        Ranking pela régua de maturidade (análise de maturidade). Fato e opinião distinguidos; cada
         campo tem fonte e data na ficha.
       </p>
     </section>

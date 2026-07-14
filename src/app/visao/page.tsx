@@ -12,11 +12,12 @@ import Link from "next/link";
 
 import { buildBriefing } from "@/lib/briefing";
 import { ageInDays, formatDateShort, formatDateTimePtBR } from "@/lib/format";
-import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
+import { analiseFalhou, runRadarLoop, type RadarLoopResult } from "@/lib/loop";
 import { listVisualReports } from "@/lib/visual";
 import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem } from "@/lib/types";
 
+import { AnaliseFalhouAviso } from "@/components/analise-falhou";
 import { RodarAgora } from "@/components/rodar-agora";
 import { ScoreBadge } from "@/components/score-badge";
 
@@ -48,6 +49,8 @@ export default async function VisaoPage({
   } catch {
     error = true;
   }
+  // Cache "morto": coletou mas a análise inteira falhou → avisa, não finge calmaria.
+  const stale = !error && analiseFalhou(result);
 
   const client = watchlist.clients.find((c) => c.name === cliente);
   const competitors = client?.competitors ?? [];
@@ -74,13 +77,13 @@ export default async function VisaoPage({
       </p>
 
       {/* três cartões de estado */}
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Sinais frescos">
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <StatCard label="Sinais recentes">
           <span className="text-3xl font-bold text-emerald-600">{frescos}</span>
           <span className="ml-2 text-sm text-stone-500">nos últimos 7 dias</span>
         </StatCard>
 
-        <StatCard label="Concorrentes vigiados">
+        <StatCard label="Concorrentes monitorados">
           <span className="text-3xl font-bold text-stone-900">{enabled}</span>
           <span className="ml-2 text-sm text-stone-500">
             {comMudanca > 0
@@ -102,7 +105,7 @@ export default async function VisaoPage({
       {/* últimos gatilhos */}
       <div className="mt-8 flex items-baseline justify-between">
         <h2 className="text-[20px] font-semibold tracking-tight text-stone-900">
-          Últimos gatilhos
+          Últimas oportunidades
         </h2>
         <Link
           href={`/?cliente=${encodeURIComponent(cliente)}`}
@@ -112,26 +115,32 @@ export default async function VisaoPage({
         </Link>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-lg border border-stone-200 bg-white">
-        {error ? (
-          <p className="px-5 py-6 text-sm text-stone-500">
-            Não foi possível rodar o Radar agora.
-          </p>
-        ) : gatilhos.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <p className="text-sm font-medium text-stone-700">Nenhum movimento ainda.</p>
-            <div className="mt-4 flex justify-center">
-              <RodarAgora cliente={cliente} />
+      {stale ? (
+        <div className="mt-3">
+          <AnaliseFalhouAviso failures={result.failures} cliente={cliente} />
+        </div>
+      ) : (
+        <div className="mt-3 overflow-hidden rounded-lg border border-stone-200 bg-white">
+          {error ? (
+            <p className="px-5 py-6 text-sm text-stone-500">
+              Não foi possível rodar o Radar agora.
+            </p>
+          ) : gatilhos.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <p className="text-sm font-medium text-stone-700">Nenhum movimento ainda.</p>
+              <div className="mt-4 flex justify-center">
+                <RodarAgora cliente={cliente} />
+              </div>
             </div>
-          </div>
-        ) : (
-          <ul className="divide-y divide-stone-200">
-            {gatilhos.map((item) => (
-              <GatilhoRow key={item.id} item={item} now={now} />
-            ))}
-          </ul>
-        )}
-      </div>
+          ) : (
+            <ul className="divide-y divide-stone-200">
+              {gatilhos.map((item) => (
+                <GatilhoRow key={item.id} item={item} now={now} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -102,7 +102,7 @@ function CreateForm({ clients }: { clients: string[] }) {
   return (
     <form onSubmit={submit} data-testid="schedule-create" className="mt-3">
       {error ? <p className="mb-2 text-sm text-red-600">{error}</p> : null}
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 md:grid-cols-2">
         {clients.length > 1 ? (
           <select value={client} onChange={(e) => setClient(e.target.value)} className={INPUT_CLASS}>
             {clients.map((c) => (

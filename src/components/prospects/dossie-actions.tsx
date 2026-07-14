@@ -85,7 +85,7 @@ export function DossieActions({ cliente, id, temDossie }: { cliente: string; id:
         )
       ) : null}
 
-      {gerando ? <span className="text-[11px] text-stone-400">consome crédito · lê o site + buscas + Brain (~1 min)</span> : null}
+      {gerando ? <span className="text-[11px] text-stone-400">consome crédito · lê o site + buscas + base (~1 min)</span> : null}
       {erro ? <span className="text-xs text-red-600">{erro}</span> : null}
     </div>
   );

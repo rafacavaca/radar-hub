@@ -48,7 +48,7 @@ export function prospectToIcs(prospect: Prospect, appUrl: string): string | null
   const uid = createHash("sha1").update(`prospect:${prospect.id}:${prospect.reuniaoEm}`).digest("hex").slice(0, 24) + "@radar.formare.tech";
   const link = `${appUrl.replace(/\/+$/, "")}/prospects/${prospect.id}?cliente=${encodeURIComponent(prospect.clientName)}`;
   const desc = [
-    `Dossiê do Radar (perfil, concorrentes, sinais, encaixe, munição): ${link}`,
+    `Dossiê do Radar (perfil, concorrentes, sinais, aderência, preparação): ${link}`,
     prospect.contato ? `Contato: ${prospect.contato}` : "",
     prospect.contexto ? `Contexto: ${prospect.contexto}` : "",
   ].filter(Boolean).join("\\n");

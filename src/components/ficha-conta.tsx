@@ -90,7 +90,7 @@ export function FichaConta({
         {jogadas.length === 0 ? (
           <p className="rounded-md border border-dashed border-stone-200 bg-stone-50/60 px-3 py-3 text-sm text-stone-500">
             {conta.sources.length === 0
-              ? "Sem fonte pública desta conta ainda — adicione o site/notícias em Contas → Vigiar pra o Radar varrer."
+              ? "Sem fonte pública desta conta ainda — adicione o site/notícias em Contas → Monitorar pra o Radar varrer."
               : "Sem novidade nesta conta — rode o Radar ou espere a próxima varredura."}
           </p>
         ) : (
@@ -119,13 +119,13 @@ export function FichaConta({
 
                 <div className="mt-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                    Gatilho
+                    Oportunidade
                   </p>
                   <p className="mt-0.5 text-sm leading-relaxed text-stone-700">{j.gatilho}</p>
                 </div>
                 <div className="mt-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
-                    Por que este encaixe
+                    Por que esta aderência
                   </p>
                   <p className="mt-0.5 text-sm leading-relaxed text-stone-700">{j.justificativa}</p>
                 </div>

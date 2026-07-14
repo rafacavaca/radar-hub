@@ -15,7 +15,9 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { currentOrgId } from "@/lib/db/session";
 import { runRadarLoop, runRadarPartial } from "@/lib/loop";
+import { LIMITES, rateLimit, respostaRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,15 @@ function wantsForce(req: NextRequest): boolean {
 export async function GET(req: NextRequest) {
   const cliente = req.nextUrl.searchParams.get("cliente")?.trim() || "";
   const concorrente = req.nextUrl.searchParams.get("concorrente")?.trim() || "";
+  const force = wantsForce(req);
+
+  // Rate-limit só o caminho CARO (coleta+LLM): parcial (?cliente) ou ?force.
+  // A leitura de cache (sem query) é barata e não conta.
+  if (cliente || force) {
+    const org = (await currentOrgId()) ?? "anon";
+    const rl = rateLimit(`run:${org}`, LIMITES.run.limit, LIMITES.run.windowMs);
+    if (rl.limited) return respostaRateLimit(rl);
+  }
 
   try {
     if (cliente) {
@@ -37,7 +48,7 @@ export async function GET(req: NextRequest) {
       });
       return NextResponse.json({ data: result, resumo: summary });
     }
-    const result = await runRadarLoop({ force: wantsForce(req) });
+    const result = await runRadarLoop({ force });
     return NextResponse.json({ data: result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "falha ao rodar o loop";

@@ -6,7 +6,8 @@
  *
  * Aberto no proxy (não exige o cookie de sessão) porque a extensão POSTa por
  * fora da página; a porta é guardada por SEGREDO COMPARTILHADO (RADAR_INGEST_SECRET,
- * Bearer). Sem o segredo configurado (dev), fica aberta — como o resto do Radar.
+ * Bearer). FAIL-CLOSED: sem o segredo configurado, a rota fica DESLIGADA (503) —
+ * nunca aberta (o payload vira input de LLM, então porta aberta = injeção).
  *
  * body (normalizado): { perfil, papel, workspace, texto, data_publicacao, data_coleta?, url }
  *   -> 200 { data: LinkedInPost }  |  400 { error }  |  401
@@ -19,13 +20,15 @@ import { ingestLinkedInPost, type IngestInput } from "@/lib/linkedin";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  // segredo compartilhado (se configurado). A extensão manda Authorization: Bearer <segredo>.
+  // FAIL-CLOSED: sem segredo configurado, a ingestão fica desligada (nunca aberta).
   const secret = process.env.RADAR_INGEST_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "não autorizado" }, { status: 401 });
-    }
+  if (!secret) {
+    return NextResponse.json({ error: "ingestão indisponível" }, { status: 503 });
+  }
+  // A extensão manda Authorization: Bearer <segredo>.
+  const auth = req.headers.get("authorization") ?? "";
+  if (auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
 
   let body: IngestInput;

@@ -31,7 +31,7 @@ export default async function ProspectsPage({
         <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-stone-900">Preparo de reunião</h1>
         <p className="mt-1 text-sm text-stone-500">
           Adicione uma empresa que vai visitar — o Radar monta um dossiê (perfil, concorrentes, sinais,
-          onde encaixamos, munição) pra você entrar preparado. On-demand, com fonte em tudo.
+          aderência, preparação) pra você entrar preparado. On-demand, com fonte em tudo.
         </p>
       </header>
 

@@ -10,8 +10,10 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { currentOrgId } from "@/lib/db/session";
 import { runDiagnostico } from "@/lib/diagnostico/run";
 import { loadDiagnostico, loadDiagnosticos, persistDiagnostico } from "@/lib/diagnostico/store";
+import { LIMITES, rateLimit, respostaRateLimit } from "@/lib/rate-limit";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +43,11 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+
+  // Ação cara (Firecrawl + LLM por concorrente) — trava loop por org.
+  const org = (await currentOrgId()) ?? "anon";
+  const rl = rateLimit(`diagnostico:${org}`, LIMITES.diagnostico.limit, LIMITES.diagnostico.windowMs);
+  if (rl.limited) return respostaRateLimit(rl);
 
   try {
     const diag = await runDiagnostico({

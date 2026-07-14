@@ -122,19 +122,19 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
     : "";
 
   // ── como nós encaixamos (ângulo já no herói; aqui só dor → resolve) ──
-  const brainTag = d.encaixe.brain_mode === "live" ? "BRAIN REAL" : d.encaixe.brain_mode === "fixture" ? "BRAIN RASCUNHO" : "SEM BRAIN";
+  const brainTag = d.encaixe.brain_mode === "live" ? "BASE REAL" : d.encaixe.brain_mode === "fixture" ? "BASE RASCUNHO" : "SEM BASE";
   const encaixeSec = `<div class="sec">
-    <div class="sectitle">Como nós encaixamos <span class="brainbadge">${brainTag}</span></div>
+    <div class="sectitle">Nossa aderência <span class="brainbadge">${brainTag}</span></div>
     ${d.encaixe.dores.length || d.encaixe.ganchos.length ? `<div class="fit">
       <div class="fitcol"><h5>DORES PROVÁVEIS</h5>${(d.encaixe.dores.length ? d.encaixe.dores.map((p) => `<div class="fitrow">${esc(p.texto)}${p.natureza === "interno" ? badge("interno") : ""}</div>`) : [`<div class="empty">— nenhuma dor clara mapeada</div>`]).join("")}</div>
       <div class="fitcol"><h5>COMO A ${esc(d.clientName.toUpperCase())} RESOLVE</h5>${(d.encaixe.ganchos.length ? d.encaixe.ganchos.map((p) => `<div class="sol">${esc(p.texto)}${p.natureza === "interno" ? badge("interno") : ""}</div>`) : [`<div class="empty">— sem gancho da nossa oferta</div>`]).join("")}</div>
-    </div>` : `<div class="empty">Sem encaixe mapeado ${d.encaixe.brain_mode === "none" ? "— este cliente não tem Brain no Formare." : "— nada claro cruzou com a nossa oferta."}</div>`}
+    </div>` : `<div class="empty">Sem aderência mapeada ${d.encaixe.brain_mode === "none" ? "— este cliente não tem base de conhecimento no Formare." : "— nada claro cruzou com a nossa oferta."}</div>`}
   </div>`;
 
   // ── munição ──
   const municaoSec = (d.municao.perguntas.length || d.municao.objecoes.length)
     ? `<div class="sec">
-        <div class="sectitle">Munição de reunião</div>
+        <div class="sectitle">Preparação pra reunião</div>
         <div class="muni">
           <div><h5>PERGUNTAS PRA FAZER</h5><ul>${d.municao.perguntas.slice(0, 4).map((p) => `<li class="q">${esc(p.texto)}</li>`).join("")}</ul></div>
           <div><h5>OBJEÇÕES PROVÁVEIS &amp; RESPOSTA</h5><ul>${d.municao.objecoes.map((o) => `<li class="o"><b>“${esc(o.objecao)}”</b> — ${esc(o.resposta)}</li>`).join("")}</ul></div>
@@ -225,11 +225,13 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
   .b-man{ background:#221f1a; color:#fff; font-size:10px; padding:1px 6px; }
   .empty{ font-size:14px; color:var(--faint); }
   .foot{ padding:16px 52px; border-top:1px solid var(--line); display:flex; justify-content:space-between; font-size:12px; color:var(--faint); }
-  @media (max-width:640px){
+  @media (max-width:768px){
     body{ padding:0; } .sheet{ border-radius:0; box-shadow:none; }
     .topbar,.hero,.sec,.foot{ padding-left:20px; padding-right:20px; }
     .hero{ grid-template-columns:1fr; gap:18px; } .company{ font-size:32px; } .headline{ font-size:21px; }
+    .gauge svg{ width:150px; height:88px; }
     .stats{ grid-template-columns:1fr 1fr; } .sols,.comps,.fit,.muni{ grid-template-columns:1fr; gap:12px; }
+    .topbar{ flex-wrap:wrap; gap:8px; } .meta{ text-align:left; }
   }
   @media print{
     body{ background:var(--paper); padding:0; } .sheet{ max-width:none; border-radius:0; box-shadow:none; }
@@ -248,8 +250,8 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
     </div>
     <div class="gauge">
       ${gaugeSvg(nv.pct, cor, nv.nivel !== "sem dado")}
-      <div class="val" style="color:${cor}">${nv.nivel === "sem dado" ? "SEM DADO" : `ENCAIXE ${nv.nivel.toUpperCase()}`}</div>
-      <div class="cap"><b>${d.encaixe.brain_mode === "live" ? "Brain real" : d.encaixe.brain_mode === "fixture" ? "Brain rascunho" : "sem Brain"}</b>${nv.nivel !== "sem dado" ? ` · ${esc(nv.nota.replace(/^.*?, /, ""))}` : ""}</div>
+      <div class="val" style="color:${cor}">${nv.nivel === "sem dado" ? "SEM DADO" : `ADERÊNCIA ${nv.nivel.toUpperCase()}`}</div>
+      <div class="cap"><b>${d.encaixe.brain_mode === "live" ? "Base real" : d.encaixe.brain_mode === "fixture" ? "Base rascunho" : "sem base"}</b>${nv.nivel !== "sem dado" ? ` · ${esc(nv.nota.replace(/^.*?, /, ""))}` : ""}</div>
     </div>
   </div>
   ${stats}

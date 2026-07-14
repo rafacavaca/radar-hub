@@ -23,7 +23,7 @@ function recency(
   const ref = publishedAt ?? collectedAt;
   const age = ageInDays(ref, now);
   if (age === null) return { fresco: false, ageText: "sem data de publicação", hasDate: false };
-  if (age <= 30) return { fresco: true, ageText: "fresco", hasDate: Boolean(publishedAt) };
+  if (age <= 30) return { fresco: true, ageText: "recente", hasDate: Boolean(publishedAt) };
   if (age <= 365) {
     const meses = Math.max(1, Math.round(age / 30));
     return { fresco: false, ageText: `há ${meses} ${meses === 1 ? "mês" : "meses"}`, hasDate: true };

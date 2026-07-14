@@ -65,14 +65,14 @@ export default async function ContasVigiarPage({
           Fichas
         </Link>
         <span className="border-b-2 border-stone-900 px-3 py-2 text-sm font-medium text-stone-900">
-          Vigiar
+          Monitorar
         </span>
       </div>
 
       <p className="mt-4 text-sm text-stone-500">
-        {contasCount} {contasCount === 1 ? "conta-chave vigiada" : "contas-chave vigiadas"} para{" "}
+        {contasCount} {contasCount === 1 ? "conta-chave monitorada" : "contas-chave monitoradas"} para{" "}
         <span className="font-medium text-stone-700">{cliente || "—"}</span>. Cadastre igual você faz
-        com concorrentes — o Radar cruza cada sinal da conta com a oferta do cliente (Brain).
+        com concorrentes — o Radar cruza cada sinal da conta com a oferta do cliente (base de conhecimento).
       </p>
 
       <div className="mt-6">

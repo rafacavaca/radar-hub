@@ -11,6 +11,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { currentOrgId } from "@/lib/db/session";
+import { LIMITES, rateLimit, respostaRateLimit } from "@/lib/rate-limit";
 import { loadWatchlist } from "@/lib/watchlist";
 import { captureIdentity, listVisualReports } from "@/lib/visual";
 
@@ -44,10 +46,15 @@ export async function POST(req: NextRequest) {
   }
   if (!found.competitor.siteUrl) {
     return NextResponse.json(
-      { error: "esse concorrente não tem site cadastrado — adicione o site na tela Vigiar" },
+      { error: "esse concorrente não tem site cadastrado — adicione o site na tela Monitorar" },
       { status: 400 },
     );
   }
+
+  // Ação cara (Firecrawl screenshot + visão por IA) — trava loop por org.
+  const org = (await currentOrgId()) ?? "anon";
+  const rl = rateLimit(`visual:${org}`, LIMITES.visual.limit, LIMITES.visual.windowMs);
+  if (rl.limited) return respostaRateLimit(rl);
 
   try {
     const report = await captureIdentity(found.competitor, found.clientName);

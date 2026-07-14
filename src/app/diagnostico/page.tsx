@@ -70,7 +70,7 @@ export default async function DiagnosticoPage({
 
       <div className="mt-2 flex gap-1 border-b border-stone-200">
         <Link href={`/vigiar${q}`} className="border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900">
-          Vigiar
+          Monitorar
         </Link>
         <Link href={`/identidade${q}`} className="border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900">
           Identidade
@@ -79,7 +79,7 @@ export default async function DiagnosticoPage({
       </div>
 
       <p className="mt-4 text-sm text-stone-500">
-        Diagnóstico de marca <span className="font-medium text-stone-700">vivo</span> — posicionamento
+        Diagnóstico de marca — posicionamento
         + canais de cada concorrente, com fonte e data. O que o site não diz aparece como “não
         encontrado” (honesto). Rode sob demanda.
       </p>
@@ -120,7 +120,7 @@ export default async function DiagnosticoPage({
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
             <p className="text-base font-medium text-stone-700">Nenhum concorrente ainda.</p>
             <p className="mt-1 text-sm text-stone-500">
-              Cadastre em <Link href={`/vigiar${q}`} className="font-medium text-stone-700 underline-offset-2 hover:underline">Vigiar</Link>.
+              Cadastre em <Link href={`/vigiar${q}`} className="font-medium text-stone-700 underline-offset-2 hover:underline">Monitorar</Link>.
             </p>
           </div>
         ) : (

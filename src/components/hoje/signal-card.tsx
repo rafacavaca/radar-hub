@@ -26,7 +26,7 @@ const LENS_META: Record<string, { label: string; tip: string }> = {
 
 const KIND_META: Record<DigestItem["kind"], { label: string; tip: string }> = {
   leitura: { label: "Leitura", tip: "Um sinal lido pelas lentes dos times." },
-  gatilho: { label: "Gatilho de venda", tip: "Sinal de uma conta que abre oportunidade comercial." },
+  gatilho: { label: "Oportunidade de venda", tip: "Sinal de uma conta que abre oportunidade comercial." },
   jogada: { label: "Relacionamento", tip: "Sinal de conta-chave cruzado com a sua oferta." },
   alerta: { label: "Alerta", tip: "Movimento de concorrente que casou uma regra sua." },
   relatorio: { label: "Relatório", tip: "Um relatório agendado saiu." },
@@ -36,8 +36,8 @@ const KIND_META: Record<DigestItem["kind"], { label: string; tip: string }> = {
 /** Rótulos estruturados da análise/ação por tipo (nada de parágrafo solto). */
 const ANALISE_LABEL: Record<DigestItem["kind"], { corpo: string; acao: string }> = {
   leitura: { corpo: "Leitura", acao: "Ação" },
-  gatilho: { corpo: "Gatilho", acao: "Ângulo" },
-  jogada: { corpo: "Gatilho", acao: "Jogada" },
+  gatilho: { corpo: "Oportunidade", acao: "Ângulo" },
+  jogada: { corpo: "Oportunidade", acao: "Jogada" },
   alerta: { corpo: "Movimento", acao: "Ação" },
   relatorio: { corpo: "Sobre", acao: "Ação" },
   reuniao: { corpo: "Dossiê", acao: "Contato" },
@@ -111,7 +111,8 @@ export function SignalCard({
               </Tooltip>
             ) : null}
           </div>
-          <div className="shrink-0">
+          {/* desktop: ações no topo-direito; mobile: vão pro fim do card (abaixo) */}
+          <div className="hidden shrink-0 md:block">
             <BriefingItemActions items={group.itens} />
           </div>
         </div>
@@ -121,10 +122,10 @@ export function SignalCard({
 
         {/* linha de chips: impacto · lentes · fonte · data */}
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-          <Tooltip content="Impacto: quão relevante para você (não popularidade). Escala 0–100.">
+          <Tooltip content="Prioridade: quão relevante para você (não popularidade). Escala 0–100.">
             <span className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-stone-700">
               {group.score}
-              <span className="font-medium uppercase tracking-wide text-stone-400">impacto</span>
+              <span className="font-medium uppercase tracking-wide text-stone-400">prioridade</span>
             </span>
           </Tooltip>
 
@@ -163,6 +164,11 @@ export function SignalCard({
           >
             abrir no painel
           </Link>
+        </div>
+
+        {/* ações — no mobile ficam no fim do card (não sobrepõem título/chips) */}
+        <div className="mt-3 border-t border-stone-100 pt-3 md:hidden">
+          <BriefingItemActions items={group.itens} />
         </div>
       </div>
 

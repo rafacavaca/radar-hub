@@ -11,6 +11,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { addArquivo, addNota, removeContexto, MAX_ARQUIVO_BYTES } from "@/lib/prospects/contexto";
 import { getProspect } from "@/lib/prospects/store";
+import { currentOrgId } from "@/lib/db/session";
+import { LIMITES, rateLimit, respostaRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // extração + resumo (LLM) do arquivo
@@ -46,6 +48,11 @@ export async function POST(req: NextRequest) {
   if (file.size > MAX_ARQUIVO_BYTES) return NextResponse.json({ error: `Arquivo grande demais (máx. ${Math.round(MAX_ARQUIVO_BYTES / 1024 / 1024)} MB).` }, { status: 400 });
   if (file.type && !TIPOS_OK.test(file.type)) return NextResponse.json({ error: "Tipo não suportado — use PDF, DOCX, TXT ou imagem." }, { status: 400 });
   if (!(await getProspect(cliente, id))) return NextResponse.json({ error: "prospect não encontrado" }, { status: 404 });
+
+  // Upload dispara extração + resumo por LLM — trava loop por org.
+  const org = (await currentOrgId()) ?? "anon";
+  const rl = rateLimit(`upload:${org}`, LIMITES.upload.limit, LIMITES.upload.windowMs);
+  if (rl.limited) return respostaRateLimit(rl);
 
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());

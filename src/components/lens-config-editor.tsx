@@ -69,7 +69,7 @@ async function postLenses(
     });
     if (res.ok) return { ok: true };
     const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-    return { ok: false, error: payload?.error ?? "Não foi possível salvar esta lente." };
+    return { ok: false, error: payload?.error ?? "Não foi possível salvar esta área." };
   } catch {
     return { ok: false, error: "Falha de conexão. Verifique a internet e tente de novo." };
   }
@@ -81,7 +81,7 @@ export function LensConfigEditor({ initial }: { initial: LensesFile }) {
       <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
         <p className="text-base font-medium text-stone-700">Nenhum cliente configurado.</p>
         <p className="mt-1 text-sm text-stone-500">
-          Cadastre um cliente em Vigiar e as três lentes aparecem aqui, já com a régua padrão.
+          Cadastre um cliente em Monitorar e as três áreas aparecem aqui, já com a régua padrão.
         </p>
       </div>
     );
@@ -177,7 +177,7 @@ function LensRow({ clientName, lens }: { clientName: string; lens: LensConfig })
 
   async function reset() {
     if (busy) return;
-    if (!window.confirm("Restaurar a régua padrão desta lente?")) return;
+    if (!window.confirm("Restaurar a régua padrão desta área?")) return;
     setBusy("reset");
     setError(null);
     const result = await postLenses({ action: "reset", clientName, lensId: lens.id });
@@ -255,12 +255,12 @@ function LensRow({ clientName, lens }: { clientName: string; lens: LensConfig })
           value={regua}
           onChange={(event) => setRegua(event.target.value)}
           rows={4}
-          placeholder="Descreva, em linguagem simples, o que faz um sinal subir pra esta lente."
+          placeholder="Descreva, em linguagem simples, o que faz um sinal subir pra esta área."
           className={FIELD_CLASS + " min-h-[96px] resize-y"}
         />
       </label>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-stone-500">Time destinatário</span>
           <input

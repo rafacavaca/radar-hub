@@ -37,7 +37,7 @@ export default async function AnalistasPage({
           Ajustes · analistas
         </p>
         <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">
-          Como cada lente pensa
+          Como cada área pensa
         </h1>
         <p className="mt-1.5 text-sm text-stone-500">
           Três analistas leem cada sinal — comercial, produto e marketing. Ajuste a régua de cada

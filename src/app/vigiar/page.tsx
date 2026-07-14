@@ -52,7 +52,7 @@ export default async function VigiarPage({
       {/* sub-nav da seção: fontes (Vigiar) · monitor visual (Identidade) */}
       <div className="mt-2 flex gap-1 border-b border-stone-200">
         <span className="border-b-2 border-stone-900 px-3 py-2 text-sm font-medium text-stone-900">
-          Vigiar
+          Monitorar
         </span>
         <Link
           href={`/identidade${q}`}
@@ -69,7 +69,7 @@ export default async function VigiarPage({
       </div>
 
       <p className="mt-4 text-sm text-stone-500">
-        {watchedCount} {watchedCount === 1 ? "concorrente vigiado" : "concorrentes vigiados"} para{" "}
+        {watchedCount} {watchedCount === 1 ? "concorrente monitorado" : "concorrentes monitorados"} para{" "}
         <span className="font-medium text-stone-700">{cliente || "—"}</span>.
       </p>
 

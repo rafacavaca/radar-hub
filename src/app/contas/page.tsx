@@ -90,7 +90,7 @@ export default async function ContasPage({
           href={`/contas/vigiar${q}`}
           className="border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900"
         >
-          Vigiar
+          Monitorar
         </Link>
       </div>
 
@@ -144,7 +144,7 @@ export default async function ContasPage({
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
             <p className="text-base font-medium text-stone-700">Nenhuma conta-chave ainda.</p>
             <p className="mt-1 text-sm text-stone-500">
-              Vá em <Link href={`/contas/vigiar${q}`} className="font-medium text-stone-700 underline-offset-2 hover:underline">Vigiar</Link>{" "}
+              Vá em <Link href={`/contas/vigiar${q}`} className="font-medium text-stone-700 underline-offset-2 hover:underline">Monitorar</Link>{" "}
               e cadastre as contas que quer acompanhar — igual você faz com concorrentes.
             </p>
           </div>

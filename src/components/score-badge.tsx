@@ -1,8 +1,8 @@
 /**
- * Selo de impacto (0-100) — UM tratamento só: número em caixa NEUTRA.
- * A cor não codifica impacto (um papel por cor: vermelho é só da marca). A
- * urgência lê-se pelo número e pela ordenação — nunca pela cor do selo.
- * Componente puro (sem estado) — serve em server e client.
+ * Selo de PRIORIDADE (0-100) — número em caixa NEUTRA + o nível em palavra
+ * (Alta · Média · Baixa), pra o gestor "sacar" sem ler o número. A cor não
+ * codifica prioridade (um papel por cor: vermelho é só da marca); o nível
+ * comunica pela PALAVRA. Componente puro (sem estado) — serve em server e client.
  */
 
 import type { IntelligenceItem } from "@/lib/types";
@@ -12,6 +12,13 @@ const SIZE = {
   sm: { box: "h-11 w-11", num: "text-base", cap: "text-[8px]" },
 } as const;
 
+/** Nível de prioridade em palavra (limiares 70 / 40). Reusado onde o score aparece. */
+export function nivelPrioridade(score: number): "Alta" | "Média" | "Baixa" {
+  if (score >= 70) return "Alta";
+  if (score >= 40) return "Média";
+  return "Baixa";
+}
+
 export function ScoreBadge({
   score,
   size = "md",
@@ -20,17 +27,18 @@ export function ScoreBadge({
   size?: keyof typeof SIZE;
 }) {
   const s = SIZE[size];
+  const nivel = nivelPrioridade(score);
   return (
     <span
       className={`inline-flex flex-none flex-col items-center justify-center rounded-lg border border-stone-200 bg-stone-100 ${s.box}`}
-      title={`Impacto ${score}/100`}
-      aria-label={`Impacto ${score} de 100`}
+      title={`Prioridade ${score}/100 — ${nivel}`}
+      aria-label={`Prioridade ${score} de 100, ${nivel}`}
     >
       <span className={`font-semibold leading-none tabular-nums text-stone-900 ${s.num}`}>
         {score}
       </span>
       <span className={`mt-0.5 font-medium uppercase leading-none tracking-wide text-stone-400 ${s.cap}`}>
-        impacto
+        {nivel}
       </span>
     </span>
   );

@@ -15,9 +15,9 @@ import { formatDateTimePtBR } from "@/lib/format";
 import { SourceRef } from "@/components/signal-meta";
 
 const BRAIN_LABEL: Record<Swot["brain_mode"], string> = {
-  live: "leitura externa ancorada no Brain real",
-  fixture: "leitura externa com rascunho local do Brain",
-  none: "sem Brain do cliente — leitura externa conservadora",
+  live: "leitura externa ancorada na base real",
+  fixture: "leitura externa com rascunho local da base",
+  none: "sem base do cliente — leitura externa conservadora",
 };
 
 function Quadrante({ titulo, cor, itens, vazio, comFonte }: { titulo: string; cor: string; itens: SwotItem[]; vazio: string; comFonte: boolean }) {
@@ -95,12 +95,12 @@ export function SwotCard({
 
       {!swot ? (
         <p className="px-4 py-4 text-sm text-stone-500 sm:px-5">
-          Sem SWOT ainda — gera do diagnóstico salvo + Brain (rápido, sem nova varredura).
+          Sem SWOT ainda — gera do diagnóstico salvo + base de conhecimento (rápido, sem nova varredura).
         </p>
       ) : (
         <div className="px-4 py-4 sm:px-5">
           <p className="mb-2 text-[11px] text-stone-400">{BRAIN_LABEL[swot.brain_mode]}</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             <Quadrante titulo="Forças" cor="text-emerald-700" itens={swot.forcas} vazio="sem evidência coletada" comFonte />
             <Quadrante titulo="Fraquezas" cor="text-red-700" itens={swot.fraquezas} vazio="sem evidência coletada" comFonte />
             <Quadrante titulo="Oportunidades (leitura)" cor="text-sky-700" itens={swot.oportunidades} vazio="—" comFonte={false} />

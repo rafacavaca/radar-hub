@@ -89,11 +89,11 @@ export function montarEvidencias(diag: DiagnosticoConcorrente): Evidencia[] {
 
 const SYSTEM =
   "Você monta um BATTLECARD comercial sobre UM concorrente, para o time de vendas do NOSSO cliente. " +
-  "Você recebe: (a) EVIDÊNCIAS numeradas (E1, E2…) — únicos fatos utilizáveis sobre o concorrente; (b) o CONTEXTO DO BRAIN — único lugar de onde podem sair os NOSSOS diferenciais. " +
+  "Você recebe: (a) EVIDÊNCIAS numeradas (E1, E2…) — únicos fatos utilizáveis sobre o concorrente; (b) o CONTEXTO DA BASE DE CONHECIMENTO — único lugar de onde podem sair os NOSSOS diferenciais. " +
   "REGRAS INVIOLÁVEIS: " +
   "(1) toda força/fraqueza aponta 'evidencia' = número de UMA evidência que a sustenta — NUNCA afirme algo sem evidência da lista; " +
-  "(2) fraquezas em 'como_ganhar' também apontam evidência; 'nosso_diferencial' SÓ pode ser algo presente no CONTEXTO DO BRAIN (parafrasear ok, inventar NUNCA) — se o Brain não cobre a fraqueza, use nosso_diferencial:null e resposta:null; " +
-  "(3) 'objecoes' = objeções que um comprador levantaria contra NÓS por causa deste concorrente, com resposta baseada SÓ em Brain/evidências; " +
+  "(2) fraquezas em 'como_ganhar' também apontam evidência; 'nosso_diferencial' SÓ pode ser algo presente no CONTEXTO DA BASE DE CONHECIMENTO (parafrasear ok, inventar NUNCA) — se a base de conhecimento não cobre a fraqueza, use nosso_diferencial:null e resposta:null; " +
+  "(3) 'objecoes' = objeções que um comprador levantaria contra NÓS por causa deste concorrente, com resposta baseada SÓ em base de conhecimento/evidências; " +
   "(4) máx 4 itens por lista; frases curtas, tom de battlecard (direto, sem marketing vazio); português do Brasil. " +
   'Responda SÓ JSON: {"quem_sao":"2-3 frases","forcas":[{"texto":"...","evidencia":1}],"fraquezas":[{"texto":"...","evidencia":2}],"como_ganhar":[{"fraqueza":"...","evidencia":2,"nosso_diferencial":"..."|null,"resposta":"..."|null}],"objecoes":[{"objecao":"...","resposta":"..."}]}';
 
@@ -110,8 +110,8 @@ export async function gerarBattlecard(diag: DiagnosticoConcorrente): Promise<Bat
   const evLista = evidencias.map((e, i) => `E${i + 1}. ${e.texto}${e.citacao ? ` — citação: "${e.citacao.slice(0, 120)}"` : ""}`).join("\n");
   const brainBloco =
     brain.mode === "none"
-      ? "CONTEXTO DO BRAIN: NENHUM — não há diferenciais nossos mapeados. TODOS os nosso_diferencial devem ser null."
-      : `CONTEXTO DO BRAIN (${brain.mode === "live" ? "Brain real" : "rascunho local — confirmar no Brain"}):\n${brain.context.slice(0, 3500)}`;
+      ? "CONTEXTO DA BASE DE CONHECIMENTO: NENHUM — não há diferenciais nossos mapeados. TODOS os nosso_diferencial devem ser null."
+      : `CONTEXTO DA BASE DE CONHECIMENTO (${brain.mode === "live" ? "base de conhecimento real" : "rascunho local — confirmar na base de conhecimento"}):\n${brain.context.slice(0, 3500)}`;
 
   const content = await completeViaGateway({
     system: SYSTEM,

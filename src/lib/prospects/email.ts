@@ -43,7 +43,7 @@ export async function sendDossiePdfEmail(prospect: Prospect, pdf: Uint8Array, or
           `<div style="font-family:Arial,sans-serif;color:#1c1917;max-width:520px">` +
           `<p style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#a8a29e">Radar · Prospect</p>` +
           `<h2 style="margin:2px 0 8px">${prospect.nome}</h2>` +
-          `<p style="color:#57534e;font-size:14px">Sua reunião é <b>${quando}</b>. O dossiê (perfil, concorrentes, sinais, encaixe, munição) está no PDF em anexo — e vivo no Radar.</p>` +
+          `<p style="color:#57534e;font-size:14px">Sua reunião é <b>${quando}</b>. O dossiê (perfil, concorrentes, sinais, aderência, preparação) está no PDF em anexo — e ao vivo no Radar.</p>` +
           `<p style="color:#a8a29e;font-size:12px">Honestidade: cada ponto traz [fato]/[inferência]/[não encontrado] + fonte. Confira antes de usar.</p>` +
           `</div>`,
         attachments: [{ filename: `dossie-${nome}.pdf`, content: Buffer.from(pdf).toString("base64") }],

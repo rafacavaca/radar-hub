@@ -18,18 +18,19 @@ import { redirect } from "next/navigation";
 import { buildBriefing } from "@/lib/briefing";
 import { formatDateTimePtBR } from "@/lib/format";
 import { loadLensesFor, LENS_LABEL, type LensId } from "@/lib/lenses";
-import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
+import { analiseFalhou, runRadarLoop, type RadarLoopResult } from "@/lib/loop";
 import { loadNotes, type RoadmapNote } from "@/lib/notes";
 import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, LensReading } from "@/lib/types";
 
 import type { CrossInsight, CrossVerdict } from "@/lib/cross-reference";
 
+import { AnaliseFalhouAviso } from "@/components/analise-falhou";
 import { CrossActionButton } from "@/components/cross-action-button";
 import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { LensReadingCard, RoadmapNoteRow } from "@/components/lens-reading-card";
 import { RodarAgora } from "@/components/rodar-agora";
-import { FonteLink, ScoreBadge } from "@/components/score-badge";
+import { FonteLink, nivelPrioridade, ScoreBadge } from "@/components/score-badge";
 import { attenuated, RecencyStamp, SourceRef } from "@/components/signal-meta";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ const LENS_TABS: Array<{ id: TabId; label: string }> = [
   { id: "comercial", label: "Comercial" },
   { id: "produto", label: "Produto" },
   { id: "marketing", label: "Marketing" },
-  { id: "cruzamento", label: "Interno × Externo" },
+  { id: "cruzamento", label: "Recomendações" },
 ];
 
 const VERDICT_META: Record<CrossVerdict, { label: string; chip: string; hint: string }> = {
@@ -63,7 +64,7 @@ const VERDICT_META: Record<CrossVerdict, { label: string; chip: string; hint: st
   sem_dado_interno: {
     label: "Falta dado interno",
     chip: "border-stone-300 bg-stone-100 text-stone-600",
-    hint: "O Brain não sabe o que você tem por dentro sobre isto — enriqueça o Brain pra destravar.",
+    hint: "A base de conhecimento não sabe o que você tem por dentro sobre isto — enriqueça-a pra destravar.",
   },
 };
 
@@ -71,8 +72,8 @@ const VERDICT_META: Record<CrossVerdict, { label: string; chip: string; hint: st
 function brainNote(result: RadarLoopResult, clientName: string): string | null {
   const source = result.brainSources?.find((s) => s.clientName === clientName);
   if (!source) return null;
-  if (source.mode === "live") return `Brain ao vivo (${source.nodeCount} fatos confirmados)`;
-  if (source.mode === "fixture") return "Brain indisponível — usando resumo local";
+  if (source.mode === "live") return `Base de conhecimento ao vivo (${source.nodeCount} fatos confirmados)`;
+  if (source.mode === "fixture") return "Base de conhecimento indisponível — usando resumo local";
   return "sem base de conhecimento do cliente";
 }
 
@@ -100,6 +101,8 @@ export default async function BriefingPage({
   } catch (err) {
     error = err instanceof Error ? err.message : "Não foi possível rodar o Radar.";
   }
+  // Cache "morto": coletou mas a análise inteira falhou → avisa, não finge calmaria.
+  const stale = !error && analiseFalhou(result);
 
   const lensConfig = lente !== "geral" ? (await loadLensesFor(cliente)).find((l) => l.id === lente) : null;
   const readings = (result.readings ?? []).filter(
@@ -114,7 +117,7 @@ export default async function BriefingPage({
     lente === "geral"
       ? "Radar — Briefing do dia"
       : lente === "cruzamento"
-        ? "Radar — Interno × Externo"
+        ? "Radar — Recomendações"
         : `Radar ${LENS_LABEL[lente as LensId]}`;
 
   // No Geral, a manchete editorial ganha a contagem de sinais com análise.
@@ -157,7 +160,7 @@ export default async function BriefingPage({
       <div className="sticky top-0 z-20 -mx-5 mt-5 border-b border-stone-200 bg-stone-50/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6">
         <div className="overflow-x-auto">
           <nav
-            aria-label="Ótica do briefing"
+            aria-label="Área do briefing"
             className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-100 p-1"
           >
             {LENS_TABS.map((tab) => {
@@ -186,6 +189,8 @@ export default async function BriefingPage({
       <div className="mt-6">
         {error ? (
           <ErrorState message={error} />
+        ) : stale ? (
+          <AnaliseFalhouAviso failures={result.failures} cliente={cliente || undefined} />
         ) : lente === "geral" ? (
           <GeralView items={geral} now={result.ranAt || new Date().toISOString()} />
         ) : lente === "cruzamento" ? (
@@ -230,8 +235,14 @@ function BriefingCard({ item, now }: { item: IntelligenceItem; now: string }) {
         <h2 className="text-[22px] font-bold leading-[1.18] tracking-[-0.01em] text-stone-900 sm:text-[26px]">
           {item.sinal}
         </h2>
-        <span className="inline-flex min-w-[30px] items-center justify-center rounded-md border border-stone-200 bg-stone-100 px-2 py-1.5 text-[13px] font-semibold text-stone-900">
-          {item.score}
+        <span
+          className="inline-flex min-w-[48px] flex-none flex-col items-center justify-center rounded-md border border-stone-200 bg-stone-100 px-2 py-1"
+          title={`Prioridade ${item.score}/100 — ${nivelPrioridade(item.score)}`}
+        >
+          <span className="text-[15px] font-semibold leading-none tabular-nums text-stone-900">{item.score}</span>
+          <span className="mt-0.5 text-[8px] font-medium uppercase leading-none tracking-wide text-stone-400">
+            {nivelPrioridade(item.score)}
+          </span>
         </span>
       </div>
 
@@ -296,7 +307,7 @@ function TeamView({
             Nenhuma leitura {LENS_LABEL[lente].toLowerCase()} hoje.
           </p>
           <p className="mt-1 text-sm text-stone-500">
-            Nada passou na régua desta lente — ajuste-a em{" "}
+            Nada passou na régua desta área — ajuste-a em{" "}
             <Link href="/analistas" className="underline underline-offset-2 hover:text-stone-700">
               Analistas
             </Link>{" "}
@@ -331,10 +342,10 @@ function CrossView({ insights }: { insights: CrossInsight[] }) {
   if (insights.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
-        <p className="text-base font-medium text-stone-700">Nenhum cruzamento nesta rodada.</p>
+        <p className="text-base font-medium text-stone-700">Nenhuma recomendação nesta rodada.</p>
         <p className="mt-1 text-sm text-stone-500">
-          O Radar cruza os movimentos dos concorrentes com o que o Brain sabe do cliente. Quanto
-          mais rico o Brain (o que vocês têm, começaram, deixaram parado), mais ouro aqui.
+          O Radar cruza os movimentos dos concorrentes com o que a base de conhecimento sabe do
+          cliente. Quanto mais rica a base (o que vocês têm, começaram, deixaram parado), mais ouro aqui.
         </p>
       </div>
     );
@@ -358,7 +369,7 @@ function CrossView({ insights }: { insights: CrossInsight[] }) {
       {semDado.length > 0 ? (
         <div className="rounded-2xl border border-stone-200 bg-white shadow-sm">
           <p className="border-b border-stone-100 px-4 py-3 text-xs font-medium uppercase tracking-wide text-stone-400 sm:px-5">
-            Falta dado interno — enriqueça o Brain pra destravar
+            Falta dado interno — enriqueça a base de conhecimento pra destravar
           </p>
           <ul className="divide-y divide-stone-100">
             {semDado.map((insight) => (
@@ -406,7 +417,7 @@ function CrossCard({ insight }: { insight: CrossInsight }) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3">
           <p className="text-xs font-medium uppercase tracking-wide text-stone-400">Externo</p>
           <p className="mt-1 text-sm leading-relaxed text-stone-700">{insight.externo}</p>
@@ -436,7 +447,7 @@ function LensOffState({ lente }: { lente: LensId }) {
   return (
     <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
       <p className="text-base font-medium text-stone-700">
-        A lente {LENS_LABEL[lente]} está desligada para este cliente.
+        A área {LENS_LABEL[lente]} está desligada para este cliente.
       </p>
       <p className="mt-1 text-sm text-stone-500">
         Ligue-a em{" "}

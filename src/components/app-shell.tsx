@@ -16,43 +16,64 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { HojeBadge } from "@/components/hoje-badge";
+import {
+  Building2Icon,
+  FileTextIcon,
+  HouseIcon,
+  RadarIcon,
+  ReceiptIcon,
+  SearchIcon,
+  ShieldIcon,
+  SlidersIcon,
+  SparklesIcon,
+  SwordsIcon,
+  TargetIcon,
+  WalletIcon,
+} from "@/components/icons";
+import { LogoutButton } from "@/components/logout-button";
 import { NewClientButton } from "@/components/new-client-dialog";
+import { WelcomePanel } from "@/components/welcome-panel";
 
-type Section = { label: string; href: string; match: (p: string) => boolean };
+type IconCmp = (props: { className?: string }) => React.ReactNode;
+type Section = { label: string; href: string; icon: IconCmp; purpose: string; match: (p: string) => boolean };
 
 /** Seções do modo CONCORRENTES (padrão). "Contas" = o pilar Clientes (contas-chave). */
 const CONCORRENTES_SECTIONS: Section[] = [
-  { label: "Visão", href: "/visao", match: (p) => p.startsWith("/visao") },
-  { label: "Briefing", href: "/", match: (p) => p === "/" },
-  { label: "Feed", href: "/feed", match: (p) => p.startsWith("/feed") },
-  { label: "Contas", href: "/contas", match: (p) => p.startsWith("/contas") },
-  { label: "Prospects", href: "/prospects", match: (p) => p.startsWith("/prospects") },
-  { label: "Conhecimento", href: "/perguntar", match: (p) => p.startsWith("/perguntar") },
+  { label: "Visão", href: "/visao", icon: HouseIcon, purpose: "O panorama deste cliente: o que mudou e o que precisa rodar.", match: (p) => p.startsWith("/visao") },
+  { label: "Briefing", href: "/", icon: SparklesIcon, purpose: "Os sinais que importam, já com a leitura por área e a ação sugerida.", match: (p) => p === "/" },
+  { label: "Feed", href: "/feed", icon: RadarIcon, purpose: "Tudo que o Radar coletou sobre este cliente — os sinais crus, sem análise.", match: (p) => p.startsWith("/feed") },
+  { label: "Contas", href: "/contas", icon: Building2Icon, purpose: "As contas-chave deste cliente — o que se move nelas e o que você pode oferecer.", match: (p) => p.startsWith("/contas") },
+  { label: "Prospects", href: "/prospects", icon: TargetIcon, purpose: "Prepare-se pra uma reunião: um dossiê completo da empresa que você vai visitar.", match: (p) => p.startsWith("/prospects") },
+  { label: "Conhecimento", href: "/perguntar", icon: SearchIcon, purpose: "Pergunte qualquer coisa sobre este cliente — a resposta vem com fonte e data.", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Concorrentes",
     href: "/vigiar",
+    icon: SwordsIcon,
+    purpose: "Monitore e diagnostique os concorrentes deste cliente.",
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
-  { label: "Relatórios", href: "/relatorios", match: (p) => p.startsWith("/relatorios") },
-  { label: "Ajustes", href: "/analistas", match: (p) => p.startsWith("/analistas") },
+  { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
+  { label: "Ajustes", href: "/analistas", icon: SlidersIcon, purpose: "Ajuste as áreas de análise e os analistas deste cliente.", match: (p) => p.startsWith("/analistas") },
 ];
 
 /** Seções do modo CARTEIRA (2º template) — a Ficha no lugar de Visão/Briefing. */
 const CARTEIRA_SECTIONS: Section[] = [
-  { label: "Carteira", href: "/carteira", match: (p) => p.startsWith("/carteira") },
-  { label: "Feed", href: "/feed", match: (p) => p.startsWith("/feed") },
-  { label: "Prospects", href: "/prospects", match: (p) => p.startsWith("/prospects") },
-  { label: "Conhecimento", href: "/perguntar", match: (p) => p.startsWith("/perguntar") },
+  { label: "Carteira", href: "/carteira", icon: WalletIcon, purpose: "Sua carteira: cada conta, o que se move nela e a aderência com o que você vende.", match: (p) => p.startsWith("/carteira") },
+  { label: "Feed", href: "/feed", icon: RadarIcon, purpose: "Tudo que o Radar coletou sobre esta carteira — os sinais crus, sem análise.", match: (p) => p.startsWith("/feed") },
+  { label: "Prospects", href: "/prospects", icon: TargetIcon, purpose: "Prepare-se pra uma reunião: um dossiê completo da empresa que você vai visitar.", match: (p) => p.startsWith("/prospects") },
+  { label: "Conhecimento", href: "/perguntar", icon: SearchIcon, purpose: "Pergunte qualquer coisa sobre esta carteira — a resposta vem com fonte e data.", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Hospitais",
     href: "/vigiar",
+    icon: Building2Icon,
+    purpose: "Monitore e diagnostique as instituições desta carteira.",
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
-  { label: "Relatórios", href: "/relatorios", match: (p) => p.startsWith("/relatorios") },
-  { label: "Ajustes", href: "/analistas", match: (p) => p.startsWith("/analistas") },
+  { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
+  { label: "Ajustes", href: "/analistas", icon: SlidersIcon, purpose: "Ajuste as áreas de análise e os analistas desta carteira.", match: (p) => p.startsWith("/analistas") },
 ];
 
 /** Home de cada cliente conforme o modo. */
@@ -94,6 +115,22 @@ function ChevronLeftIcon() {
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
 function GearIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg aria-hidden viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -109,6 +146,142 @@ function TodayIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
       <rect x="3" y="4.5" width="18" height="16" rx="2" />
       <path d="M3 9h18M8 2.5v4M16 2.5v4" />
     </svg>
+  );
+}
+
+/** A marca do Radar — o ícone com a onda pulsando atrás (a "vida" do produto,
+    na linguagem do pulso do ponto vermelho original). */
+function RadarMark({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <span className="relative inline-flex shrink-0 items-center justify-center">
+      <span aria-hidden className="radar-ping absolute inset-0 rounded-full bg-red-500/20" />
+      <RadarIcon className={"relative text-red-500 " + className} />
+    </span>
+  );
+}
+
+/** Item de FUNÇÃO da agência no rodapé/topo (Hoje, Automações, Agências, Custo) —
+    ícone solto + label, tratamento único. Distingue-se das CONTAS (monograma). */
+function NavItem({
+  href,
+  label,
+  icon: Icon,
+  active,
+  collapsed,
+  badge,
+}: {
+  href: string;
+  label: string;
+  icon: IconCmp;
+  active: boolean;
+  collapsed: boolean;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
+      className={
+        (collapsed ? "justify-center " : "gap-2.5 px-2 ") +
+        "flex items-center rounded-md py-1.5 text-sm transition-colors " +
+        (active ? "bg-stone-100 font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
+      }
+    >
+      <Icon className={"h-[18px] w-[18px] shrink-0 " + (active ? "text-stone-900" : "text-stone-500")} />
+      {!collapsed ? <span className="flex-1">{label}</span> : null}
+      {!collapsed ? badge : null}
+    </Link>
+  );
+}
+
+/** Miolo da sidebar (Hoje + clientes + rodapé) — reusado no desktop e na gaveta
+    mobile. `collapsed` só é true no desktop recolhido; na gaveta é sempre false. */
+function SidebarNav({
+  clients,
+  modes,
+  isAdmin,
+  pathname,
+  cliente,
+  collapsed,
+}: {
+  clients: string[];
+  modes?: Record<string, string>;
+  isAdmin: boolean;
+  pathname: string;
+  cliente: string;
+  collapsed: boolean;
+}) {
+  return (
+    <>
+      <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Clientes">
+        {/* HOJE — o ritual da manhã é da AGÊNCIA (cruza os clientes), acima da lista */}
+        <div className="mb-2">
+          <NavItem href="/hoje" label="Hoje" icon={TodayIcon} active={pathname === "/hoje"} collapsed={collapsed} badge={<HojeBadge />} />
+        </div>
+        {!collapsed ? (
+          <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Clientes</p>
+        ) : null}
+        <ul className="space-y-0.5">
+          {clients.map((name) => {
+            const active = name === cliente;
+            return (
+              <li key={name}>
+                <Link
+                  href={withClient(homeFor(modes?.[name]), name)}
+                  aria-current={active ? "true" : undefined}
+                  title={collapsed ? name : undefined}
+                  className={
+                    collapsed
+                      ? "flex justify-center rounded-md py-1.5 transition-colors hover:bg-stone-100"
+                      : "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors " +
+                        (active
+                          ? "bg-stone-100 font-semibold text-stone-900"
+                          : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
+                  }
+                >
+                  <span
+                    aria-hidden
+                    className={
+                      "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold " +
+                      (active ? "bg-stone-900 text-white" : "bg-stone-200 text-stone-600")
+                    }
+                  >
+                    {monogram(name)}
+                  </span>
+                  {!collapsed ? <span className="truncate">{name}</span> : null}
+                </Link>
+              </li>
+            );
+          })}
+          {clients.length === 0 && !collapsed ? (
+            <li className="px-2 py-1.5 text-sm text-stone-400">Nenhum cliente ainda</li>
+          ) : null}
+        </ul>
+      </nav>
+
+      {/* rodapé — ações da AGÊNCIA (fora do escopo de um cliente) */}
+      <div className="space-y-1 border-t border-stone-200 p-3">
+        <NewClientButton clients={clients} collapsed={collapsed} />
+        <NavItem href="/automacoes" label="Automações" icon={GearIcon} active={pathname === "/automacoes"} collapsed={collapsed} />
+        {isAdmin ? (
+          collapsed ? (
+            <>
+              <NavItem href="/admin" label="Agências" icon={ShieldIcon} active={pathname === "/admin"} collapsed />
+              <NavItem href="/custo" label="Custo" icon={ReceiptIcon} active={pathname === "/custo"} collapsed />
+            </>
+          ) : (
+            <div className="pt-2">
+              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-400">Administração</p>
+              <NavItem href="/admin" label="Agências" icon={ShieldIcon} active={pathname === "/admin"} collapsed={false} />
+              <NavItem href="/custo" label="Custo" icon={ReceiptIcon} active={pathname === "/custo"} collapsed={false} />
+            </div>
+          )
+        ) : null}
+        <LogoutButton collapsed={collapsed} />
+      </div>
+    </>
   );
 }
 
@@ -128,6 +301,7 @@ export function AppShell({
   const pathname = usePathname();
   const params = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Lê a preferência depois de montar (evita mismatch de hidratação).
   useEffect(() => {
@@ -137,6 +311,19 @@ export function AppShell({
       /* localStorage indisponível — mantém expandido */
     }
   }, []);
+
+  // Fecha a gaveta mobile ao navegar (mudou rota OU cliente selecionado).
+  const routeSig = pathname + "?" + params.toString();
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [routeSig]);
+
+  // Mantém a aba ATIVA visível na fileira rolável (mobile: 9 abas não cabem).
+  const tabsRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const ativo = tabsRef.current?.querySelector('[aria-current="page"]');
+    ativo?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [routeSig]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -167,12 +354,13 @@ export function AppShell({
       : (clients[0] ?? "");
   const mode = modes?.[cliente] ?? "concorrentes";
   const sections = mode === "carteira" ? CARTEIRA_SECTIONS : CONCORRENTES_SECTIONS;
+  const activeSection = sections.find((s) => s.match(pathname));
   // telas da AGÊNCIA (não de um cliente) — sem o cabeçalho/abas de cliente.
   const orgLevel = pathname === "/hoje" || pathname === "/automacoes";
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-stone-50">
-      {/* SIDEBAR — marca + contas + novo cliente (global) */}
+      {/* SIDEBAR (desktop) — marca + contas + novo cliente (global) */}
       <aside
         className={
           "hidden shrink-0 flex-col border-r border-stone-200 bg-white transition-[width] duration-200 md:flex " +
@@ -194,11 +382,11 @@ export function AppShell({
               aria-label="Expandir a barra"
               className="flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-stone-100"
             >
-              <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-red-500 radar-pulse" />
+              <RadarMark />
             </button>
           ) : (
             <>
-              <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-red-500 radar-pulse" />
+              <RadarMark />
               <span className="text-[15px] font-bold tracking-[-0.01em] text-stone-900">Radar</span>
               <button
                 type="button"
@@ -212,162 +400,78 @@ export function AppShell({
             </>
           )}
         </div>
+        <SidebarNav clients={clients} modes={modes} isAdmin={isAdmin} pathname={pathname} cliente={cliente} collapsed={collapsed} />
+      </aside>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Clientes">
-          {/* HOJE — o ritual da manhã é da AGÊNCIA (cruza os clientes), acima da lista */}
-          <Link
-            href="/hoje"
-            aria-current={pathname === "/hoje" ? "page" : undefined}
-            title={collapsed ? "Hoje" : undefined}
-            className={
-              (collapsed ? "flex justify-center rounded-md py-1.5 " : "mb-2 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm ") +
-              "transition-colors " +
-              (pathname === "/hoje"
-                ? "bg-stone-100 font-semibold text-stone-900"
-                : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
-            }
+      {/* GAVETA (mobile) — overlay + painel deslizante com a MESMA navegação */}
+      {drawerOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-stone-900/40 md:hidden"
+          onClick={() => setDrawerOpen(false)}
+          aria-hidden
+        />
+      ) : null}
+      <aside
+        className={
+          "fixed inset-y-0 left-0 z-50 flex w-[264px] max-w-[82vw] flex-col border-r border-stone-200 bg-white shadow-xl transition-transform duration-200 md:hidden " +
+          (drawerOpen ? "translate-x-0" : "-translate-x-full")
+        }
+        aria-label="Navegação"
+      >
+        <div className="flex h-14 items-center gap-2.5 border-b border-stone-200 px-5">
+          <RadarMark />
+          <span className="text-[15px] font-bold tracking-[-0.01em] text-stone-900">Radar</span>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Fechar menu"
+            className="ml-auto flex h-9 w-9 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
           >
-            <span
-              aria-hidden
-              className={
-                "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md " +
-                (pathname === "/hoje" ? "bg-stone-900 text-white" : "bg-stone-200 text-stone-600")
-              }
-            >
-              <TodayIcon />
-            </span>
-            {!collapsed ? <span>Hoje</span> : null}
-            {!collapsed ? <HojeBadge /> : null}
-          </Link>
-          {!collapsed ? (
-            <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
-              Clientes
-            </p>
-          ) : null}
-          <ul className="space-y-0.5">
-            {clients.map((name) => {
-              const active = name === cliente;
-              return (
-                <li key={name}>
-                  <Link
-                    href={withClient(homeFor(modes?.[name]), name)}
-                    aria-current={active ? "true" : undefined}
-                    title={collapsed ? name : undefined}
-                    className={
-                      collapsed
-                        ? "flex justify-center rounded-md py-1.5 transition-colors hover:bg-stone-100"
-                        : "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors " +
-                          (active
-                            ? "bg-stone-100 font-semibold text-stone-900"
-                            : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
-                    }
-                  >
-                    <span
-                      aria-hidden
-                      className={
-                        "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold " +
-                        (active ? "bg-stone-900 text-white" : "bg-stone-200 text-stone-600")
-                      }
-                    >
-                      {monogram(name)}
-                    </span>
-                    {!collapsed ? <span className="truncate">{name}</span> : null}
-                  </Link>
-                </li>
-              );
-            })}
-            {clients.length === 0 && !collapsed ? (
-              <li className="px-2 py-1.5 text-sm text-stone-400">Nenhum cliente ainda</li>
-            ) : null}
-          </ul>
-        </nav>
-
-        {/* rodapé — "+ Novo cliente" é GLOBAL (ação da agência) + Automações + Administração */}
-        <div className="space-y-2 border-t border-stone-200 p-3">
-          <NewClientButton clients={clients} collapsed={collapsed} />
-          <Link
-            href="/automacoes"
-            aria-current={pathname === "/automacoes" ? "page" : undefined}
-            title={collapsed ? "Automações" : undefined}
-            className={
-              (collapsed
-                ? "flex justify-center rounded-md py-1.5 "
-                : "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ") +
-              "transition-colors " +
-              (pathname === "/automacoes" ? "bg-stone-100 font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
-            }
-          >
-            <GearIcon />
-            {!collapsed ? "Automações" : null}
-          </Link>
-          {isAdmin ? (
-            collapsed ? (
-              <Link
-                href="/admin"
-                title="Administração"
-                aria-label="Administração"
-                className="flex justify-center rounded-md py-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
-              >
-                <GearIcon />
-              </Link>
-            ) : (
-              <div>
-                <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-400">Administração</p>
-                <Link
-                  href="/admin"
-                  aria-current={pathname === "/admin" ? "page" : undefined}
-                  className={
-                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors " +
-                    (pathname === "/admin" ? "bg-stone-100 font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
-                  }
-                >
-                  <GearIcon /> Agências
-                </Link>
-                <Link
-                  href="/custo"
-                  aria-current={pathname === "/custo" ? "page" : undefined}
-                  className={
-                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors " +
-                    (pathname === "/custo" ? "bg-stone-100 font-semibold text-stone-900" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")
-                  }
-                >
-                  <span aria-hidden className="inline-flex h-4 w-4 items-center justify-center text-stone-400">◔</span> Custo
-                </Link>
-              </div>
-            )
-          ) : null}
+            <CloseIcon />
+          </button>
         </div>
+        <SidebarNav clients={clients} modes={modes} isAdmin={isAdmin} pathname={pathname} cliente={cliente} collapsed={false} />
       </aside>
 
       {/* CONTEÚDO — topbar do cliente (fixo) + tabs + página (rola).
           /hoje e /automacoes são da agência: sem cabeçalho de cliente. */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* TOPBAR MOBILE (universal) — hambúrguer + marca + troca rápida de cliente.
+            Aparece em TODAS as telas do mobile, inclusive as da agência (Hoje). */}
+        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-stone-200 bg-white px-4 md:hidden">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Abrir menu"
+            className="-ml-1.5 flex h-10 w-10 items-center justify-center rounded-md text-stone-600 transition-colors hover:bg-stone-100"
+          >
+            <MenuIcon />
+          </button>
+          <RadarMark />
+          <span className="text-[15px] font-bold tracking-[-0.01em] text-stone-900">Radar</span>
+          {!orgLevel && clients.length > 0 ? (
+            <select
+              aria-label="Cliente"
+              value={cliente}
+              className="ml-auto max-w-[45%] truncate rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-800"
+              onChange={(e) => {
+                window.location.href = withClient(pathname, e.target.value);
+              }}
+            >
+              {clients.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </div>
+
+        <WelcomePanel />
         {orgLevel ? (
           <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
         ) : (
         <header className="shrink-0 border-b border-stone-200 bg-stone-50">
-          {/* mobile: marca + seletor de cliente */}
-          <div className="flex items-center gap-2.5 px-5 py-2.5 md:hidden">
-            <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
-            <span className="text-[15px] font-bold tracking-[-0.01em] text-stone-900">Radar</span>
-            {clients.length > 0 ? (
-              <select
-                aria-label="Cliente"
-                defaultValue={cliente}
-                className="ml-auto rounded-md border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800"
-                onChange={(e) => {
-                  window.location.href = withClient(pathname, e.target.value);
-                }}
-              >
-                {clients.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-          </div>
-
           {/* cliente atual (desktop) */}
           <div className="hidden items-center gap-3 px-6 pt-4 md:flex">
             <span
@@ -381,27 +485,44 @@ export function AppShell({
             </span>
           </div>
 
-          {/* tabs de seção */}
-          <nav className="flex gap-1 overflow-x-auto px-4 md:px-6" aria-label="Seções">
-            {sections.map((s) => {
-              const active = s.match(pathname);
-              return (
-                <Link
-                  key={s.href}
-                  href={withClient(s.href, cliente)}
-                  aria-current={active ? "page" : undefined}
-                  className={
-                    "shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors " +
-                    (active
-                      ? "border-stone-900 text-stone-900"
-                      : "border-transparent text-stone-500 hover:text-stone-900")
-                  }
-                >
-                  {s.label}
-                </Link>
-              );
-            })}
-          </nav>
+          {/* tabs de seção — fileira rolável no mobile (9 abas), fade nas bordas */}
+          <div className="relative">
+            <nav
+              ref={tabsRef}
+              className="flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] md:px-6 [&::-webkit-scrollbar]:hidden"
+              aria-label="Seções"
+            >
+              {sections.map((s) => {
+                const active = s.match(pathname);
+                return (
+                  <Link
+                    key={s.href}
+                    href={withClient(s.href, cliente)}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors " +
+                      (active
+                        ? "border-stone-900 text-stone-900"
+                        : "border-transparent text-stone-500 hover:text-stone-900")
+                    }
+                  >
+                    <s.icon className={"h-4 w-4 shrink-0 " + (active ? "text-stone-900" : "text-stone-400")} />
+                    {s.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            {/* fades — sinalizam que a fileira rola (só mobile) */}
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-stone-50 md:hidden" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-gradient-to-l from-stone-50 md:hidden" />
+          </div>
+
+          {/* Linha "pra que serve esta tela" — orienta quem chegou agora. */}
+          {activeSection ? (
+            <p className="px-4 pb-2.5 text-[13px] leading-snug text-stone-500 md:px-6">
+              {activeSection.purpose}
+            </p>
+          ) : null}
         </header>
         )}
 

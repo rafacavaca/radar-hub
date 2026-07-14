@@ -100,8 +100,8 @@ export default async function DossiePage({
           <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
             <p className="text-base font-medium text-stone-700">Dossiê ainda não gerado.</p>
             <p className="mx-auto mt-1 max-w-md text-sm text-stone-500">
-              Clique <span className="font-medium text-stone-700">Gerar dossiê</span> — o Radar lê o site, farejando
-              concorrentes e sinais públicos, e cruza com a nossa oferta (Brain). Leva ~1 min e consome crédito.
+              Clique <span className="font-medium text-stone-700">Gerar dossiê</span> — o Radar lê o site, descobrindo
+              concorrentes e sinais públicos, e cruza com a nossa oferta (base de conhecimento). Leva ~1 min e consome crédito.
             </p>
           </div>
         )}

@@ -72,7 +72,7 @@ export default async function IdentidadePage({
           href={`/vigiar${q}`}
           className="border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900"
         >
-          Vigiar
+          Monitorar
         </Link>
         <span className="border-b-2 border-stone-900 px-3 py-2 text-sm font-medium text-stone-900">
           Identidade
@@ -92,7 +92,7 @@ export default async function IdentidadePage({
               : "concorrentes sem site cadastrado não aparecem aqui"}{" "}
             — adicione o site em{" "}
             <Link href={`/vigiar${q}`} className="underline underline-offset-2 hover:text-stone-600">
-              Vigiar
+              Monitorar
             </Link>
             .
           </p>
@@ -110,7 +110,7 @@ export default async function IdentidadePage({
             <p className="mt-1 text-sm text-stone-500">
               Adicione o site de um concorrente na tela{" "}
               <Link href="/vigiar" className="underline underline-offset-2 hover:text-stone-700">
-                Vigiar
+                Monitorar
               </Link>
               .
             </p>

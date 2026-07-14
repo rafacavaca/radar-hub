@@ -145,7 +145,7 @@ export function FichaDiagnostico({ diag, now }: { diag: DiagnosticoConcorrente; 
       {/* Presença & Canais */}
       <div className="border-t border-stone-100 px-4 py-4 sm:px-5">
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-400">Presença &amp; Canais</p>
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
           {CANAL_KEYS.map((k: CanalKey) => {
             const ch = diag.canais[k];
             return (
@@ -202,7 +202,7 @@ export function FichaDiagnostico({ diag, now }: { diag: DiagnosticoConcorrente; 
             </span>
           </p>
           {diag.preco.planos.length > 0 ? (
-            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
               {diag.preco.planos.map((p, i) => (
                 <div key={i} className="rounded-xl border border-stone-200 bg-stone-50/40 p-3">
                   <div className="flex items-baseline justify-between gap-2">
@@ -243,7 +243,7 @@ export function FichaDiagnostico({ diag, now }: { diag: DiagnosticoConcorrente; 
               temas derivados de reviews
             </span>
           </p>
-          <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="grid gap-2.5 md:grid-cols-2">
             {diag.reputacao.fontes.map((f) => {
               const nome = { reclame_aqui: "Reclame Aqui", google: "Google", g2: "G2", capterra: "Capterra" }[f.fonte];
               return (
@@ -323,7 +323,7 @@ export function FichaDiagnostico({ diag, now }: { diag: DiagnosticoConcorrente; 
       {diag.midia_paga ? (
         <div className="border-t border-stone-100 px-4 py-4 sm:px-5">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-400">Mídia paga</p>
-          <div className="grid gap-2.5 sm:grid-cols-3">
+          <div className="grid gap-2.5 md:grid-cols-3">
             {(["meta", "linkedin", "google"] as const).map((plat) => {
               const m = diag.midia_paga![plat];
               return (

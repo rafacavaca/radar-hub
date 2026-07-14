@@ -77,7 +77,7 @@ export function ProspectLifecycle({ cliente, id, status }: { cliente: string; id
         <button
           onClick={promover}
           disabled={busy !== null}
-          title="Virou oportunidade real? Passa a ser vigiada continuamente (pilar Clientes)."
+          title="Virou oportunidade real? Passa a ser monitorada continuamente (pilar Clientes)."
           className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
         >
           {busy === "promover" ? "Promovendo…" : "Promover a conta-chave"}
@@ -90,7 +90,7 @@ export function ProspectLifecycle({ cliente, id, status }: { cliente: string; id
           Arquivar
         </button>
       </div>
-      {busy === "promover" ? <span className="text-[11px] text-stone-400">descobrindo fontes pra vigiar…</span> : null}
+      {busy === "promover" ? <span className="text-[11px] text-stone-400">descobrindo fontes pra monitorar…</span> : null}
       {erro ? <span className="text-[11px] text-red-600">{erro}</span> : null}
     </div>
   );

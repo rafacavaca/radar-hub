@@ -122,7 +122,7 @@ export function DiagConfigEditor({
 
           {/* Temas a vigiar */}
           <label className="block">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Temas a vigiar</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Temas a monitorar</span>
             <input
               value={temas}
               onChange={(e) => setTemas(e.target.value)}

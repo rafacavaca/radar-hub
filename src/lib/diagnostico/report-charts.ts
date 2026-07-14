@@ -129,7 +129,7 @@ export function buildDiagnosticoCharts(diags: DiagnosticoConcorrente[]): ChartSp
     charts.push({
       tipo: "barras",
       titulo: "Maturidade de comunicação",
-      subtitulo: "régua da Lente 4 — quanto maior, mais madura",
+      subtitulo: "régua de maturidade — quanto maior, mais madura",
       series: [...comMaturidade]
         .sort((a, b) => nivelRank(a.maturidade?.nivel) - nivelRank(b.maturidade?.nivel))
         .map((d) => ({ label: d.concorrente_nome, valor: d.maturidade?.score ?? null, nota: d.maturidade?.nivel ?? undefined })),
