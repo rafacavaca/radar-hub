@@ -147,6 +147,42 @@ async function runLive(): Promise<void> {
   const { data: bVeColetor } = await asB.from("signals").select("*").eq("id", "sig-coletor-A");
   reg("Coletor grava na org A (org_id explícito) e B não vê", (aVeColetor ?? []).length === 1 && (bVeColetor ?? []).length === 0 ? "ok" : "falhou", `A=${(aVeColetor ?? []).length} B=${(bVeColetor ?? []).length}`);
 
+  // 7) BRAIN + LinkedIn org-scoped (o GAP ALTO): duas orgs com um cliente de nome
+  //    IDÊNTICO. Só a org DONA (A) lê o Brain/LinkedIn; a outra (B) recebe "none"
+  //    e [] — mesmo pedindo o mesmo nome. Prova que não vaza conhecimento entre agências.
+  {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join: joinP } = await import("node:path");
+    process.env.RADAR_DATA_DIR = mkdtempSync(joinP(tmpdir(), "iso-li-")); // store LinkedIn isolado (não polui data/)
+    process.env.RADAR_BRAIN_ORG_ID = aId; // A é a org DONA do Brain/LinkedIn
+
+    const { fetchClientBrain } = await import("@/lib/brain");
+    const { linkedInReadAllowed, ingestLinkedInPost, collectLinkedIn } = await import("@/lib/linkedin");
+    const { runAsOrgCollector } = await import("@/lib/db/collector-org");
+    const { MOOVEFY } = await import("@/lib/clients/moovefy");
+    const nome = MOOVEFY.clientName; // um cliente que o Formare (org A) tem
+
+    // Brain: A (dona) lê; B (mesmo nome) recebe "none".
+    const brainA = await runAsOrgCollector(aId, () => fetchClientBrain(nome, { noCache: true }));
+    const brainB = await runAsOrgCollector(bId, () => fetchClientBrain(nome, { noCache: true }));
+    reg(
+      "Brain org-scoped: A (dona) lê o Brain; B com cliente de NOME IGUAL recebe 'none' — não vaza",
+      brainA.mode !== "none" && brainB.mode === "none" ? "ok" : "falhou",
+      `A=${brainA.mode} B=${brainB.mode}`,
+    );
+
+    // LinkedIn: semeia 1 post p/ o mesmo nome; A lê, B (gate) não vê.
+    ingestLinkedInPost({ perfil: "Concorrente X", papel: "concorrente", workspace: nome, texto: "SEGREDO-LINKEDIN-A", data_publicacao: "2026-07-10", url: "https://www.linkedin.com/posts/segredo-a" });
+    const liA = await runAsOrgCollector(aId, async () => ((await linkedInReadAllowed()) ? collectLinkedIn(nome).concorrente : []));
+    const liB = await runAsOrgCollector(bId, async () => ((await linkedInReadAllowed()) ? collectLinkedIn(nome).concorrente : []));
+    reg(
+      "LinkedIn org-scoped: A (dona) lê os posts; B com cliente de NOME IGUAL não vê — não vaza",
+      liA.length > 0 && liB.length === 0 ? "ok" : "falhou",
+      `A=${liA.length} B=${liB.length} post(s)`,
+    );
+  }
+
   // limpeza
   await admin.from("orgs").delete().in("slug", [orgA.slug, orgB.slug]);
 }

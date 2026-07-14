@@ -10,7 +10,8 @@
  */
 
 import { collectBlog } from "@/lib/collectors/blog";
-import { collectLinkedIn } from "@/lib/linkedin";
+import { collectLinkedIn, linkedInReadAllowed } from "@/lib/linkedin";
+import type { RawEvent } from "@/lib/types";
 import { scrape } from "@/lib/firecrawl";
 import { slugify, sourceId, type Competitor, type WatchSource } from "@/lib/watchlist";
 import {
@@ -81,14 +82,15 @@ async function auditBlog(
   };
 }
 
-/** LinkedIn: profundidade vem dos posts ingeridos pelo botão (senão, honesto). */
+/** LinkedIn: profundidade vem dos posts ingeridos pelo botão (senão, honesto).
+    `linkedInPosts` já vem gated por org (só a org dona lê) — ver runLente2. */
 function auditLinkedIn(
-  clientName: string,
+  linkedInPosts: RawEvent[],
   name: string,
   url: string | null,
   now: string,
 ): CanalAudit {
-  const posts = collectLinkedIn(clientName).concorrente.filter(
+  const posts = linkedInPosts.filter(
     (e) => slugify(e.competitorName) === slugify(name),
   );
   if (posts.length > 0) {
@@ -143,6 +145,10 @@ export async function runLente2(
 ): Promise<Canais> {
   const now = new Date().toISOString();
 
+  // ISOLAMENTO: só a org DONA lê os posts de LinkedIn ingeridos (senão vazaria
+  // por colisão de nome de cliente entre agências).
+  const linkedInPosts = (await linkedInReadAllowed()) ? collectLinkedIn(clientName).concorrente : [];
+
   let links: string[] = [];
   try {
     links = (await scrape(siteUrl, { formats: ["links"], onlyMainContent: false })).links ?? [];
@@ -161,7 +167,7 @@ export async function runLente2(
   return {
     site: { presente: true, url: siteUrl, frequencia: null, recencia: null, tipo_conteudo: null, engajamento: null, status: "encontrado" },
     blog: blogUrl ? await auditBlog(competitorId, name, blogUrl, now) : canalNaoLocalizado(),
-    linkedin: auditLinkedIn(clientName, name, linkedinUrl, now),
+    linkedin: auditLinkedIn(linkedInPosts, name, linkedinUrl, now),
     youtube: auditPresenca(youtubeUrl),
     instagram: auditPresenca(instagramUrl),
     facebook: auditPresenca(facebookUrl),

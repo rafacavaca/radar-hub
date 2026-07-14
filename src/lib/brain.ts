@@ -27,6 +27,7 @@ import { join } from "node:path";
 import { GEMMINI } from "@/lib/clients/gemmini";
 import { MOOVEFY } from "@/lib/clients/moovefy";
 import { TAGAT } from "@/lib/clients/tagat";
+import { currentOrgId } from "@/lib/db/session";
 import { slugify } from "@/lib/watchlist";
 
 const CACHE_DIR = join(process.cwd(), ".cache");
@@ -62,16 +63,43 @@ export function isBrainDoorConfigured(): boolean {
   return Boolean(process.env.RADAR_BRAIN_URL && process.env.RADAR_BRAIN_SECRET);
 }
 
+/**
+ * ISOLAMENTO MULTI-TENANT: a org DONA do Brain — a ÚNICA que pode ler o Brain do
+ * Formare (e os fixtures locais). A porta serve por NOME de workspace com um
+ * segredo compartilhado; sem este portão, uma org com um cliente de nome igual
+ * ao de outra agência leria o conhecimento da outra. Default: a org de ingestão
+ * (o Formare do Rafael). Exportado pra o teste de isolamento provar o gate.
+ */
+export function brainOwnerOrgId(): string | undefined {
+  return process.env.RADAR_BRAIN_ORG_ID || process.env.RADAR_INGEST_ORG_ID || undefined;
+}
+
+/**
+ * Contexto genérico "sem Brain" — o que uma org NÃO-dona SEMPRE recebe. Nunca o
+ * fixture (que é de um cliente do Formare) nem o Brain de outra org.
+ */
+function noneFor(clientName: string): BrainContext {
+  return {
+    mode: "none",
+    context:
+      `Ainda NÃO há base de conhecimento disponível para ${clientName}. ` +
+      "Seja conservador: gere itens só quando o impacto for óbvio pelo próprio movimento, " +
+      "com scores baixos, e deixe claro no porQueImporta que falta contexto do cliente.",
+  };
+}
+
 function todayStamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function cachePathFor(clientName: string): string {
-  return join(CACHE_DIR, `brain-${slugify(clientName)}-${todayStamp()}.json`);
+/** Cache do dia POR ORG (nunca serve o Brain de uma org a outra, nem por nome). */
+function cachePathFor(orgId: string, clientName: string): string {
+  const org = (orgId || "sem-org").slice(0, 12);
+  return join(CACHE_DIR, `brain-${org}-${slugify(clientName)}-${todayStamp()}.json`);
 }
 
-function readCache(clientName: string): BrainContext | null {
-  const path = cachePathFor(clientName);
+function readCache(orgId: string, clientName: string): BrainContext | null {
+  const path = cachePathFor(orgId, clientName);
   if (!existsSync(path)) return null;
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8")) as BrainContext;
@@ -82,10 +110,10 @@ function readCache(clientName: string): BrainContext | null {
   }
 }
 
-function writeCache(clientName: string, value: BrainContext): void {
+function writeCache(orgId: string, clientName: string, value: BrainContext): void {
   try {
     mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(cachePathFor(clientName), JSON.stringify(value, null, 2), "utf8");
+    writeFileSync(cachePathFor(orgId, clientName), JSON.stringify(value, null, 2), "utf8");
   } catch {
     // cache é conveniência; falha de escrita não pode derrubar o loop.
   }
@@ -169,10 +197,17 @@ export async function fetchClientBrain(
   clientName: string,
   opts: FetchBrainOptions = {},
 ): Promise<BrainContext> {
+  // ISOLAMENTO MULTI-TENANT: só a org DONA lê Brain/fixtures. Qualquer outra org
+  // recebe "none" — nunca o conhecimento de outra agência, mesmo com cliente de
+  // nome idêntico. (A porta serve por nome com segredo compartilhado; o gate é aqui.)
+  const org = (await currentOrgId()) ?? "";
+  const owner = brainOwnerOrgId();
+  if (owner && org !== owner) return noneFor(clientName);
+
   if (!isBrainDoorConfigured()) return fallbackFor(clientName);
 
   if (!opts.noCache) {
-    const cached = readCache(clientName);
+    const cached = readCache(org, clientName);
     if (cached) return cached;
   }
 
@@ -203,7 +238,7 @@ export async function fetchClientBrain(
       context: formatContext(clientName, nodes),
       nodeCount: nodes.length,
     };
-    if (!opts.noCache) writeCache(clientName, live);
+    if (!opts.noCache) writeCache(org, clientName, live);
     return live;
   } catch (err) {
     console.warn(`[brain] falha lendo o Brain de ${clientName}: ${(err as Error).message}`);

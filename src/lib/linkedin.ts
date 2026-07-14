@@ -21,6 +21,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { currentOrgId } from "@/lib/db/session";
+import { supabaseEnabled } from "@/lib/db/supabase";
 import { slugify } from "@/lib/watchlist";
 import type { RawEvent } from "@/lib/types";
 
@@ -186,6 +188,23 @@ export function ingestLinkedInPost(input: IngestInput): LinkedInPost {
   else file.posts.push(post);
   writeFile(file);
   return post;
+}
+
+/**
+ * A org DONA da ingestão de LinkedIn — a ÚNICA que pode LER os posts. O store é
+ * global por nome de workspace; sem este gate, uma org com cliente de nome igual
+ * ao de outra agência leria os posts dela. Mesma org dona do Brain (o Formare).
+ */
+export function linkedInOwnerOrgId(): string | undefined {
+  return process.env.RADAR_BRAIN_ORG_ID || process.env.RADAR_INGEST_ORG_ID || undefined;
+}
+
+/** Só a org dona lê os posts de LinkedIn. Modo clássico (single-tenant) = livre. */
+export async function linkedInReadAllowed(): Promise<boolean> {
+  if (!supabaseEnabled()) return true;
+  const owner = linkedInOwnerOrgId();
+  if (!owner) return true;
+  return (await currentOrgId()) === owner;
 }
 
 /** Posts ingeridos (opcionalmente de um workspace), mais novos primeiro. */
