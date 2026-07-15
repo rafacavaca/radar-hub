@@ -56,7 +56,7 @@ const CONCORRENTES_SECTIONS: Section[] = [
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
   { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
-  { label: "Parametrização", href: "/parametrizacao", icon: SlidersIcon, purpose: "A Ficha deste cliente: quem observamos, de onde vem, como lemos, como chega e como falamos.", match: (p) => p.startsWith("/parametrizacao") || p.startsWith("/analistas") },
+  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As áreas que leem cada sinal deste cliente — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas") },
 ];
 
 /** Seções do modo CARTEIRA (2º template) — a Ficha no lugar de Visão/Briefing. */
@@ -73,7 +73,7 @@ const CARTEIRA_SECTIONS: Section[] = [
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
   { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
-  { label: "Parametrização", href: "/parametrizacao", icon: SlidersIcon, purpose: "A Ficha desta carteira: quem observamos, de onde vem, como lemos, como chega e como falamos.", match: (p) => p.startsWith("/parametrizacao") || p.startsWith("/analistas") },
+  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As áreas que leem cada sinal desta carteira — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas") },
 ];
 
 /** Home de cada cliente conforme o modo. */
@@ -265,6 +265,7 @@ function SidebarNav({
       <div className="space-y-1 border-t border-stone-200 p-3">
         <NewClientButton clients={clients} collapsed={collapsed} />
         <NavItem href="/automacoes" label="Automações" icon={GearIcon} active={pathname === "/automacoes"} collapsed={collapsed} />
+        <NavItem href="/implantacao" label="Implantação" icon={FileTextIcon} active={pathname === "/implantacao"} collapsed={collapsed} />
         {isAdmin ? (
           collapsed ? (
             <>
@@ -356,7 +357,7 @@ export function AppShell({
   const sections = mode === "carteira" ? CARTEIRA_SECTIONS : CONCORRENTES_SECTIONS;
   const activeSection = sections.find((s) => s.match(pathname));
   // telas da AGÊNCIA (não de um cliente) — sem o cabeçalho/abas de cliente.
-  const orgLevel = pathname === "/hoje" || pathname === "/automacoes";
+  const orgLevel = pathname === "/hoje" || pathname === "/automacoes" || pathname === "/implantacao";
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-stone-50">

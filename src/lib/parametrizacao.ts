@@ -1,6 +1,6 @@
 /**
  * PARAMETRIZAÇÃO (por cliente, org-scoped) — a PROVENIÊNCIA da implantação e o
- * STATUS de cada parâmetro da Ficha. É o que a tela /parametrizacao mostra no
+ * STATUS de cada parâmetro da Ficha. É o que a tela /implantacao mostra no
  * topo ("parametrizado na implantação de X · revisado em Y") e o que dá o selo
  * honesto PENDENTE vs DEFINIDO por parâmetro — nunca um default silencioso que
  * depois vira "o Radar está errado".
@@ -59,6 +59,13 @@ export type Parametrizacao = {
 };
 
 const DOC_KIND = "parametrizacao";
+
+/**
+ * Chave do REGISTRO da agência (org-level). A Implantação é o critério da
+ * AGÊNCIA (um registro por org), não por cliente — o status dos 13 parâmetros
+ * é "foi revisado na implantação?". Usada como `clientName` nas funções abaixo.
+ */
+export const REGISTRO_KEY = "__agencia__";
 
 /** Ficha vazia (nada implantado ainda — todos os parâmetros pendentes). */
 export function parametrizacaoVazia(clientName: string): Parametrizacao {
