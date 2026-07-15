@@ -56,7 +56,7 @@ const CONCORRENTES_SECTIONS: Section[] = [
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
   { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
-  { label: "Ajustes", href: "/analistas", icon: SlidersIcon, purpose: "Ajuste as áreas de análise e os analistas deste cliente.", match: (p) => p.startsWith("/analistas") },
+  { label: "Parametrização", href: "/parametrizacao", icon: SlidersIcon, purpose: "A Ficha deste cliente: quem observamos, de onde vem, como lemos, como chega e como falamos.", match: (p) => p.startsWith("/parametrizacao") || p.startsWith("/analistas") },
 ];
 
 /** Seções do modo CARTEIRA (2º template) — a Ficha no lugar de Visão/Briefing. */
@@ -73,7 +73,7 @@ const CARTEIRA_SECTIONS: Section[] = [
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
   { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
-  { label: "Ajustes", href: "/analistas", icon: SlidersIcon, purpose: "Ajuste as áreas de análise e os analistas desta carteira.", match: (p) => p.startsWith("/analistas") },
+  { label: "Parametrização", href: "/parametrizacao", icon: SlidersIcon, purpose: "A Ficha desta carteira: quem observamos, de onde vem, como lemos, como chega e como falamos.", match: (p) => p.startsWith("/parametrizacao") || p.startsWith("/analistas") },
 ];
 
 /** Home de cada cliente conforme o modo. */
