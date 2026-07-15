@@ -33,8 +33,7 @@ export const PARAM_IDS = [
   // COMO LEMOS
   "areas_ativas",
   "regras_area",
-  "regua_prioridade",
-  "severidade_minima",
+  "regua_prioridade", // inclui o corte de ruído (P8 não é parâmetro próprio hoje)
   // COMO CHEGA
   "cadencia",
   "destinatarios",
@@ -185,10 +184,17 @@ export async function registrarImplantacao(clientName: string, ids: ParamId[], n
   return saveParametrizacao(comImplantado(atual, ids, now.toISOString()));
 }
 
-/** Define o status de um parâmetro (definido/pendente) e toca a revisão. */
+/**
+ * Define o status de um parâmetro (definido/pendente) e toca a revisão. Ao
+ * marcar o PRIMEIRO como definido, carimba a data da implantação (a implantação
+ * "aconteceu" quando se começou a revisar).
+ */
 export async function definirParametro(clientName: string, id: ParamId, status: ParamStatus, now: Date): Promise<Parametrizacao> {
   const atual = await loadParametrizacao(clientName);
-  return saveParametrizacao(comParametro(atual, id, status, now.toISOString()));
+  const nowIso = now.toISOString();
+  let prox = comParametro(atual, id, status, nowIso);
+  if (status === "definido" && !prox.implantadoEm) prox = { ...prox, implantadoEm: nowIso };
+  return saveParametrizacao(prox);
 }
 
 /** Toca a revisão de um cliente (chamado quando um editor embutido salva). */

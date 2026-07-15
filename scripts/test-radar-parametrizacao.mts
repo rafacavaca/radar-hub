@@ -41,9 +41,9 @@ const T2 = "2026-08-14T10:00:00.000Z"; // ~30 dias depois (a afinação)
 // ── 1. vazio = honesto (nada implantado, tudo pendente) ──
 const vazia = parametrizacaoVazia("Moovefy");
 add("Vazia: nunca implantado (implantadoEm null)", vazia.implantadoEm === null);
-add("Vazia: 13 parâmetros conhecidos", PARAM_IDS.length === 13);
+add("Vazia: 12 parâmetros conhecidos (P8 fundido no de prioridade)", PARAM_IDS.length === 12);
 add("Vazia: TODO parâmetro é pendente (sem default silencioso)", PARAM_IDS.every((id) => statusDe(vazia, id) === "pendente"));
-add("Vazia: completude 0/13", completude(vazia).definidos === 0 && completude(vazia).total === 13);
+add("Vazia: completude 0/12", completude(vazia).definidos === 0 && completude(vazia).total === 12);
 
 // ── 2. implantar: marca os parâmetros + carimba data (uma vez) ──
 const impl = comImplantado(vazia, ["clientes", "concorrentes", "areas_ativas"], T1);
@@ -51,13 +51,13 @@ add("Implantar carimba implantadoEm", impl.implantadoEm === T1);
 add("Implantar carimba revisadoEm", impl.revisadoEm === T1);
 add("Implantar marca os informados como DEFINIDOS", ["clientes", "concorrentes", "areas_ativas"].every((id) => statusDe(impl, id as never) === "definido"));
 add("Os não-informados seguem PENDENTES", statusDe(impl, "rotulos") === "pendente" && statusDe(impl, "cadencia") === "pendente");
-add("Completude reflete 3/13", completude(impl).definidos === 3);
+add("Completude reflete 3/12", completude(impl).definidos === 3);
 
 // ── 3. re-implantar depois: implantadoEm NÃO muda, revisadoEm sim ──
 const impl2 = comImplantado(impl, ["cadencia"], T2);
 add("Re-implantar preserva a data ORIGINAL de implantação", impl2.implantadoEm === T1);
 add("Re-implantar atualiza revisadoEm (a régua se afina)", impl2.revisadoEm === T2);
-add("Novo parâmetro entra como definido (4/13)", completude(impl2).definidos === 4);
+add("Novo parâmetro entra como definido (4/12)", completude(impl2).definidos === 4);
 
 // ── 4. definir um parâmetro / revisar ──
 const comRot = comParametro(impl2, "rotulos", "definido", T2);
@@ -78,7 +78,7 @@ const lido = await loadParametrizacao("TAGAT");
 add("Store: registrarImplantacao persiste e relê", lido.implantadoEm === T1 && completude(lido).definidos === 3);
 await definirParametro("TAGAT", "alertas", "definido", new Date(T2));
 const lido2 = await loadParametrizacao("TAGAT");
-add("Store: definirParametro persiste (4/13) e afina revisão", completude(lido2).definidos === 4 && lido2.revisadoEm === T2);
+add("Store: definirParametro persiste (4/12) e afina revisão", completude(lido2).definidos === 4 && lido2.revisadoEm === T2);
 const outro = await loadParametrizacao("Gemmini");
 add("Store: cliente sem Ficha = vazio honesto (não vaza de outro)", outro.implantadoEm === null && completude(outro).definidos === 0);
 

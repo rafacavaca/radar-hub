@@ -22,6 +22,7 @@ import { completude, loadParametrizacao, REGISTRO_KEY, statusDe, type ParamId, t
 import { loadVocab, rotulo, VOCAB_TERMS } from "@/lib/vocab";
 import { loadWatchlist, pillarOf } from "@/lib/watchlist";
 
+import { MarcarDefinido } from "@/components/marcar-definido";
 import { VocabEditor } from "@/components/vocab-editor";
 
 export const dynamic = "force-dynamic";
@@ -59,13 +60,13 @@ function Nivel({ n, titulo, hint, children }: { n: string; titulo: string; hint:
   );
 }
 
-/** Um parâmetro do critério: nome + selo + conteúdo (read-only). */
-function Item({ ficha, id, nome, editar, children }: { ficha: Parametrizacao; id: ParamId; nome: string; editar?: React.ReactNode; children: React.ReactNode }) {
+/** Um parâmetro do critério: nome + selo + conteúdo. super_admin marca o selo. */
+function Item({ ficha, id, nome, editar, superAdmin, children }: { ficha: Parametrizacao; id: ParamId; nome: string; editar?: React.ReactNode; superAdmin?: boolean; children: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-stone-200 bg-white px-4 py-3">
       <div className="mb-1.5 flex flex-wrap items-center gap-2">
         <h3 className="text-[13px] font-semibold text-stone-900">{nome}</h3>
-        <Selo ficha={ficha} id={id} />
+        {superAdmin ? <MarcarDefinido id={id} definido={statusDe(ficha, id) === "definido"} /> : <Selo ficha={ficha} id={id} />}
         {editar ? <span className="ml-auto">{editar}</span> : null}
       </div>
       <div className="text-[13px] text-stone-600">{children}</div>
@@ -147,6 +148,7 @@ export default async function ImplantacaoPage() {
           ficha={ficha}
           id="regras_area"
           nome="Régua de leitura das áreas"
+          superAdmin={superAdmin}
           editar={superAdmin ? <Ajustar href="/analistas" label="Afinar" /> : undefined}
         >
           <ul className="space-y-1.5">
@@ -160,7 +162,7 @@ export default async function ImplantacaoPage() {
           <p className="mt-2 text-[12px] text-stone-400">Régua padrão da agência — hoje afinável por conta (aba Áreas); vira padrão único no próximo lote.</p>
         </Item>
 
-        <Item ficha={ficha} id="regua_prioridade" nome="Régua de prioridade · corte de ruído">
+        <Item ficha={ficha} id="regua_prioridade" nome="Régua de prioridade · corte de ruído" superAdmin={superAdmin}>
           Prioridade <span className="font-medium text-stone-800">Alta</span> a partir de 70, <span className="font-medium text-stone-800">Média</span> a partir de 40. Sem piso de severidade — a régua de cada área é que filtra o ruído.
           <p className="mt-1 text-[12px] text-stone-400">Padrão do sistema; edição por-agência chega na Fase 1.5.</p>
         </Item>
@@ -169,6 +171,7 @@ export default async function ImplantacaoPage() {
           ficha={ficha}
           id="cadencia"
           nome="Cadência"
+          superAdmin={superAdmin}
           editar={superAdmin ? <Ajustar href="/automacoes" label="Ajustar em Automações" /> : undefined}
         >
           Varredura de concorrentes: <span className="font-medium text-stone-800">{proximaExecucao(automacoes.diagnostico, now)}</span> · Resumo do dia: <span className="font-medium text-stone-800">{proximaExecucao(automacoes.digest, now)}</span>.
@@ -178,6 +181,7 @@ export default async function ImplantacaoPage() {
           ficha={ficha}
           id="destinatarios"
           nome="Destinatários"
+          superAdmin={superAdmin}
           editar={superAdmin ? <Ajustar href="/admin" label="Ajustar em Agências" /> : undefined}
         >
           {emailTo ? (
@@ -187,7 +191,17 @@ export default async function ImplantacaoPage() {
           )}
         </Item>
 
-        <Item ficha={ficha} id="rotulos" nome="Rótulos da agência">
+        <Item
+          ficha={ficha}
+          id="alertas"
+          nome="Alertas"
+          superAdmin={superAdmin}
+          editar={superAdmin ? <Ajustar href="/diagnostico" label="Ajustar por conta" /> : undefined}
+        >
+          Alertas de mudança nos concorrentes (tagline, produto, preço, reputação…), com limiares padrão. Disparam a cada varredura; as regras são ajustáveis por conta no Diagnóstico.
+        </Item>
+
+        <Item ficha={ficha} id="rotulos" nome="Rótulos da agência" superAdmin={superAdmin}>
           {superAdmin ? (
             <VocabEditor initial={vocab} />
           ) : (
@@ -205,6 +219,28 @@ export default async function ImplantacaoPage() {
 
       {/* ── NÍVEL 2 — QUEM OBSERVAMOS ──────────────────────────────────── */}
       <Nivel n="2" titulo="Quem observamos" hint="Por conta — os concorrentes, contas-chave, base de conhecimento e áreas de cada cliente.">
+        {/* checklist da implantação: as categorias por-conta revisadas (agência) */}
+        <div className="rounded-xl border border-stone-200 bg-white px-4 py-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Revisado na implantação</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {(
+              [
+                ["clientes", "Contas monitoradas"],
+                ["concorrentes", "Concorrentes"],
+                ["contas_chave", "Contas-chave"],
+                ["base_conhecimento", "Base de conhecimento"],
+                ["areas_ativas", "Áreas ativas"],
+                ["fontes_temas", "Fontes e temas"],
+              ] as const
+            ).map(([id, label]) => (
+              <span key={id} className="inline-flex items-center gap-1.5">
+                <span className="text-[12px] text-stone-600">{label}</span>
+                {superAdmin ? <MarcarDefinido id={id} definido={statusDe(ficha, id) === "definido"} /> : <Selo ficha={ficha} id={id} />}
+              </span>
+            ))}
+          </div>
+        </div>
+
         {watchlist.clients.length === 0 ? (
           <p className="text-[13px] text-stone-400">Nenhuma conta cadastrada ainda.</p>
         ) : (
@@ -246,7 +282,7 @@ export default async function ImplantacaoPage() {
       </Nivel>
 
       <p className="mt-10 border-t border-stone-200 pt-4 text-[12px] text-stone-400">
-        Registro da implantação. Próximos lotes: rótulos por-agência, régua/alertas como critério único da agência, e a base de conhecimento local.
+        Registro da implantação. Próximos lotes: régua e alertas como critério único da agência, a base de conhecimento local, e os temas de mercado editáveis.
       </p>
     </section>
   );
