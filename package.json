@@ -59,7 +59,8 @@
     "smoke:ritual": "tsx scripts/test-radar-ritual.mts",
     "smoke:charts": "tsx scripts/test-radar-charts-dom.mts",
     "smoke:prospects": "tsx scripts/test-radar-prospects.mts",
-    "smoke:automacoes": "tsx scripts/test-radar-automacoes.mts"
+    "smoke:automacoes": "tsx scripts/test-radar-automacoes.mts",
+    "smoke:param": "tsx scripts/test-radar-parametrizacao.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
