@@ -34,14 +34,14 @@ export default async function AnalistasPage({
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
-          Ajustes · analistas
+          Ajustes · áreas
         </p>
         <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">
           Como cada área pensa
         </h1>
         <p className="mt-1.5 text-sm text-stone-500">
-          Três analistas leem cada sinal — comercial, produto e marketing. Ajuste a régua de cada
-          um; o padrão já vem pronto.
+          Três áreas leem cada sinal — comercial, produto e marketing. Ajuste a régua de cada
+          uma; o padrão já vem pronto.
         </p>
       </header>
 

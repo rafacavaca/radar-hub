@@ -60,7 +60,7 @@ export function RodarAgora({
         aria-hidden
         className={running ? "inline-block h-2 w-2 animate-ping rounded-full bg-current" : ""}
       />
-      {running ? "Rodando…" : cliente ? `Rodar ${cliente}` : "Rodar tudo"}
+      {running ? "Coletando…" : cliente ? `Coletar ${cliente}` : "Coletar tudo"}
     </button>
   );
 }

@@ -550,7 +550,7 @@ function FindMoreSources({
             disabled={state !== "idle"}
             className="text-xs font-medium text-stone-400 underline-offset-2 hover:text-stone-700 hover:underline disabled:opacity-60"
           >
-            {state === "searching" ? "Investigando o site (lendo a navegação)…" : "Achar mais fontes →"}
+            {state === "searching" ? "Investigando o site (lendo a navegação)…" : "Descobrir fontes →"}
           </button>
           {notice ? <span className="text-xs text-emerald-700">{notice}</span> : null}
           {error ? <span className="text-xs text-red-600">{error}</span> : null}
@@ -678,7 +678,7 @@ function RunCompetitor({
         title={`Coleta e analisa só ${competitor.name} (o resto do dia fica como está)`}
         className="inline-flex min-h-[40px] items-center rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:opacity-50"
       >
-        {state === "running" ? "Rodando…" : "Rodar"}
+        {state === "running" ? "Coletando…" : "Coletar agora"}
       </button>
     </span>
   );
