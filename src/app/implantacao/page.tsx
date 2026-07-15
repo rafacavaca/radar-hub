@@ -19,7 +19,10 @@ import { sbGetDoc } from "@/lib/db/repo-org-docs";
 import { supabaseEnabled } from "@/lib/db/supabase";
 import { LENS_DEFAULTS, LENS_IDS, LENS_LABEL, loadLenses } from "@/lib/lenses";
 import { completude, loadParametrizacao, REGISTRO_KEY, statusDe, type ParamId, type Parametrizacao } from "@/lib/parametrizacao";
+import { loadVocab, rotulo, VOCAB_TERMS } from "@/lib/vocab";
 import { loadWatchlist, pillarOf } from "@/lib/watchlist";
+
+import { VocabEditor } from "@/components/vocab-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -82,11 +85,12 @@ export default async function ImplantacaoPage() {
   const orgId = await currentOrgId();
   const superAdmin = supabaseEnabled() ? await isSuperAdmin() : true;
 
-  const [watchlist, lensesFile, automacoes, ficha] = await Promise.all([
+  const [watchlist, lensesFile, automacoes, ficha, vocab] = await Promise.all([
     loadWatchlist(),
     loadLenses(),
     loadAutomacoes(),
     loadParametrizacao(REGISTRO_KEY),
+    loadVocab(),
   ]);
   const now = new Date();
 
@@ -184,7 +188,18 @@ export default async function ImplantacaoPage() {
         </Item>
 
         <Item ficha={ficha} id="rotulos" nome="Rótulos da agência">
-          <span className="text-stone-500">Renomear os termos que a agência vê (Concorrente, Área, Prioridade…) chega no próximo lote.</span>
+          {superAdmin ? (
+            <VocabEditor initial={vocab} />
+          ) : (
+            <ul className="space-y-1">
+              {VOCAB_TERMS.map((t) => (
+                <li key={t.key}>
+                  <span className="font-medium text-stone-800">{rotulo(vocab, t.key)}</span>
+                  {rotulo(vocab, t.key) !== t.label ? <span className="text-stone-400"> (padrão: {t.label})</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </Item>
       </Nivel>
 

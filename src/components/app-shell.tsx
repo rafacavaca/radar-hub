@@ -35,10 +35,13 @@ import {
 } from "@/components/icons";
 import { LogoutButton } from "@/components/logout-button";
 import { NewClientButton } from "@/components/new-client-dialog";
+import { useRotulo } from "@/components/vocab-context";
 import { WelcomePanel } from "@/components/welcome-panel";
+import type { VocabKey } from "@/lib/vocab-terms";
 
 type IconCmp = (props: { className?: string }) => React.ReactNode;
-type Section = { label: string; href: string; icon: IconCmp; purpose: string; match: (p: string) => boolean };
+/** `vocabKey` (opcional): o rótulo desta seção é renomeável pela agência (P13). */
+type Section = { label: string; href: string; icon: IconCmp; purpose: string; match: (p: string) => boolean; vocabKey?: VocabKey };
 
 /** Seções do modo CONCORRENTES (padrão). "Contas" = o pilar Clientes (contas-chave). */
 const CONCORRENTES_SECTIONS: Section[] = [
@@ -54,9 +57,10 @@ const CONCORRENTES_SECTIONS: Section[] = [
     icon: SwordsIcon,
     purpose: "Monitore e diagnostique os concorrentes deste cliente.",
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
+    vocabKey: "concorrentes",
   },
   { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
-  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As áreas que leem cada sinal deste cliente — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas") },
+  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As áreas que leem cada sinal deste cliente — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas"), vocabKey: "areas" },
 ];
 
 /** Seções do modo CARTEIRA (2º template) — a Ficha no lugar de Visão/Briefing. */
@@ -73,7 +77,7 @@ const CARTEIRA_SECTIONS: Section[] = [
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
   { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
-  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As áreas que leem cada sinal desta carteira — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas") },
+  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As áreas que leem cada sinal desta carteira — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas"), vocabKey: "areas" },
 ];
 
 /** Home de cada cliente conforme o modo. */
@@ -303,6 +307,7 @@ export function AppShell({
   const params = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const r = useRotulo(); // rótulos renomeáveis pela agência (P13)
 
   // Lê a preferência depois de montar (evita mismatch de hidratação).
   useEffect(() => {
@@ -508,7 +513,7 @@ export function AppShell({
                     }
                   >
                     <s.icon className={"h-4 w-4 shrink-0 " + (active ? "text-stone-900" : "text-stone-400")} />
-                    {s.label}
+                    {s.vocabKey ? r(s.vocabKey) : s.label}
                   </Link>
                 );
               })}
