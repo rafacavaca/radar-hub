@@ -18,7 +18,7 @@ import { loadAutomacoes, proximaExecucao } from "@/lib/automacoes";
 import { currentOrgId, isSuperAdmin, supabaseRouteClient } from "@/lib/db/session";
 import { sbGetDoc } from "@/lib/db/repo-org-docs";
 import { supabaseEnabled } from "@/lib/db/supabase";
-import { LENS_DEFAULTS, LENS_IDS, LENS_LABEL, loadLenses } from "@/lib/lenses";
+import { LENS_IDS, LENS_LABEL, loadLenses, loadReguaAgencia } from "@/lib/lenses";
 import { completude, loadParametrizacao, REGISTRO_KEY, statusDe, type ParamId, type Parametrizacao } from "@/lib/parametrizacao";
 import { loadVocab, rotulo, VOCAB_TERMS } from "@/lib/vocab";
 import { loadWatchlist, pillarOf } from "@/lib/watchlist";
@@ -88,12 +88,13 @@ export default async function ImplantacaoPage() {
   const orgId = await currentOrgId();
   const superAdmin = supabaseEnabled() ? await isSuperAdmin() : true;
 
-  const [watchlist, lensesFile, automacoes, ficha, vocab] = await Promise.all([
+  const [watchlist, lensesFile, automacoes, ficha, vocab, regua] = await Promise.all([
     loadWatchlist(),
     loadLenses(),
     loadAutomacoes(),
     loadParametrizacao(REGISTRO_KEY),
     loadVocab(),
+    loadReguaAgencia(),
   ]);
   const now = new Date();
 
@@ -162,11 +163,11 @@ export default async function ImplantacaoPage() {
             {LENS_IDS.map((id) => (
               <li key={id}>
                 <span className="font-medium text-stone-800">{LENS_LABEL[id]}:</span>{" "}
-                <span className="text-stone-500">{LENS_DEFAULTS[id].regua}</span>
+                <span className="text-stone-500">{regua[id].regua}</span>
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-[12px] text-stone-400">Régua padrão da agência — hoje afinável por conta (aba Áreas); vira padrão único no próximo lote.</p>
+          <p className="mt-2 text-[12px] text-stone-400">Régua ÚNICA da agência — vale para todas as contas. Afine na aba Áreas (a edição por qualquer conta vale para todas).</p>
         </Item>
 
         <Item ficha={ficha} id="regua_prioridade" nome="Régua de prioridade · corte de ruído" superAdmin={superAdmin}>

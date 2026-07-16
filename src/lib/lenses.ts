@@ -259,81 +259,148 @@ export function resetLens(clientName: string, lensId: LensId): LensesFile {
   return file;
 }
 
-// ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
-// Um doc por cliente (kind `lenses`, key = cliente, data = LensConfig[]).
-// A semeadura em modo org é EM MEMÓRIA (defaults determinísticos) — só grava
-// quando o usuário edita. O loop segue no sync (vira por-org no rework).
+// ─── RE-SCOPE (org-level): a RÉGUA/time/ação de cada área é CRITÉRIO DA AGÊNCIA
+// (um doc por org, kind `lens-regua`, key `global`) — editar por um cliente vale
+// pra TODOS. As ÁREAS ATIVAS seguem POR CLIENTE (doc `lenses`, key=cliente — só o
+// campo `enabled` importa agora). loadActiveLensesFor MESCLA os dois → LensConfig[]
+// completo, então o LOOP e o analista NÃO mudam (contrato preservado; smoke prova).
 
-const DOC_KIND = "lenses";
+const DOC_KIND = "lenses"; // por-cliente: fonte do `enabled`
+const DOC_KIND_REGUA = "lens-regua"; // org-level: régua/time/ação da agência
+const REGUA_KEY = "global";
 
-/** Completa lentes que faltem (versão futura) com o default. */
-function comLentesCompletas(lenses: LensConfig[]): LensConfig[] {
-  const out = [...lenses];
-  for (const id of LENS_IDS) {
-    if (!out.some((l) => l.id === id)) out.push({ id, enabled: true, ...LENS_DEFAULTS[id] });
+/** A régua/time/ação de cada área — o critério de leitura da agência (org-level). */
+export type ReguaAgencia = Record<LensId, Omit<LensConfig, "id" | "enabled">>;
+
+function reguaAgenciaDefault(): ReguaAgencia {
+  return {
+    comercial: { ...LENS_DEFAULTS.comercial },
+    produto: { ...LENS_DEFAULTS.produto },
+    marketing: { ...LENS_DEFAULTS.marketing },
+  };
+}
+
+/** Mescla o salvo sobre o default (área/campo faltante fica seguro no padrão). */
+function mesclarRegua(saved: Partial<ReguaAgencia> | null): ReguaAgencia {
+  const base = reguaAgenciaDefault();
+  if (saved) for (const id of LENS_IDS) if (saved[id]) base[id] = { ...base[id], ...saved[id] };
+  return base;
+}
+
+// JSON fallback (clássico/testes) da régua da agência.
+function reguaPath(): string {
+  return join(dataDir(), "lens-regua.json");
+}
+function readReguaJson(): ReguaAgencia {
+  if (!existsSync(reguaPath())) return reguaAgenciaDefault();
+  try {
+    return mesclarRegua(JSON.parse(readFileSync(reguaPath(), "utf8")) as Partial<ReguaAgencia>);
+  } catch {
+    return reguaAgenciaDefault();
   }
+}
+function writeReguaJson(r: ReguaAgencia): void {
+  mkdirSync(dataDir(), { recursive: true });
+  const tmp = `${reguaPath()}.tmp`;
+  writeFileSync(tmp, JSON.stringify(r, null, 2), "utf8");
+  renameSync(tmp, reguaPath());
+}
+
+/** A régua da agência (org-scoped), semeada com o padrão. Nunca lança. */
+export async function loadReguaAgencia(): Promise<ReguaAgencia> {
+  if (!supabaseEnabled()) return readReguaJson();
+  return mesclarRegua(await sbGetDoc<Partial<ReguaAgencia> | null>(DOC_KIND_REGUA, REGUA_KEY, null));
+}
+
+async function persistReguaMap(r: ReguaAgencia): Promise<void> {
+  if (!supabaseEnabled()) writeReguaJson(r);
+  else await sbSetDoc(DOC_KIND_REGUA, REGUA_KEY, r);
+}
+
+/** As áreas ATIVAS de um cliente (só o `enabled`; default: todas ativas). */
+async function ativasFor(clientName: string): Promise<Record<LensId, boolean>> {
+  const saved = supabaseEnabled()
+    ? await sbGetDoc<LensConfig[] | null>(DOC_KIND, clientName, null)
+    : (readLenses().clients.find((c) => c.clientName === clientName)?.lenses ?? null);
+  const out = {} as Record<LensId, boolean>;
+  for (const id of LENS_IDS) out[id] = saved?.find((l) => l.id === id)?.enabled ?? true;
   return out;
 }
 
-/** Lentes de UM cliente, na org da sessão (ou JSON) — semeadas se preciso. */
-export async function loadLensesFor(clientName: string): Promise<LensConfig[]> {
-  if (!supabaseEnabled()) return lensesFor(clientName);
-  const saved = await sbGetDoc<LensConfig[] | null>(DOC_KIND, clientName, null);
-  return saved ? comLentesCompletas(saved) : defaultLensesFor(clientName).lenses;
+/** Monta LensConfig[] mesclando a régua da agência + o enabled do cliente. */
+function montarLenses(regua: ReguaAgencia, ativas: Record<LensId, boolean>): LensConfig[] {
+  return LENS_IDS.map((id) => ({ id, enabled: ativas[id] !== false, ...regua[id] }));
 }
 
-/** Só as lentes ATIVAS de um cliente, org-scoped (o que o loop roda). */
+/** Grava o `enabled` de uma área para um cliente (no doc por-cliente). */
+async function setAtiva(clientName: string, lensId: LensId, enabled: boolean): Promise<void> {
+  const atuais = await loadLensesFor(clientName); // já mesclado (régua + enabled)
+  const lens = atuais.find((l) => l.id === lensId);
+  if (lens) lens.enabled = enabled;
+  if (!supabaseEnabled()) {
+    const file = readLenses();
+    const c = file.clients.find((x) => x.clientName === clientName);
+    if (c) c.lenses = atuais;
+    else file.clients.push({ clientName, lenses: atuais });
+    writeFile(file);
+  } else {
+    await sbSetDoc(DOC_KIND, clientName, atuais);
+  }
+}
+
+/** Lentes de UM cliente (régua da agência + enabled do cliente). */
+export async function loadLensesFor(clientName: string): Promise<LensConfig[]> {
+  const [regua, ativas] = await Promise.all([loadReguaAgencia(), ativasFor(clientName)]);
+  return montarLenses(regua, ativas);
+}
+
+/** Só as ATIVAS de um cliente (o que o loop roda) — contrato preservado. */
 export async function loadActiveLensesFor(clientName: string): Promise<LensConfig[]> {
   return (await loadLensesFor(clientName)).filter((l) => l.enabled);
 }
 
-/** A config completa (todos os clientes da org), semeando defaults em memória. */
+/** A config completa (todos os clientes da org), com a régua ÚNICA da agência. */
 export async function loadLenses(): Promise<LensesFile> {
-  if (!supabaseEnabled()) return readLenses();
-  const [docs, watchlist] = await Promise.all([sbListDocs<LensConfig[]>(DOC_KIND), loadWatchlist()]);
-  const byClient = new Map(docs.map((d) => [d.key, comLentesCompletas(d.data ?? [])]));
-  const clients: ClientLenses[] = watchlist.clients.map((c) => ({
-    clientName: c.name,
-    lenses: byClient.get(c.name) ?? defaultLensesFor(c.name).lenses,
-  }));
+  const [regua, watchlist] = await Promise.all([loadReguaAgencia(), loadWatchlist()]);
+  const clients: ClientLenses[] = await Promise.all(
+    watchlist.clients.map(async (c) => ({ clientName: c.name, lenses: montarLenses(regua, await ativasFor(c.name)) })),
+  );
   return { clients };
 }
 
-/** Edita uma lente na org da sessão (ou JSON). Devolve a config completa. */
+/**
+ * Edita uma lente. RE-SCOPE: `enabled` vai pro CLIENTE; régua/time/ação vão pro
+ * CRITÉRIO DA AGÊNCIA (org-level) — editar por um cliente muda pra TODOS.
+ */
 export async function persistLensUpdate(
   clientName: string,
   lensId: LensId,
   patch: LensPatch,
 ): Promise<LensesFile> {
-  if (!supabaseEnabled()) return updateLens(clientName, lensId, patch);
   validarPatch(patch);
-  const watchlist = await loadWatchlist();
-  if (!watchlist.clients.some((c) => c.name === clientName)) {
-    throw new Error(`Cliente não encontrado: ${clientName}`);
+  if (patch.enabled !== undefined) await setAtiva(clientName, lensId, patch.enabled);
+  if (patch.team !== undefined || patch.regua !== undefined || patch.action !== undefined) {
+    const regua = await loadReguaAgencia();
+    const cur = regua[lensId];
+    regua[lensId] = {
+      team: patch.team?.trim() ?? cur.team,
+      regua: patch.regua?.trim() ?? cur.regua,
+      action: patch.action ?? cur.action,
+    };
+    await persistReguaMap(regua);
   }
-  const lenses = await loadLensesFor(clientName);
-  const lens = lenses.find((l) => l.id === lensId);
-  if (!lens) throw new Error(`Lente não encontrada: ${lensId}`);
-  aplicarPatch(lens, patch);
-  await sbSetDoc(DOC_KIND, clientName, lenses);
   return loadLenses();
 }
 
-/** Restaura a lente ao padrão, na org da sessão (ou JSON). */
-export async function persistLensReset(clientName: string, lensId: LensId): Promise<LensesFile> {
-  if (!supabaseEnabled()) return resetLens(clientName, lensId);
-  const lenses = await loadLensesFor(clientName);
-  const lens = lenses.find((l) => l.id === lensId);
-  if (!lens) throw new Error(`Lente não encontrada: ${lensId}`);
-  const defaults = LENS_DEFAULTS[lensId];
-  lens.team = defaults.team;
-  lens.regua = defaults.regua;
-  lens.action = defaults.action;
-  await sbSetDoc(DOC_KIND, clientName, lenses);
+/** Restaura a régua de uma área ao padrão de fábrica (org-level, vale pra todos). */
+export async function persistLensReset(_clientName: string, lensId: LensId): Promise<LensesFile> {
+  const regua = await loadReguaAgencia();
+  regua[lensId] = { ...LENS_DEFAULTS[lensId] };
+  await persistReguaMap(regua);
   return loadLenses();
 }
 
-/** Limpa a config de lentes de um cliente removido, na org da sessão (ou JSON). */
+/** Limpa as áreas ativas de um cliente removido (a régua é da agência, permanece). */
 export async function dropClientLenses(clientName: string): Promise<void> {
   if (!supabaseEnabled()) return removeClientLenses(clientName);
   await sbDeleteDoc(DOC_KIND, clientName);
