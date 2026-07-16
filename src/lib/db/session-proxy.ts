@@ -13,7 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
-export function supabaseProxyClient(request: NextRequest): { supabase: SupabaseClient; response: NextResponse } {
+export function supabaseProxyClient(request: NextRequest): { supabase: SupabaseClient; getResponse: () => NextResponse } {
   const url = process.env.RADAR_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const anon = process.env.RADAR_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
   let response = NextResponse.next({ request });
@@ -27,5 +27,11 @@ export function supabaseProxyClient(request: NextRequest): { supabase: SupabaseC
       },
     },
   });
-  return { supabase, response };
+  // BUG CORRIGIDO: `setAll` roda DEPOIS (dentro do getUser do chamador, quando o
+  // token é refrescado) e REATRIBUI `response`. Se devolvêssemos o valor agora, o
+  // chamador ficaria com o response VELHO (sem o Set-Cookie do token novo) — o
+  // navegador nunca recebia o refresh, o refresh token rotacionado morria, e o
+  // POST seguinte caía em 401. O getter fecha sobre a variável mutável e entrega
+  // o response ATUAL (pós-refresh). É a causa raiz do "página concede, rota nega".
+  return { supabase, getResponse: () => response };
 }

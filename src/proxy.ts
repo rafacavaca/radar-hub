@@ -50,11 +50,17 @@ async function proxySupabase(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
   if (isOpenPath(pathname)) return NextResponse.next();
 
-  const { supabase, response } = supabaseProxyClient(req);
-  const { data } = await supabase.auth.getUser();
-  if (data.user) return response; // sessão válida (cookies já refrescados no response)
+  const { supabase, getResponse } = supabaseProxyClient(req);
+  const { data, error } = await supabase.auth.getUser();
+  if (data.user) return getResponse(); // sessão válida — response ATUAL (com o Set-Cookie do token refrescado)
 
-  if (pathname.startsWith("/api/")) return NextResponse.json({ error: "não autorizado" }, { status: 401 });
+  if (pathname.startsWith("/api/")) {
+    // Diagnóstico (temporário): por que uma sessão que renderiza a página cai
+    // aqui num POST? Loga a causa + quais cookies vieram, sem vazar valores.
+    const nomes = req.cookies.getAll().map((c) => c.name).filter((n) => n.startsWith("sb-") || n === "radar_auth");
+    console.warn(`[proxy] 401 em ${req.method} ${pathname} — getUser: ${error?.message ?? "sem usuário"} · cookies: [${nomes.join(", ") || "nenhum"}]`);
+    return NextResponse.json({ error: "não autorizado" }, { status: 401 });
+  }
   const login = req.nextUrl.clone();
   login.pathname = "/entrar";
   login.search = "";

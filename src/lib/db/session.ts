@@ -46,6 +46,14 @@ export async function supabaseRouteClient(): Promise<SupabaseClient> {
   if (collectorOrgId()) return adminClient(); // cron: org explícita + filtros nos repos
   const store = await cookies();
   return createServerClient(url(), anon(), {
+    // O PROXY (session-proxy) é o ÚNICO ponto que ROTACIONA o token (e grava o
+    // cookie novo). Aqui autoRefreshToken=false: um SERVER COMPONENT não consegue
+    // gravar cookie (setAll no-op), então se ele rotacionasse, mataria o refresh
+    // token sem persistir o novo → o POST seguinte viria com token morto → 401
+    // "não autorizado" numa sessão que a página renderiza. Página pesada
+    // (/implantacao) expira o token no meio do render e cai exatamente nisso.
+    // O proxy roda antes de tudo e já entrega o cookie fresco pra cá.
+    auth: { autoRefreshToken: false, persistSession: false },
     cookies: {
       getAll: () => store.getAll(),
       setAll: (list: CookieToSet[]) => {

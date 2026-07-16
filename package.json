@@ -64,7 +64,8 @@
     "smoke:vocab": "tsx scripts/test-radar-vocab.mts",
     "smoke:rescope": "tsx scripts/test-radar-rescope.mts",
     "smoke:prioridade": "tsx scripts/test-radar-prioridade.mts",
-    "smoke:ficha": "tsx scripts/test-radar-ficha-import.mts"
+    "smoke:ficha": "tsx scripts/test-radar-ficha-import.mts",
+    "test:route-auth": "tsx scripts/test-route-auth.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
