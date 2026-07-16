@@ -27,6 +27,7 @@ import { SourceRef } from "@/components/signal-meta";
 const BRAIN_LABEL: Record<Battlecard["brain_mode"], { texto: string; cor: string }> = {
   live: { texto: "diferenciais da base real", cor: "bg-emerald-50 text-emerald-700" },
   fixture: { texto: "diferenciais de rascunho local — confirmar na base", cor: "bg-amber-50 text-amber-800" },
+  local: { texto: "diferenciais da base LOCAL da implantação (enxuta)", cor: "bg-amber-50 text-amber-800" },
   none: { texto: "Base sem dados deste cliente — sem 'como ganhar'", cor: "bg-stone-100 text-stone-500" },
 };
 

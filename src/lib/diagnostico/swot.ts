@@ -40,7 +40,7 @@ export async function gerarSwot(diag: DiagnosticoConcorrente): Promise<Swot> {
   const brainBloco =
     brain.mode === "none"
       ? "CONTEXTO DO BRAIN: nenhum — seja conservador na leitura externa (oportunidades/ameaças mais genéricas)."
-      : `CONTEXTO DO BRAIN do nosso cliente (${brain.mode === "live" ? "real" : "rascunho local"}):\n${brain.context.slice(0, 3000)}`;
+      : `CONTEXTO DO BRAIN do nosso cliente (${brain.mode === "live" ? "real" : brain.mode === "local" ? "base local da implantação" : "rascunho local"}):\n${brain.context.slice(0, 3000)}`;
 
   let content = "";
   try {

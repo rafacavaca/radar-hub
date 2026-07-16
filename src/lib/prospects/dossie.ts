@@ -283,7 +283,7 @@ async function montarEncaixe(
   const nat = (t: string): Ponto => {
     const s = t.trim();
     if (/^\[interno\]/i.test(s)) return pontoInterno(s.replace(/^\[interno\]\s*/i, ""), "contexto privado");
-    return pontoInferencia(s, undefined, brain.mode === "live" ? "cruzamento com a base de conhecimento" : "cruzamento (base de rascunho)");
+    return pontoInferencia(s, undefined, brain.mode === "live" ? "cruzamento com a base de conhecimento" : brain.mode === "local" ? "cruzamento (base local da implantação)" : "cruzamento (base de rascunho)");
   };
   return {
     encaixe: {
@@ -292,7 +292,12 @@ async function montarEncaixe(
       dores: (parsed?.dores ?? []).filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 4).map(nat),
       angulo: typeof parsed?.angulo === "string" && parsed.angulo.trim() ? nat(parsed.angulo.trim()) : null,
     },
-    obs: brain.mode === "fixture" ? "encaixe: baseado em base de conhecimento de RASCUNHO — confirmar no Formare." : undefined,
+    obs:
+      brain.mode === "local"
+        ? "aderência: baseada na base LOCAL da implantação (enxuta) — não é o Brain completo do cliente."
+        : brain.mode === "fixture"
+          ? "encaixe: baseado em base de conhecimento de RASCUNHO — confirmar no Formare."
+          : undefined,
   };
 }
 

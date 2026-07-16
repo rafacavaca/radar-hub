@@ -17,6 +17,7 @@ import { SourceRef } from "@/components/signal-meta";
 const BRAIN_LABEL: Record<Swot["brain_mode"], string> = {
   live: "leitura externa ancorada na base real",
   fixture: "leitura externa com rascunho local da base",
+  local: "leitura externa com base local da implantação (enxuta)",
   none: "sem base do cliente — leitura externa conservadora",
 };
 

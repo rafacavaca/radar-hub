@@ -122,7 +122,7 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
     : "";
 
   // ── como nós encaixamos (ângulo já no herói; aqui só dor → resolve) ──
-  const brainTag = d.encaixe.brain_mode === "live" ? "BASE REAL" : d.encaixe.brain_mode === "fixture" ? "BASE RASCUNHO" : "SEM BASE";
+  const brainTag = d.encaixe.brain_mode === "live" ? "BASE REAL" : d.encaixe.brain_mode === "local" ? "BASE LOCAL" : d.encaixe.brain_mode === "fixture" ? "BASE RASCUNHO" : "SEM BASE";
   const encaixeSec = `<div class="sec">
     <div class="sectitle">Nossa aderência <span class="brainbadge">${brainTag}</span></div>
     ${d.encaixe.dores.length || d.encaixe.ganchos.length ? `<div class="fit">
@@ -251,7 +251,7 @@ export function dossieToHtml(dossie: Dossie, prospect: Prospect, concorrentes: C
     <div class="gauge">
       ${gaugeSvg(nv.pct, cor, nv.nivel !== "sem dado")}
       <div class="val" style="color:${cor}">${nv.nivel === "sem dado" ? "SEM DADO" : `ADERÊNCIA ${nv.nivel.toUpperCase()}`}</div>
-      <div class="cap"><b>${d.encaixe.brain_mode === "live" ? "Base real" : d.encaixe.brain_mode === "fixture" ? "Base rascunho" : "sem base"}</b>${nv.nivel !== "sem dado" ? ` · ${esc(nv.nota.replace(/^.*?, /, ""))}` : ""}</div>
+      <div class="cap"><b>${d.encaixe.brain_mode === "live" ? "Base real" : d.encaixe.brain_mode === "local" ? "Base local" : d.encaixe.brain_mode === "fixture" ? "Base rascunho" : "sem base"}</b>${nv.nivel !== "sem dado" ? ` · ${esc(nv.nota.replace(/^.*?, /, ""))}` : ""}</div>
     </div>
   </div>
   ${stats}

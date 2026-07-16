@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 
+import { loadBaseLocal } from "@/lib/base-local";
 import { brainOwnerOrgId, isBrainDoorConfigured } from "@/lib/brain";
 import { loadAutomacoes, proximaExecucao } from "@/lib/automacoes";
 import { currentOrgId, isSuperAdmin, supabaseRouteClient } from "@/lib/db/session";
@@ -22,6 +23,7 @@ import { completude, loadParametrizacao, REGISTRO_KEY, statusDe, type ParamId, t
 import { loadVocab, rotulo, VOCAB_TERMS } from "@/lib/vocab";
 import { loadWatchlist, pillarOf } from "@/lib/watchlist";
 
+import { BaseLocalEditor } from "@/components/base-local-editor";
 import { MarcarDefinido } from "@/components/marcar-definido";
 import { VocabEditor } from "@/components/vocab-editor";
 
@@ -113,6 +115,11 @@ export default async function ImplantacaoPage() {
   const comp = completude(ficha);
 
   const lensesDe = (name: string) => lensesFile.clients.find((c) => c.clientName === name)?.lenses ?? [];
+
+  // base local por cliente (org-scoped) — pro rótulo honesto + o editor.
+  const bases = Object.fromEntries(
+    await Promise.all(watchlist.clients.map(async (c) => [c.name, await loadBaseLocal(c.name)] as const)),
+  ) as Record<string, string>;
 
   return (
     <section className="mx-auto max-w-[1000px] px-5 py-8 sm:px-6">
@@ -248,12 +255,15 @@ export default async function ImplantacaoPage() {
             const conc = client.competitors.filter((k) => pillarOf(k, client.mode) === "concorrente");
             const contas = client.competitors.filter((k) => pillarOf(k, client.mode) === "conta-chave");
             const areas = lensesDe(client.name).filter((l) => l.enabled).map((l) => LENS_LABEL[l.id]);
+            const baseTexto = bases[client.name] ?? "";
+            // honesto: pro dono o Brain real VENCE; pras demais, a base local (se houver).
+            const baseLabel = brainDono ? "Base: Brain do Formare" : baseTexto ? "Base local (implantação)" : "sem base (modo reduzido)";
             const q = `?cliente=${encodeURIComponent(client.name)}`;
             return (
               <div key={client.name} className="rounded-xl border border-stone-200 bg-white px-4 py-3.5">
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="text-[14px] font-semibold text-stone-900">{client.name}</h3>
-                  <span className="text-[11px] text-stone-400">{brainDono ? "Base: Brain do Formare" : "Base: modo reduzido"}</span>
+                  <span className={"text-[11px] " + (baseTexto ? "text-amber-700" : "text-stone-400")}>{baseLabel}</span>
                 </div>
                 <dl className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-3">
                   <div>
@@ -275,6 +285,11 @@ export default async function ImplantacaoPage() {
                     <dd className="mt-0.5 text-[13px] text-stone-700">{areas.length > 0 ? areas.join(" · ") : <span className="text-stone-400">nenhuma</span>}</dd>
                   </div>
                 </dl>
+                {superAdmin ? (
+                  <div className="mt-3 border-t border-stone-100 pt-2.5">
+                    <BaseLocalEditor cliente={client.name} initial={baseTexto} />
+                  </div>
+                ) : null}
               </div>
             );
           })

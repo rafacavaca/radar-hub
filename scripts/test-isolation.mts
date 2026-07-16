@@ -183,6 +183,33 @@ async function runLive(): Promise<void> {
     );
   }
 
+  // 8) BASE LOCAL homônima (o GAP-1 no Brain-local): duas orgs NÃO-DONAS, ambas
+  //    com o cliente de NOME IGUAL, cada uma com a SUA base local (texto da
+  //    implantação). A lê só a de A, B só a de B — a base de uma agência nunca
+  //    vaza pra outra, nem por cliente homônimo. É o caso que expõe a falha.
+  {
+    process.env.RADAR_BRAIN_ORG_ID = "00000000-0000-0000-0000-000000000000"; // dona = ninguém → A e B são NÃO-DONAS
+    const { fetchClientBrain } = await import("@/lib/brain");
+    const { saveBaseLocal } = await import("@/lib/base-local");
+    const { runAsOrgCollector } = await import("@/lib/db/collector-org");
+    const { MOOVEFY } = await import("@/lib/clients/moovefy");
+    const nome = MOOVEFY.clientName; // MESMO nome nas duas orgs (homônimo)
+
+    await runAsOrgCollector(aId, () => saveBaseLocal(nome, "SEGREDO-BASE-A — oferta exclusiva da agência A"));
+    await runAsOrgCollector(bId, () => saveBaseLocal(nome, "SEGREDO-BASE-B — oferta exclusiva da agência B"));
+
+    const bA = await runAsOrgCollector(aId, () => fetchClientBrain(nome, { noCache: true }));
+    const bB = await runAsOrgCollector(bId, () => fetchClientBrain(nome, { noCache: true }));
+
+    const aSoDela = bA.mode === "local" && bA.context.includes("SEGREDO-BASE-A") && !bA.context.includes("SEGREDO-BASE-B");
+    const bSoDela = bB.mode === "local" && bB.context.includes("SEGREDO-BASE-B") && !bB.context.includes("SEGREDO-BASE-A");
+    reg(
+      "Base local org-scoped: A e B (cliente de NOME IGUAL) leem SÓ a própria base — nenhuma vaza (GAP-1)",
+      aSoDela && bSoDela ? "ok" : "falhou",
+      `A=${bA.mode}${aSoDela ? " própria" : " VAZOU?"} · B=${bB.mode}${bSoDela ? " própria" : " VAZOU?"}`,
+    );
+  }
+
   // limpeza
   await admin.from("orgs").delete().in("slug", [orgA.slug, orgB.slug]);
 }

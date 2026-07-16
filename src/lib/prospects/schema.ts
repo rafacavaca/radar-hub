@@ -144,7 +144,7 @@ export type SinalProspect = {
 /** Como NÓS encaixamos — cruza perfil/sinais com a oferta lida do Brain. */
 export type EncaixeProspect = {
   /** de onde veio a nossa oferta: Brain real, rascunho, ou nada (honestidade). */
-  brain_mode: "live" | "fixture" | "none";
+  brain_mode: "live" | "fixture" | "local" | "none";
   /** ganchos de conversa (por que faz sentido falar com eles agora). */
   ganchos: Ponto[];
   /** dores prováveis deles que a nossa oferta endereça. */

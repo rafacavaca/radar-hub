@@ -111,7 +111,7 @@ export async function gerarBattlecard(diag: DiagnosticoConcorrente): Promise<Bat
   const brainBloco =
     brain.mode === "none"
       ? "CONTEXTO DA BASE DE CONHECIMENTO: NENHUM — não há diferenciais nossos mapeados. TODOS os nosso_diferencial devem ser null."
-      : `CONTEXTO DA BASE DE CONHECIMENTO (${brain.mode === "live" ? "base de conhecimento real" : "rascunho local — confirmar na base de conhecimento"}):\n${brain.context.slice(0, 3500)}`;
+      : `CONTEXTO DA BASE DE CONHECIMENTO (${brain.mode === "live" ? "base de conhecimento real" : brain.mode === "local" ? "base LOCAL da implantação — enxuta, não é o Brain completo" : "rascunho local — confirmar na base de conhecimento"}):\n${brain.context.slice(0, 3500)}`;
 
   const content = await completeViaGateway({
     system: SYSTEM,

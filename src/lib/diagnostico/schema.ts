@@ -239,7 +239,7 @@ export type Battlecard = {
   como_ganhar: ComoGanhar[];
   objecoes: Objecao[];
   /** de onde vieram os "nossos diferenciais" (honestidade do Brain). */
-  brain_mode: "live" | "fixture" | "none";
+  brain_mode: "live" | "fixture" | "local" | "none";
   gerado_em: string;
   tipo: "derivado";
   /** rascunho de abordagem/e-mail gerado a partir do card (opcional). */
@@ -310,7 +310,7 @@ export type Swot = {
   oportunidades: SwotItem[];
   ameacas: SwotItem[];
   /** origem do contexto do nosso cliente (Brain) usado na leitura externa. */
-  brain_mode: "live" | "fixture" | "none";
+  brain_mode: "live" | "fixture" | "local" | "none";
   gerado_em: string;
   tipo: "derivado";
 };

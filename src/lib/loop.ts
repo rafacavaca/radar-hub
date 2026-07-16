@@ -60,8 +60,8 @@ const DEFAULT_LIMIT = 5;
 /** De onde veio o contexto que ancorou os analistas (transparência na UI). */
 export type BrainSourceNote = {
   clientName: string;
-  /** live = Brain real do Formare; fixture = resumo local; none = sem contexto. */
-  mode: "live" | "fixture" | "none";
+  /** live = Brain real; fixture = resumo local Formare; local = base da implantação; none = sem contexto. */
+  mode: "live" | "fixture" | "local" | "none";
   /** nº de fatos confirmados usados (só em mode=live). */
   nodeCount?: number;
 };

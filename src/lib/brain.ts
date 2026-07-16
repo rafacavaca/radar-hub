@@ -24,6 +24,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { loadBaseLocal } from "@/lib/base-local";
 import { GEMMINI } from "@/lib/clients/gemmini";
 import { MOOVEFY } from "@/lib/clients/moovefy";
 import { TAGAT } from "@/lib/clients/tagat";
@@ -51,6 +52,7 @@ export type BrainNode = {
 export type BrainContext =
   | { mode: "live"; context: string; nodeCount: number }
   | { mode: "fixture"; context: string }
+  | { mode: "local"; context: string }
   | { mode: "none"; context: string };
 
 export type FetchBrainOptions = {
@@ -189,21 +191,32 @@ function fallbackFor(clientName: string): BrainContext {
   };
 }
 
-/**
- * Busca o contexto do cliente no Brain real (com cache de dia); cai no
- * fallback honesto se a porta não estiver configurada/disponível. Nunca lança.
- */
-export async function fetchClientBrain(
-  clientName: string,
-  opts: FetchBrainOptions = {},
-): Promise<BrainContext> {
-  // ISOLAMENTO MULTI-TENANT: só a org DONA lê Brain/fixtures. Qualquer outra org
-  // recebe "none" — nunca o conhecimento de outra agência, mesmo com cliente de
-  // nome idêntico. (A porta serve por nome com segredo compartilhado; o gate é aqui.)
-  const org = (await currentOrgId()) ?? "";
-  const owner = brainOwnerOrgId();
-  if (owner && org !== owner) return noneFor(clientName);
+/** Contexto da BASE LOCAL (implantação) — honesto: diz que é local e enxuto. */
+export function baseLocalContext(clientName: string, texto: string): BrainContext {
+  return {
+    mode: "local",
+    context:
+      `BASE LOCAL DE ${clientName.toUpperCase()} — digitada na implantação (enxuta; NÃO é o Brain completo do cliente):\n` +
+      texto.trim() +
+      "\n\nÉ uma base LOCAL da implantação, não conhecimento confirmado do Brain — trate como ponto de partida, não como verdade institucional.",
+  };
+}
 
+/** A base local da org para este cliente, se houver (org-scoped). Nunca lança. */
+async function localBrain(clientName: string): Promise<BrainContext | null> {
+  try {
+    const texto = await loadBaseLocal(clientName);
+    return texto ? baseLocalContext(clientName, texto) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * O Brain REAL do Formare (porta + cache de dia) — só a org DONA chega aqui.
+ * Cai no fallback honesto (fixture/none) se a porta não configurada/indisponível.
+ */
+async function realBrain(clientName: string, org: string, opts: FetchBrainOptions): Promise<BrainContext> {
   if (!isBrainDoorConfigured()) return fallbackFor(clientName);
 
   if (!opts.noCache) {
@@ -244,4 +257,36 @@ export async function fetchClientBrain(
     console.warn(`[brain] falha lendo o Brain de ${clientName}: ${(err as Error).message}`);
     return fallbackFor(clientName);
   }
+}
+
+/**
+ * Contexto de conhecimento do cliente, POR ORG (nunca lança):
+ * - Org DONA do Brain: o Brain real (porta) VENCE; se não trouxer fatos, a base
+ *   local da org é fallback antes do "none".
+ * - Qualquer outra org: NUNCA o Brain/fixtures do Formare — só a PRÓPRIA base
+ *   local (org-scoped: não vaza de outra agência, nem por cliente de nome igual).
+ */
+export async function fetchClientBrain(
+  clientName: string,
+  opts: FetchBrainOptions = {},
+): Promise<BrainContext> {
+  const org = (await currentOrgId()) ?? "";
+  const owner = brainOwnerOrgId();
+  const isOwner = !owner || org === owner;
+
+  if (isOwner) {
+    const real = await realBrain(clientName, org, opts);
+    if (real.mode === "live") return real;
+    // porta sem fatos confirmados: a base local da org (se houver) supera o "none".
+    if (real.mode === "none") {
+      const local = await localBrain(clientName);
+      if (local) return local;
+    }
+    return real;
+  }
+
+  // não-dona: só a própria base local, senão "none". NUNCA Brain/fixtures do Formare.
+  const local = await localBrain(clientName);
+  if (local) return local;
+  return noneFor(clientName);
 }
