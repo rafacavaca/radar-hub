@@ -17,6 +17,7 @@ import { loadCobertura } from "@/lib/diagnostico/cobertura";
 import { buildDiagnosticoCharts, buildMapaPosicionamento } from "@/lib/diagnostico/report-charts";
 
 import { AlertasDiagnostico } from "@/components/alertas-diagnostico";
+import { Rotulo } from "@/components/rotulo";
 import { BattlecardCard } from "@/components/battlecard-card";
 import { CoberturaCard } from "@/components/cobertura-card";
 import { SwotCard } from "@/components/swot-card";
@@ -66,7 +67,7 @@ export default async function DiagnosticoPage({
 
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Concorrentes</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400"><Rotulo termo="concorrentes" /></p>
 
       <div className="mt-2 flex gap-1 border-b border-stone-200">
         <Link href={`/vigiar${q}`} className="border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 hover:text-stone-900">

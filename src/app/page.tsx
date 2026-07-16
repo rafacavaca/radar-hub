@@ -31,6 +31,7 @@ import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { LensReadingCard, RoadmapNoteRow } from "@/components/lens-reading-card";
 import { RodarAgora } from "@/components/rodar-agora";
 import { FonteLink, ScoreBadge } from "@/components/score-badge";
+import { Rotulo } from "@/components/rotulo";
 import { loadPrioridade } from "@/lib/prioridade";
 import { nivelPorCorte, type CortePrioridade } from "@/lib/prioridade-core";
 import { attenuated, RecencyStamp, SourceRef } from "@/components/signal-meta";
@@ -435,7 +436,7 @@ function CrossCard({ insight }: { insight: CrossInsight }) {
       </div>
 
       <div className="mt-3 rounded-xl border-l-2 border-emerald-400 bg-emerald-50/60 py-3 pl-4 pr-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Oportunidade</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700"><Rotulo termo="oportunidade" /></p>
         <p className="mt-1 leading-relaxed text-stone-800">{insight.oportunidade}</p>
       </div>
 

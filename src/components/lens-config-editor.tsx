@@ -249,6 +249,7 @@ function LensRow({ clientName, lens }: { clientName: string; lens: LensConfig })
       <label className="mt-4 block">
         <span className="mb-1 block text-xs font-medium text-stone-500">
           Régua de relevância — o que faz um sinal subir
+          <span className="ml-1 font-normal text-stone-400">· critério da agência (vale para todas as contas)</span>
         </span>
         <textarea
           data-testid="lens-regua"
@@ -309,7 +310,7 @@ function LensRow({ clientName, lens }: { clientName: string; lens: LensConfig })
           {busy === "reset" ? "Restaurando…" : "Restaurar padrão"}
         </button>
 
-        {saved ? <span className="text-xs text-emerald-700">✓ salvo</span> : null}
+        {saved ? <span className="text-xs text-emerald-700">✓ salvo — vale para todas as contas</span> : null}
       </div>
 
       {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}

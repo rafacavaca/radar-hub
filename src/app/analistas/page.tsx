@@ -43,6 +43,9 @@ export default async function AnalistasPage({
           Três áreas leem cada sinal — comercial, produto e marketing. Ajuste a régua de cada
           uma; o padrão já vem pronto.
         </p>
+        <p className="mt-2 max-w-[70ch] rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+          A <span className="font-medium text-stone-700">régua</span>, o time e a ação de cada área são <span className="font-medium text-stone-700">critério da agência</span>: você ajusta uma vez e vale para todas as contas. Só <span className="font-medium text-stone-700">ligar/desligar</span> uma área é por conta.
+        </p>
       </header>
 
       <div className="mt-8">

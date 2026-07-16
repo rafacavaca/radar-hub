@@ -243,10 +243,10 @@ export default async function ImplantacaoPage() {
             {(
               [
                 ["clientes", "Contas monitoradas"],
-                ["concorrentes", "Concorrentes"],
-                ["contas_chave", "Contas-chave"],
-                ["base_conhecimento", "Base de conhecimento"],
-                ["areas_ativas", "Áreas ativas"],
+                ["concorrentes", rotulo(vocab, "concorrentes")],
+                ["contas_chave", rotulo(vocab, "contas_chave")],
+                ["base_conhecimento", rotulo(vocab, "base_conhecimento")],
+                ["areas_ativas", `${rotulo(vocab, "areas")} ativas`],
                 ["fontes_temas", "Fontes e temas"],
               ] as const
             ).map(([id, label]) => (
@@ -265,6 +265,7 @@ export default async function ImplantacaoPage() {
             const conc = client.competitors.filter((k) => pillarOf(k, client.mode) === "concorrente");
             const contas = client.competitors.filter((k) => pillarOf(k, client.mode) === "conta-chave");
             const areas = lensesDe(client.name).filter((l) => l.enabled).map((l) => LENS_LABEL[l.id]);
+            const fontesCount = client.competitors.reduce((n, c) => n + (c.sources?.length ?? 0), 0);
             const baseTexto = bases[client.name] ?? "";
             // honesto: pro dono o Brain real VENCE; pras demais, a base local (se houver).
             const baseLabel = brainDono ? "Base: Brain do Formare" : baseTexto ? "Base local (implantação)" : "sem base (modo reduzido)";
@@ -278,23 +279,27 @@ export default async function ImplantacaoPage() {
                 <dl className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-3">
                   <div>
                     <dt className="text-[11px] font-semibold uppercase tracking-[0.06em] text-stone-400">
-                      Concorrentes {superAdmin ? <Ajustar href={`/vigiar${q}`} label="ver" /> : null}
+                      {rotulo(vocab, "concorrentes")} {superAdmin ? <Ajustar href={`/vigiar${q}`} label="ver" /> : null}
                     </dt>
                     <dd className="mt-0.5 text-[13px] text-stone-700">{conc.length > 0 ? conc.map((c) => c.name).join(" · ") : <span className="text-stone-400">nenhum</span>}</dd>
                   </div>
                   <div>
                     <dt className="text-[11px] font-semibold uppercase tracking-[0.06em] text-stone-400">
-                      Contas-chave {superAdmin ? <Ajustar href={`/contas/vigiar${q}`} label="ver" /> : null}
+                      {rotulo(vocab, "contas_chave")} {superAdmin ? <Ajustar href={`/contas/vigiar${q}`} label="ver" /> : null}
                     </dt>
                     <dd className="mt-0.5 text-[13px] text-stone-700">{contas.length > 0 ? contas.map((c) => c.name).join(" · ") : <span className="text-stone-400">nenhuma</span>}</dd>
                   </div>
                   <div>
                     <dt className="text-[11px] font-semibold uppercase tracking-[0.06em] text-stone-400">
-                      Áreas ativas {superAdmin ? <Ajustar href={`/analistas${q}`} label="ver" /> : null}
+                      {rotulo(vocab, "areas")} ativas {superAdmin ? <Ajustar href={`/analistas${q}`} label="ver" /> : null}
                     </dt>
                     <dd className="mt-0.5 text-[13px] text-stone-700">{areas.length > 0 ? areas.join(" · ") : <span className="text-stone-400">nenhuma</span>}</dd>
                   </div>
                 </dl>
+                <p className="mt-2.5 text-[12px] text-stone-500">
+                  Fontes e temas: <span className="font-medium text-stone-700">{fontesCount}</span> {fontesCount === 1 ? "fonte pública monitorada" : "fontes públicas monitoradas"}
+                  {superAdmin ? <> · <Ajustar href={`/vigiar${q}`} label="gerir fontes" /> · <Ajustar href={`/diagnostico${q}`} label="temas no Diagnóstico" /></> : null}
+                </p>
                 {superAdmin ? (
                   <div className="mt-3 border-t border-stone-100 pt-2.5">
                     <BaseLocalEditor cliente={client.name} initial={baseTexto} />
@@ -307,7 +312,7 @@ export default async function ImplantacaoPage() {
       </Nivel>
 
       <p className="mt-10 border-t border-stone-200 pt-4 text-[12px] text-stone-400">
-        Registro da implantação. Próximo lote: os temas de mercado editáveis por conta.
+        Registro da implantação — o retrato do critério da agência. O dia a dia (concorrentes, fontes, temas) afina-se nas abas de cada conta; o critério comum, aqui.
       </p>
     </section>
   );
