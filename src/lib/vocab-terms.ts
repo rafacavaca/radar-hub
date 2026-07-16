@@ -5,26 +5,38 @@
  * importam SEMPRE daqui (`@/lib/vocab-terms`), nunca de `@/lib/vocab`.
  */
 
-/** Os termos renomeáveis (chave estável + rótulo padrão + o que é, pra a tela). */
+/**
+ * Os termos renomeáveis (chave estável + rótulo padrão + o que é, pra a tela).
+ * `singular` é a forma pra slots de um item só (coluna, campo). A agência só
+ * renomeia UM rótulo (o `label`); no custom, o singular cai no termo dela —
+ * consistente (mostra sempre a palavra da agência), só não flexiona.
+ */
 export const VOCAB_TERMS = [
-  { key: "concorrentes", label: "Concorrentes", desc: "quem a agência monitora" },
-  { key: "contas_chave", label: "Contas-chave", desc: "as contas que o cliente quer cuidar" },
-  { key: "areas", label: "Áreas", desc: "as óticas de leitura (comercial, produto, marketing)" },
-  { key: "prioridade", label: "Prioridade", desc: "o peso de um sinal (Alta · Média · Baixa)" },
-  { key: "oportunidade", label: "Oportunidade", desc: "um gancho acionável num sinal" },
-  { key: "base_conhecimento", label: "Base de conhecimento", desc: "o que o Radar sabe do cliente" },
+  { key: "concorrentes", label: "Concorrentes", singular: "Concorrente", desc: "quem a agência monitora" },
+  { key: "contas_chave", label: "Contas-chave", singular: "Conta-chave", desc: "as contas que o cliente quer cuidar" },
+  { key: "areas", label: "Áreas", singular: "Área", desc: "as óticas de leitura (comercial, produto, marketing)" },
+  { key: "prioridade", label: "Prioridade", singular: "Prioridade", desc: "o peso de um sinal (Alta · Média · Baixa)" },
+  { key: "oportunidade", label: "Oportunidade", singular: "Oportunidade", desc: "um gancho acionável num sinal" },
+  { key: "base_conhecimento", label: "Base de conhecimento", singular: "Base de conhecimento", desc: "o que o Radar sabe do cliente" },
 ] as const;
 
 export type VocabKey = (typeof VOCAB_TERMS)[number]["key"];
 export type VocabMap = Partial<Record<VocabKey, string>>;
 
 const DEFAULTS = Object.fromEntries(VOCAB_TERMS.map((t) => [t.key, t.label])) as Record<VocabKey, string>;
+const SINGULARS = Object.fromEntries(VOCAB_TERMS.map((t) => [t.key, t.singular])) as Record<VocabKey, string>;
 const KEYS = new Set<string>(VOCAB_TERMS.map((t) => t.key));
 
 /** O rótulo efetivo de um termo: o custom da agência, ou o padrão. PURO. */
 export function rotulo(vocab: VocabMap | null | undefined, key: VocabKey): string {
   const custom = vocab?.[key]?.trim();
   return custom && custom.length > 0 ? custom : DEFAULTS[key];
+}
+
+/** O rótulo no SINGULAR (coluna/campo de um item). Custom → o termo da agência. */
+export function rotuloSingular(vocab: VocabMap | null | undefined, key: VocabKey): string {
+  const custom = vocab?.[key]?.trim();
+  return custom && custom.length > 0 ? custom : SINGULARS[key];
 }
 
 /** O rótulo PADRÃO de um termo (sem override). */

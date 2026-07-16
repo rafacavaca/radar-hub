@@ -11,6 +11,8 @@
  */
 
 import Link from "next/link";
+
+import { useRotulo } from "@/components/vocab-context";
 import { useState } from "react";
 
 import { BriefingItemActions } from "@/components/briefing-item-actions";
@@ -88,6 +90,10 @@ export function SignalCard({
   const agrupado = group.itens.length > 1;
   // lentes presentes (quando agrupado por sinal) — chips escaneáveis.
   const lentes = group.itens.map((i) => i.lens).filter((l): l is NonNullable<typeof l> => Boolean(l));
+  // vocabulário da agência: o tipo "gatilho" é a Oportunidade (renomeável).
+  const r = useRotulo();
+  const kindLabel = (k: DigestItem["kind"]) => (k === "gatilho" ? `${r("oportunidade")} de venda` : KIND_META[k].label);
+  const corpoLabel = (k: DigestItem["kind"]) => (k === "gatilho" || k === "jogada" ? r("oportunidade") : ANALISE_LABEL[k].corpo);
 
   return (
     <article
@@ -102,7 +108,7 @@ export function SignalCard({
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-stone-400">{head.clientName}</span>
             <Tooltip content={KIND_META[head.kind].tip}>
-              <Chip>{KIND_META[head.kind].label}</Chip>
+              <Chip>{kindLabel(head.kind)}</Chip>
             </Tooltip>
             {voltou ? <Chip className="bg-amber-100 text-amber-800">Adiado</Chip> : null}
             {unread && !voltou ? (
@@ -183,7 +189,7 @@ export function SignalCard({
                 </p>
               ) : null}
               <p className="mt-0.5 text-sm leading-relaxed text-stone-700">
-                <span className="font-medium text-stone-500">{ANALISE_LABEL[item.kind].corpo}: </span>
+                <span className="font-medium text-stone-500">{corpoLabel(item.kind)}: </span>
                 {item.detalhe}
               </p>
               {item.acao ? (

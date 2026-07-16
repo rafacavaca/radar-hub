@@ -6,6 +6,7 @@
  */
 
 import type { DiagnosticoConcorrente } from "@/lib/diagnostico/schema";
+import { Rotulo } from "@/components/rotulo";
 
 /** Régua de maturidade, do melhor pro pior (para o ranking). */
 const NIVEL_ORDER = ["icônica", "proprietária", "diferenciada", "padronizada", "clichê", "desestruturada", "defasada"];
@@ -59,7 +60,7 @@ export function PainelComparativo({ diagnosticos }: { diagnosticos: DiagnosticoC
         <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b border-stone-200 text-left text-[11px] uppercase tracking-wide text-stone-400">
-              <th className="py-2 pr-3 font-semibold">Concorrente</th>
+              <th className="py-2 pr-3 font-semibold"><Rotulo termo="concorrentes" singular /></th>
               <th className="py-2 pr-3 font-semibold">Maturidade</th>
               <th className="py-2 pr-3 font-semibold">Produtos</th>
               <th className="py-2 pr-3 font-semibold">Canais</th>

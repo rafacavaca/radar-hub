@@ -13,6 +13,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { Rotulo } from "@/components/rotulo";
+
 import { ageInDays } from "@/lib/format";
 import type { ClientEvent } from "@/lib/loop";
 
@@ -91,7 +93,7 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
 
         {competitors.length > 1 ? (
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-stone-500">Concorrente</span>
+            <span className="mb-1 block text-xs font-medium text-stone-500"><Rotulo termo="concorrentes" singular /></span>
             <select
               value={competitor}
               onChange={(e) => setCompetitor(e.target.value)}

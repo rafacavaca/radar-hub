@@ -14,6 +14,7 @@ import { loadSourceStatus } from "@/lib/source-status";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { WatchlistEditor } from "@/components/watchlist-editor";
+import { Rotulo } from "@/components/rotulo";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export default async function ContasVigiarPage({
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
-        Contas-chave · {cliente}
+        <Rotulo termo="contas_chave" /> · {cliente}
       </p>
 
       {/* sub-nav: fichas · vigiar (esta) */}

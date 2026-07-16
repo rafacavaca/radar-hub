@@ -14,7 +14,7 @@ import { join } from "node:path";
 process.env.RADAR_DATA_DIR = mkdtempSync(join(tmpdir(), "radar-vocab-"));
 delete process.env.RADAR_DB;
 
-const { VOCAB_TERMS, rotulo, rotuloPadrao, sanitizarVocab, loadVocab, saveVocab } = await import("@/lib/vocab");
+const { VOCAB_TERMS, rotulo, rotuloPadrao, rotuloSingular, sanitizarVocab, loadVocab, saveVocab } = await import("@/lib/vocab");
 
 type Criterio = { nome: string; feito: boolean };
 const criterios: Criterio[] = [];
@@ -36,6 +36,12 @@ add("Sanitizar: descarta termo desconhecido", !("inventado" in san));
 add("Sanitizar: descarta vazio", !("areas" in san));
 add("Sanitizar: descarta o que == padrão (mapa mínimo)", !("prioridade" in san));
 add("Sanitizar: trim no valor", sanitizarVocab({ contas_chave: "  Alvos " }).contas_chave === "Alvos");
+
+// ── 2b. singular (coluna/campo de um item) ──
+add("Singular padrão: concorrentes → 'Concorrente'", rotuloSingular({}, "concorrentes") === "Concorrente");
+add("Singular padrão: areas → 'Área', contas_chave → 'Conta-chave'", rotuloSingular(null, "areas") === "Área" && rotuloSingular({}, "contas_chave") === "Conta-chave");
+add("Singular custom → o termo da agência (consistente, não flexiona)", rotuloSingular({ concorrentes: "Rivais" }, "concorrentes") === "Rivais");
+add("Singular de termo já-singular = igual ao plural", rotuloSingular({}, "oportunidade") === "Oportunidade");
 
 // ── 3. catálogo ──
 add("Catálogo tem os termos do pitch", VOCAB_TERMS.length >= 6 && VOCAB_TERMS.some((t) => t.key === "base_conhecimento"));

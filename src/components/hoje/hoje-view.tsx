@@ -14,6 +14,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { useRotulo } from "@/components/vocab-context";
+
 import { AtualizarDigest } from "@/components/atualizar-digest";
 import { LimparFalhas } from "@/components/hoje/limpar-falhas";
 import { SignalCard } from "@/components/hoje/signal-card";
@@ -25,9 +27,10 @@ const SEEN_KEY = "radar:hoje:seen";
 
 /** Barra de composição do dia por tipo (mini-visual, sem lib — F2 traz gráficos). */
 function CompBar({ grupos }: { grupos: DigestGroup[] }) {
+  const r = useRotulo();
   const KIND_ORDER = ["alerta", "gatilho", "jogada", "leitura", "relatorio"] as const;
   const KIND_LABEL: Record<string, string> = {
-    alerta: "Alertas", gatilho: "Oportunidades", jogada: "Relacionamento", leitura: "Leituras", relatorio: "Relatórios",
+    alerta: "Alertas", gatilho: r("oportunidade"), jogada: "Relacionamento", leitura: "Leituras", relatorio: "Relatórios",
   };
   // tom: alerta = acento vermelho (o urgente); resto = escala de tinta.
   const KIND_FILL: Record<string, string> = {

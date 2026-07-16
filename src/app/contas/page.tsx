@@ -17,6 +17,7 @@ import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { FichaConta } from "@/components/ficha-conta";
+import { Rotulo } from "@/components/rotulo";
 import { RodarAgora } from "@/components/rodar-agora";
 import { ScoreBadge } from "@/components/score-badge";
 
@@ -78,7 +79,7 @@ export default async function ContasPage({
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
-        Contas-chave · {cliente}
+        <Rotulo termo="contas_chave" /> · {cliente}
       </p>
 
       {/* sub-nav: fichas (esta) · vigiar (cadastro) */}

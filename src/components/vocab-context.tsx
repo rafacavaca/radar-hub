@@ -9,7 +9,7 @@
 
 import { createContext, useContext } from "react";
 
-import { rotulo, type VocabKey, type VocabMap } from "@/lib/vocab-terms";
+import { rotulo, rotuloSingular, type VocabKey, type VocabMap } from "@/lib/vocab-terms";
 
 const VocabCtx = createContext<VocabMap>({});
 
@@ -21,4 +21,10 @@ export function VocabProvider({ vocab, children }: { vocab: VocabMap; children: 
 export function useRotulo(): (key: VocabKey) => string {
   const vocab = useContext(VocabCtx);
   return (key) => rotulo(vocab, key);
+}
+
+/** Como useRotulo, mas no SINGULAR (coluna/campo de um item só). */
+export function useRotuloSingular(): (key: VocabKey) => string {
+  const vocab = useContext(VocabCtx);
+  return (key) => rotuloSingular(vocab, key);
 }
