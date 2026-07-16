@@ -58,6 +58,14 @@ await persistLensReset("Beta", "comercial"); // reset disparado via Beta
 const alphaComercial = (await loadLensesFor("Alpha")).find((l) => l.id === "comercial");
 add("reset da régua é org-level (via Beta restaura o padrão pra Alpha)", !!alphaComercial?.regua.startsWith("Sobe quando o movimento mexe"));
 
+// ── 5. ALERTAS org-level (o par da régua): editar via um cliente vale pra todos ──
+const { loadRegras, persistRegras } = await import("@/lib/diagnostico/alertas-store");
+const regrasAntes = await loadRegras("Alpha");
+add("alertas: lista completa de regras (padrão)", regrasAntes.length > 0 && regrasAntes.every((r) => typeof r.tipo === "string"));
+await persistRegras("Alpha", regrasAntes.map((r) => (r.tipo === "anuncios_variacao" ? { ...r, limiar: 99 } : r)));
+const regrasBeta = await loadRegras("Beta");
+add("alertas org-level: editar regra via Alpha vale pra Beta (mesma agência)", regrasBeta.find((r) => r.tipo === "anuncios_variacao")?.limiar === 99);
+
 // ── Resultado ──
 console.log("── Resultado ──");
 let ok = true;

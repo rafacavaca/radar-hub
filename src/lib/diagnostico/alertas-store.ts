@@ -19,9 +19,13 @@ import type { AlertaDisparo, RegraAlerta } from "@/lib/diagnostico/schema";
 const MAX_DISPAROS = 300;
 const KIND_REGRAS = "diag-alertas-regras";
 const KIND_DISPAROS = "diag-alertas-disparos";
+// RE-SCOPE: as REGRAS de alerta são CRITÉRIO DA AGÊNCIA (org-level) — uma vez,
+// valem pra todas as contas. Chave fixa (o clientName recebido é ignorado nas
+// regras; os DISPAROS seguem por-cliente). Migração lossless (ninguém customizou).
+const REGRAS_KEY = "__agencia__";
 
 type AlertasFile = {
-  /** regras por cliente (nome → regras). Ausente ⇒ REGRAS_PADRAO. */
+  /** regras da AGÊNCIA (chave fixa REGRAS_KEY → regras). Ausente ⇒ REGRAS_PADRAO. */
   regras: Record<string, RegraAlerta[]>;
   /** disparos (mais novo primeiro), com cap. */
   disparos: AlertaDisparo[];
@@ -62,16 +66,16 @@ function comPadrao(salvas: RegraAlerta[] | null | undefined): RegraAlerta[] {
   return REGRAS_PADRAO.map((padrao) => salvas.find((s) => s.tipo === padrao.tipo) ?? { ...padrao });
 }
 
-/** Regras do cliente (padrão quando nunca editadas) — sempre a lista completa. */
-export function getRegras(clientName: string): RegraAlerta[] {
-  return comPadrao(readFile().regras[clientName]);
+/** Regras da AGÊNCIA (padrão quando nunca editadas) — sempre a lista completa. */
+export function getRegras(_clientName?: string): RegraAlerta[] {
+  return comPadrao(readFile().regras[REGRAS_KEY]);
 }
 
-export function saveRegras(clientName: string, regras: RegraAlerta[]): RegraAlerta[] {
+export function saveRegras(_clientName: string, regras: RegraAlerta[]): RegraAlerta[] {
   const file = readFile();
-  file.regras[clientName] = regras;
+  file.regras[REGRAS_KEY] = regras;
   writeFile(file);
-  return getRegras(clientName);
+  return getRegras();
 }
 
 /** Anexa disparos novos (dedupe por id) — mais novos primeiro, com cap. */
@@ -104,16 +108,16 @@ export function marcarVistos(clientName: string): void {
 
 // ─── MULTI-TENANT (item 2): API org-scoped (Supabase/org_docs ou JSON). ──
 
-/** Regras do cliente, na org da sessão (ou JSON). Sempre a lista completa. */
-export async function loadRegras(clientName: string): Promise<RegraAlerta[]> {
-  if (!supabaseEnabled()) return getRegras(clientName);
-  return comPadrao(await sbGetDoc<RegraAlerta[] | null>(KIND_REGRAS, clientName, null));
+/** Regras da AGÊNCIA (org-level), na org da sessão (ou JSON). Lista completa. */
+export async function loadRegras(_clientName?: string): Promise<RegraAlerta[]> {
+  if (!supabaseEnabled()) return getRegras();
+  return comPadrao(await sbGetDoc<RegraAlerta[] | null>(KIND_REGRAS, REGRAS_KEY, null));
 }
 
-/** Salva as regras do cliente na org da sessão (ou JSON). */
-export async function persistRegras(clientName: string, regras: RegraAlerta[]): Promise<RegraAlerta[]> {
-  if (!supabaseEnabled()) return saveRegras(clientName, regras);
-  await sbSetDoc(KIND_REGRAS, clientName, regras);
+/** Salva as regras da AGÊNCIA (org-level) na org da sessão (ou JSON). */
+export async function persistRegras(_clientName: string, regras: RegraAlerta[]): Promise<RegraAlerta[]> {
+  if (!supabaseEnabled()) return saveRegras("", regras);
+  await sbSetDoc(KIND_REGRAS, REGRAS_KEY, regras);
   return comPadrao(regras);
 }
 
