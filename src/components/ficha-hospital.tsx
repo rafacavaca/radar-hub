@@ -13,6 +13,7 @@ import type { SalesReading } from "@/lib/types";
 
 import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { ScoreBadge } from "@/components/score-badge";
+import { Rotulo } from "@/components/rotulo";
 import { RecencyStamp, SourceRef } from "@/components/signal-meta";
 
 const MODO_LABEL: Record<string, string> = {
@@ -141,7 +142,7 @@ export function FichaHospital({
 
                 <div className="mt-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                    Oportunidade
+                    <Rotulo termo="oportunidade" />
                   </p>
                   <p className="mt-0.5 text-sm leading-relaxed text-stone-700">{g.gatilho}</p>
                 </div>

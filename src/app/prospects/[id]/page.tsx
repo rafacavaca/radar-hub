@@ -8,6 +8,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ConcorrentesEditor } from "@/components/prospects/concorrentes-editor";
+import { Rotulo } from "@/components/rotulo";
 import { ContextoPrivado } from "@/components/prospects/contexto-privado";
 import { DossieActions } from "@/components/prospects/dossie-actions";
 import { DossieFrame } from "@/components/prospects/dossie-frame";
@@ -89,7 +90,7 @@ export default async function DossiePage({
             {/* curadoria de concorrentes (gaveta) — reflete no dossiê e no PDF ao salvar. */}
             <details className="mt-4 rounded-lg border border-stone-200 bg-white">
               <summary className="cursor-pointer px-4 py-2.5 text-[13px] font-medium text-stone-600 hover:text-stone-900">
-                Curar concorrentes — indicar / validar (reflete no dossiê e no PDF)
+                Curar <Rotulo termo="concorrentes" lower /> — indicar / validar (reflete no dossiê e no PDF)
               </summary>
               <div className="border-t border-stone-100 px-4 py-3.5">
                 <ConcorrentesEditor cliente={cliente} id={id} concorrentes={concorrentes} />

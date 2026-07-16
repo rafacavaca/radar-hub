@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { CORTE_PADRAO, nivelPorCorte, sanitizarCorte, type CortePrioridade } from "@/lib/prioridade-core";
+import { Rotulo } from "@/components/rotulo";
 
 const EXEMPLOS = [85, 72, 55, 40, 25]; // régua de prévia — cobre os três níveis
 const COR: Record<string, string> = {
@@ -61,7 +62,7 @@ export function PrioridadeEditor({ initial }: { initial: CortePrioridade }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <label className="flex items-center gap-2 text-[13px] text-stone-700">
-          Prioridade <span className="font-medium">Alta</span> a partir de
+          <Rotulo termo="prioridade" /> <span className="font-medium">Alta</span> a partir de
           <input
             type="number"
             min={2}
@@ -112,7 +113,7 @@ export function PrioridadeEditor({ initial }: { initial: CortePrioridade }) {
           disabled={busy}
           className="inline-flex min-h-[36px] items-center rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-stone-50 transition-colors hover:bg-stone-700 disabled:opacity-50"
         >
-          {busy ? "Salvando…" : "Salvar régua de prioridade"}
+          {busy ? "Salvando…" : <>Salvar régua de <Rotulo termo="prioridade" lower /></>}
         </button>
         {padrao ? <span className="text-[12px] text-stone-400">Cortes no padrão do sistema.</span> : null}
         {ok ? <span className="text-[12px] text-emerald-700">Salvo — vale em toda a interface.</span> : null}

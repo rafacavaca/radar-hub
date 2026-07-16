@@ -70,7 +70,8 @@ export default async function VigiarPage({
       </div>
 
       <p className="mt-4 text-sm text-stone-500">
-        {watchedCount} {watchedCount === 1 ? "concorrente monitorado" : "concorrentes monitorados"} para{" "}
+        {watchedCount} <Rotulo termo="concorrentes" singular={watchedCount === 1} lower />{" "}
+        {watchedCount === 1 ? "monitorado" : "monitorados"} para{" "}
         <span className="font-medium text-stone-700">{cliente || "—"}</span>.
       </p>
 

@@ -9,6 +9,7 @@
 import { loadWatchlist } from "@/lib/watchlist";
 
 import { AskRadar } from "@/components/ask-radar";
+import { Rotulo } from "@/components/rotulo";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function PerguntarPage({
           O que o Radar sabe sobre {cliente || "o cliente"}
         </h1>
         <p className="mt-1.5 text-sm text-stone-500">
-          Responde só com o que o Radar coletou e o Brain do cliente — sempre com fontes, e honesto
+          Responde só com o que o Radar coletou e a <Rotulo termo="base_conhecimento" lower /> do cliente — sempre com fontes, e honesto
           quando não sabe.
         </p>
       </header>

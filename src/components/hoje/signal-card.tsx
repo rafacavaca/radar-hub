@@ -131,7 +131,7 @@ export function SignalCard({
           <Tooltip content="Prioridade: quão relevante para você (não popularidade). Escala 0–100.">
             <span className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-stone-700">
               {group.score}
-              <span className="font-medium uppercase tracking-wide text-stone-400">prioridade</span>
+              <span className="font-medium uppercase tracking-wide text-stone-400">{r("prioridade")}</span>
             </span>
           </Tooltip>
 
@@ -162,7 +162,7 @@ export function SignalCard({
             className="inline-flex items-center gap-1 text-[12px] font-medium text-stone-500 transition-colors hover:text-stone-900"
           >
             <span aria-hidden className={"transition-transform " + (open ? "rotate-90" : "")}>▸</span>
-            {open ? "ocultar análise" : agrupado ? `ver análise · ${group.itens.length} lentes` : "ver análise"}
+            {open ? "ocultar análise" : agrupado ? `ver análise · ${group.itens.length} ${r("areas").toLocaleLowerCase("pt-BR")}` : "ver análise"}
           </button>
           <Link
             href={painelDe(head)}

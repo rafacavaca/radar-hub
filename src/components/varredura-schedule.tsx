@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { DiagScheduleClient } from "@/lib/diagnostico/schedule";
+import { Rotulo } from "@/components/rotulo";
 
 const WEEKDAYS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
@@ -87,7 +88,7 @@ export function VarreduraSchedule({
       </span>
 
       <span className="text-xs text-stone-400">
-        {alvos > 0 ? `${alvos} concorrente(s) na varredura` : "nenhum concorrente diagnosticado ainda"}
+        {alvos > 0 ? <>{alvos} <Rotulo termo="concorrentes" singular={alvos === 1} lower /> na varredura</> : <>nenhum <Rotulo termo="concorrentes" singular lower /> diagnosticado ainda</>}
         {" · "}
         {config.lastRunDay ? `última: ${config.lastRunDay}` : "ainda não rodou"}
       </span>

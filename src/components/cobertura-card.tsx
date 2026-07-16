@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 
 import type { CoberturaConteudo } from "@/lib/diagnostico/cobertura";
 import { formatDateTimePtBR } from "@/lib/format";
+import { Rotulo } from "@/components/rotulo";
 
 export function CoberturaCard({ cliente, cobertura }: { cliente: string; cobertura: CoberturaConteudo | null }) {
   const router = useRouter();
@@ -57,8 +58,8 @@ export function CoberturaCard({ cliente, cobertura }: { cliente: string; cobertu
 
       {!cobertura ? (
         <p className="px-4 py-4 text-sm text-stone-500 sm:px-5">
-          Mapa de quais temas cada concorrente cobre no conteúdo — e onde há espaço vazio (oportunidade
-          editorial). Precisa de ≥2 concorrentes com conteúdo coletado.
+          Mapa de quais temas cada <Rotulo termo="concorrentes" singular lower /> cobre no conteúdo — e onde há espaço vazio (oportunidade
+          editorial). Precisa de ≥2 <Rotulo termo="concorrentes" lower /> com conteúdo coletado.
         </p>
       ) : (
         <div className="px-4 py-4 sm:px-5">
@@ -66,7 +67,7 @@ export function CoberturaCard({ cliente, cobertura }: { cliente: string; cobertu
             <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Whitespace — pouco disputado</p>
               <p className="mt-1 text-sm text-stone-700">{whitespace.map((t) => t.tema).join(" · ")}</p>
-              <p className="mt-1 text-[11px] text-emerald-800">Temas que ≤1 concorrente cobre — espaço para o cliente liderar.</p>
+              <p className="mt-1 text-[11px] text-emerald-800">Temas que ≤1 <Rotulo termo="concorrentes" singular lower /> cobre — espaço para o cliente liderar.</p>
             </div>
           ) : null}
 

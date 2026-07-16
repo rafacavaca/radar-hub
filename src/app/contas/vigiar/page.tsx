@@ -71,9 +71,10 @@ export default async function ContasVigiarPage({
       </div>
 
       <p className="mt-4 text-sm text-stone-500">
-        {contasCount} {contasCount === 1 ? "conta-chave monitorada" : "contas-chave monitoradas"} para{" "}
+        {contasCount} <Rotulo termo="contas_chave" singular={contasCount === 1} lower />{" "}
+        {contasCount === 1 ? "monitorada" : "monitoradas"} para{" "}
         <span className="font-medium text-stone-700">{cliente || "—"}</span>. Cadastre igual você faz
-        com concorrentes — o Radar cruza cada sinal da conta com a oferta do cliente (base de conhecimento).
+        com <Rotulo termo="concorrentes" lower /> — o Radar cruza cada sinal da conta com a oferta do cliente (<Rotulo termo="base_conhecimento" lower />).
       </p>
 
       <div className="mt-6">

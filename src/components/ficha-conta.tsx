@@ -17,6 +17,7 @@ import type { Competitor } from "@/lib/watchlist";
 import type { Encaixe, RelationshipPlay } from "@/lib/types";
 
 import { ContaReportButton } from "@/components/conta-report-button";
+import { Rotulo } from "@/components/rotulo";
 import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { ScoreBadge } from "@/components/score-badge";
 import { RecencyStamp, SourceRef } from "@/components/signal-meta";
@@ -69,7 +70,7 @@ export function FichaConta({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[17px] font-semibold tracking-tight text-stone-900">{conta.name}</h2>
             <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
-              conta-chave
+              <Rotulo termo="contas_chave" singular lower />
             </span>
             {!conta.enabled ? (
               <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs text-stone-500">
@@ -119,7 +120,7 @@ export function FichaConta({
 
                 <div className="mt-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                    Oportunidade
+                    <Rotulo termo="oportunidade" />
                   </p>
                   <p className="mt-0.5 text-sm leading-relaxed text-stone-700">{j.gatilho}</p>
                 </div>

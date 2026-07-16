@@ -48,19 +48,19 @@ const CONCORRENTES_SECTIONS: Section[] = [
   { label: "Visão", href: "/visao", icon: HouseIcon, purpose: "O panorama deste cliente: o que mudou e o que precisa rodar.", match: (p) => p.startsWith("/visao") },
   { label: "Briefing", href: "/", icon: SparklesIcon, purpose: "Os sinais que importam, já com a leitura por área e a ação sugerida.", match: (p) => p === "/" },
   { label: "Feed", href: "/feed", icon: RadarIcon, purpose: "Tudo que o Radar coletou sobre este cliente — os sinais crus, sem análise.", match: (p) => p.startsWith("/feed") },
-  { label: "Contas", href: "/contas", icon: Building2Icon, purpose: "As contas-chave deste cliente — o que se move nelas e o que você pode oferecer.", match: (p) => p.startsWith("/contas") },
+  { label: "Contas", href: "/contas", icon: Building2Icon, purpose: "As {contas_chave} deste cliente — o que se move nelas e o que você pode oferecer.", match: (p) => p.startsWith("/contas") },
   { label: "Prospects", href: "/prospects", icon: TargetIcon, purpose: "Prepare-se pra uma reunião: um dossiê completo da empresa que você vai visitar.", match: (p) => p.startsWith("/prospects") },
   { label: "Conhecimento", href: "/perguntar", icon: SearchIcon, purpose: "Pergunte qualquer coisa sobre este cliente — a resposta vem com fonte e data.", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Concorrentes",
     href: "/vigiar",
     icon: SwordsIcon,
-    purpose: "Monitore e diagnostique os concorrentes deste cliente.",
+    purpose: "Monitore e diagnostique os {concorrentes} deste cliente.",
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
     vocabKey: "concorrentes",
   },
   { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
-  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As áreas que leem cada sinal deste cliente — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas"), vocabKey: "areas" },
+  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As {areas} que leem cada sinal deste cliente — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas"), vocabKey: "areas" },
 ];
 
 /** Seções do modo CARTEIRA (2º template) — a Ficha no lugar de Visão/Briefing. */
@@ -77,8 +77,13 @@ const CARTEIRA_SECTIONS: Section[] = [
     match: (p) => p.startsWith("/vigiar") || p.startsWith("/identidade") || p.startsWith("/diagnostico"),
   },
   { label: "Relatórios", href: "/relatorios", icon: FileTextIcon, purpose: "Monte e exporte relatórios com gráficos, prontos pra reunião.", match: (p) => p.startsWith("/relatorios") },
-  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As áreas que leem cada sinal desta carteira — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas"), vocabKey: "areas" },
+  { label: "Áreas", href: "/analistas", icon: SlidersIcon, purpose: "As {areas} que leem cada sinal desta carteira — comercial, produto, marketing — e a régua de cada uma.", match: (p) => p.startsWith("/analistas"), vocabKey: "areas" },
 ];
+
+/** Resolve os {termos} de um purpose pelo vocabulário da agência (minúsculo, meio de frase). */
+function resolverPurpose(texto: string, r: (k: VocabKey) => string): string {
+  return texto.replace(/\{(\w+)\}/g, (_, k) => r(k as VocabKey).toLocaleLowerCase("pt-BR"));
+}
 
 /** Home de cada cliente conforme o modo. */
 function homeFor(mode: string | undefined): string {
@@ -526,7 +531,7 @@ export function AppShell({
           {/* Linha "pra que serve esta tela" — orienta quem chegou agora. */}
           {activeSection ? (
             <p className="px-4 pb-2.5 text-[13px] leading-snug text-stone-500 md:px-6">
-              {activeSection.purpose}
+              {resolverPurpose(activeSection.purpose, r)}
             </p>
           ) : null}
         </header>

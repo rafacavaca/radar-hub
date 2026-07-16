@@ -81,7 +81,7 @@ export default async function DiagnosticoPage({
 
       <p className="mt-4 text-sm text-stone-500">
         Diagnóstico de marca — posicionamento
-        + canais de cada concorrente, com fonte e data. O que o site não diz aparece como “não
+        + canais de cada <Rotulo termo="concorrentes" singular lower />, com fonte e data. O que o site não diz aparece como “não
         encontrado” (honesto). Rode sob demanda.
       </p>
 
@@ -119,7 +119,7 @@ export default async function DiagnosticoPage({
       <div className="mt-6 space-y-6">
         {concorrentes.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
-            <p className="text-base font-medium text-stone-700">Nenhum concorrente ainda.</p>
+            <p className="text-base font-medium text-stone-700">Nenhum <Rotulo termo="concorrentes" singular lower /> ainda.</p>
             <p className="mt-1 text-sm text-stone-500">
               Cadastre em <Link href={`/vigiar${q}`} className="font-medium text-stone-700 underline-offset-2 hover:underline">Monitorar</Link>.
             </p>

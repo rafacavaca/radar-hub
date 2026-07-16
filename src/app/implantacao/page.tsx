@@ -170,7 +170,7 @@ export default async function ImplantacaoPage() {
         <Item
           ficha={ficha}
           id="regras_area"
-          nome="Régua de leitura das áreas"
+          nome={`Régua de leitura das ${rotulo(vocab, "areas").toLocaleLowerCase("pt-BR")}`}
           superAdmin={superAdmin}
           editar={superAdmin ? <Ajustar href="/analistas" label="Afinar" /> : undefined}
         >
@@ -185,7 +185,7 @@ export default async function ImplantacaoPage() {
           <p className="mt-2 text-[12px] text-stone-400">Régua ÚNICA da agência — vale para todas as contas. Afine na aba Áreas (a edição por qualquer conta vale para todas).</p>
         </Item>
 
-        <Item ficha={ficha} id="regua_prioridade" nome="Régua de prioridade" superAdmin={superAdmin}>
+        <Item ficha={ficha} id="regua_prioridade" nome={`Régua de ${rotulo(vocab, "prioridade").toLocaleLowerCase("pt-BR")}`} superAdmin={superAdmin}>
           {superAdmin ? (
             <PrioridadeEditor initial={corte} />
           ) : (
@@ -203,7 +203,7 @@ export default async function ImplantacaoPage() {
           superAdmin={superAdmin}
           editar={superAdmin ? <Ajustar href="/automacoes" label="Ajustar em Automações" /> : undefined}
         >
-          Varredura de concorrentes: <span className="font-medium text-stone-800">{proximaExecucao(automacoes.diagnostico, now)}</span> · Resumo do dia: <span className="font-medium text-stone-800">{proximaExecucao(automacoes.digest, now)}</span>.
+          Varredura de {rotulo(vocab, "concorrentes").toLocaleLowerCase("pt-BR")}: <span className="font-medium text-stone-800">{proximaExecucao(automacoes.diagnostico, now)}</span> · Resumo do dia: <span className="font-medium text-stone-800">{proximaExecucao(automacoes.digest, now)}</span>.
         </Item>
 
         <Item

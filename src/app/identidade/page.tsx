@@ -15,6 +15,7 @@ import { latestByCompetitor, type VisualReport } from "@/lib/visual";
 import { loadWatchlist } from "@/lib/watchlist";
 
 import { IdentidadeView } from "@/components/identidade-view";
+import { Rotulo } from "@/components/rotulo";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export default async function IdentidadePage({
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
-        Concorrentes
+        <Rotulo termo="concorrentes" />
       </p>
 
       {/* sub-nav: fontes (Vigiar) · monitor visual (Identidade) */}
@@ -81,15 +82,15 @@ export default async function IdentidadePage({
 
       <header className="mt-4">
         <p className="text-sm text-stone-500">
-          O Radar olha a página pública de cada concorrente e detecta se mudaram as cores, o visual
+          O Radar olha a página pública de cada <Rotulo termo="concorrentes" singular lower /> e detecta se mudaram as cores, o visual
           ou o discurso — sinais de rebranding.
         </p>
         {competitors.length > 0 && semSite > 0 ? (
           <p className="mt-2 text-xs text-stone-400">
-            {semSite}{" "}
+            {semSite} <Rotulo termo="concorrentes" singular={semSite === 1} lower />{" "}
             {semSite === 1
-              ? "concorrente sem site cadastrado não aparece aqui"
-              : "concorrentes sem site cadastrado não aparecem aqui"}{" "}
+              ? "sem site cadastrado não aparece aqui"
+              : "sem site cadastrado não aparecem aqui"}{" "}
             — adicione o site em{" "}
             <Link href={`/vigiar${q}`} className="underline underline-offset-2 hover:text-stone-600">
               Monitorar
@@ -105,10 +106,10 @@ export default async function IdentidadePage({
         ) : (
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
             <p className="text-base font-medium text-stone-700">
-              Nenhum concorrente com site cadastrado.
+              Nenhum <Rotulo termo="concorrentes" singular lower /> com site cadastrado.
             </p>
             <p className="mt-1 text-sm text-stone-500">
-              Adicione o site de um concorrente na tela{" "}
+              Adicione o site de um <Rotulo termo="concorrentes" singular lower /> na tela{" "}
               <Link href="/vigiar" className="underline underline-offset-2 hover:text-stone-700">
                 Monitorar
               </Link>

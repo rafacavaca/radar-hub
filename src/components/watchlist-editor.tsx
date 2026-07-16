@@ -20,6 +20,7 @@ import { useState, type FormEvent } from "react";
 import type { SourceCandidate } from "@/lib/discovery";
 import type { SourceStatus } from "@/lib/source-status";
 import type { Competitor, EntityPillar, SourceKind, WatchClient, Watchlist } from "@/lib/watchlist";
+import { useRotuloSingular } from "@/components/vocab-context";
 
 /** Vocabulário por pilar — o MESMO fluxo, rótulos diferentes (concorrente × conta-chave). */
 const VOCAB: Record<
@@ -53,6 +54,21 @@ const VOCAB: Record<
     hint: 'Digite nome + site e clique em "Descobrir fontes". Adicionou? Vá em Contas → Fichas e use "Rodar" pra varrer já.',
   },
 };
+
+/**
+ * O VOCAB do pilar com o TERMO resolvido pelo vocabulário da agência (P13): só
+ * nomeLabel e emptyRow carregam o substantivo; o resto do texto é estrutural.
+ * Concordância de gênero segue o padrão (masc. p/ concorrente, fem. p/ conta) —
+ * um rename pra gênero oposto é a limitação conhecida do rótulo único.
+ */
+function usePillarVocab(pillar: EntityPillar): (typeof VOCAB)[EntityPillar] {
+  const rs = useRotuloSingular();
+  const base = VOCAB[pillar];
+  const sing = rs(pillar === "concorrente" ? "concorrentes" : "contas_chave").toLocaleLowerCase("pt-BR");
+  return pillar === "concorrente"
+    ? { ...base, nomeLabel: `Nome do ${sing}`, emptyRow: `Nenhum ${sing} monitorado ainda. Adicione o primeiro abaixo.` }
+    : { ...base, nomeLabel: `Nome da ${sing}`, addCta: `Adicionar ${sing}`, emptyRow: `Nenhuma ${sing} monitorada ainda. Adicione a primeira abaixo.` };
+}
 
 /** Status por fonte (chave `${competitorId}:${sourceId}`) — F18, transparência. */
 type StatusMap = Record<string, SourceStatus>;
@@ -168,7 +184,7 @@ function ClientCard({
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
-  const vocab = VOCAB[pillar];
+  const vocab = usePillarVocab(pillar);
   // as entidades já vêm filtradas pelo pilar no server (a página escopa por pillarOf).
   const entities = client.competitors;
 
@@ -245,7 +261,7 @@ type Candidate = SourceCandidate & { checked: boolean };
 
 function AddCompetitorFlow({ clientName, pillar }: { clientName: string; pillar: EntityPillar }) {
   const router = useRouter();
-  const vocab = VOCAB[pillar];
+  const vocab = usePillarVocab(pillar);
 
   const [name, setName] = useState("");
   const [siteUrl, setSiteUrl] = useState("");

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import type { AlertaDisparo, RegraAlerta } from "@/lib/diagnostico/schema";
 import { REGRA_LABEL } from "@/lib/diagnostico/movimento";
 import { formatDateShort } from "@/lib/format";
+import { Rotulo } from "@/components/rotulo";
 
 function resumo(d: AlertaDisparo): string {
   const m = d.movimento;
@@ -139,7 +140,7 @@ export function AlertasDiagnostico({
       {editando ? (
         <div className="mt-3 rounded-xl border border-stone-200 bg-white p-3">
           <p className="text-xs font-medium text-stone-500">
-            Regras deste cliente (valem pra todos os concorrentes dele):
+            Regras deste cliente (valem pra todos os <Rotulo termo="concorrentes" lower /> dele):
           </p>
           <ul className="mt-2 space-y-1.5">
             {regras.map((r, i) => (

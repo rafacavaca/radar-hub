@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { SourceRef } from "@/components/signal-meta";
+import { Rotulo } from "@/components/rotulo";
+import { useRotuloSingular } from "@/components/vocab-context";
 import type { ConcorrenteExibido } from "@/lib/prospects/schema";
 
 async function acao(cliente: string, id: string, acao: string, nome: string, nota?: string): Promise<void> {
@@ -30,6 +32,7 @@ function ChipEstado({ c }: { c: ConcorrenteExibido }) {
 
 export function ConcorrentesEditor({ cliente, id, concorrentes }: { cliente: string; id: string; concorrentes: ConcorrenteExibido[] }) {
   const router = useRouter();
+  const rs = useRotuloSingular();
   const [busy, setBusy] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [nome, setNome] = useState("");
@@ -64,7 +67,7 @@ export function ConcorrentesEditor({ cliente, id, concorrentes }: { cliente: str
       ) : null}
 
       {concorrentes.length === 0 ? (
-        <p className="text-sm text-stone-400">Nenhum concorrente ainda — a busca não trouxe e você não indicou. Adicione abaixo.</p>
+        <p className="text-sm text-stone-400">Nenhum <Rotulo termo="concorrentes" singular lower /> ainda — a busca não trouxe e você não indicou. Adicione abaixo.</p>
       ) : (
         <ul className="space-y-2">
           {concorrentes.map((c, i) => (
@@ -100,14 +103,14 @@ export function ConcorrentesEditor({ cliente, id, concorrentes }: { cliente: str
 
       {addOpen ? (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do concorrente" className="min-w-0 flex-1 rounded-md border border-stone-300 px-2.5 py-1.5 text-sm outline-none focus:border-stone-500" />
+          <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder={`Nome do ${rs("concorrentes").toLocaleLowerCase("pt-BR")}`} className="min-w-0 flex-1 rounded-md border border-stone-300 px-2.5 py-1.5 text-sm outline-none focus:border-stone-500" />
           <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="nota (opcional)" className="min-w-0 flex-1 rounded-md border border-stone-300 px-2.5 py-1.5 text-sm outline-none focus:border-stone-500" />
           <button onClick={adicionar} disabled={busy !== null} className="rounded-md bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-50">Adicionar</button>
           <button onClick={() => setAddOpen(false)} className="rounded-md px-2 py-1.5 text-sm text-stone-400 hover:text-stone-700">cancelar</button>
         </div>
       ) : (
         <button onClick={() => setAddOpen(true)} className="mt-2.5 text-[13px] font-medium text-stone-500 hover:text-stone-900">
-          + Indicar concorrente
+          + Indicar <Rotulo termo="concorrentes" singular lower />
         </button>
       )}
     </div>

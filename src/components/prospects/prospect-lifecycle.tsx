@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { ProspectStatus } from "@/lib/prospects/schema";
+import { Rotulo } from "@/components/rotulo";
 
 export function ProspectLifecycle({ cliente, id, status }: { cliente: string; id: string; status: ProspectStatus }) {
   const router = useRouter();
@@ -54,7 +55,7 @@ export function ProspectLifecycle({ cliente, id, status }: { cliente: string; id
     return (
       <div className="flex flex-col items-end gap-1">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700">
-          ✓ Monitorado (conta-chave)
+          ✓ Monitorado (<Rotulo termo="contas_chave" singular lower />)
         </span>
         <Link href={`/contas?cliente=${encodeURIComponent(cliente)}`} className="text-[11px] text-stone-400 underline-offset-2 hover:text-stone-700 hover:underline">
           ver em Contas →
@@ -80,7 +81,7 @@ export function ProspectLifecycle({ cliente, id, status }: { cliente: string; id
           title="Virou oportunidade real? Passa a ser monitorada continuamente (pilar Clientes)."
           className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
         >
-          {busy === "promover" ? "Promovendo…" : "Promover a conta-chave"}
+          {busy === "promover" ? "Promovendo…" : <>Promover a <Rotulo termo="contas_chave" singular lower /></>}
         </button>
         <button
           onClick={() => setStatus("arquivado")}

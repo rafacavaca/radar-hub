@@ -349,7 +349,7 @@ function CrossView({ insights }: { insights: CrossInsight[] }) {
       <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
         <p className="text-base font-medium text-stone-700">Nenhuma recomendação nesta rodada.</p>
         <p className="mt-1 text-sm text-stone-500">
-          O Radar cruza os movimentos dos concorrentes com o que a base de conhecimento sabe do
+          O Radar cruza os movimentos dos <Rotulo termo="concorrentes" lower /> com o que a <Rotulo termo="base_conhecimento" lower /> sabe do
           cliente. Quanto mais rica a base (o que vocês têm, começaram, deixaram parado), mais ouro aqui.
         </p>
       </div>
@@ -363,7 +363,7 @@ function CrossView({ insights }: { insights: CrossInsight[] }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-stone-500">
-        O mesmo movimento do concorrente, cruzado com o que o cliente tem por dentro. O ouro é o{" "}
+        O mesmo movimento do <Rotulo termo="concorrentes" singular lower />, cruzado com o que o cliente tem por dentro. O ouro é o{" "}
         <span className="font-medium text-amber-700">meio-pronto</span> — algo que vocês começaram e
         pararam.
       </p>
@@ -470,7 +470,7 @@ function EmptyState() {
     <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
       <p className="text-base font-medium text-stone-700">Nenhum movimento relevante ainda.</p>
       <p className="mt-1 text-sm text-stone-500">
-        Rode o Radar para buscar os últimos movimentos dos concorrentes.
+        Rode o Radar para buscar os últimos movimentos dos <Rotulo termo="concorrentes" lower />.
       </p>
       <div className="mt-5 flex justify-center">
         <RodarAgora />
