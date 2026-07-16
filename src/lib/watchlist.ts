@@ -451,6 +451,36 @@ export async function addCompetitor(clientName: string, input: AddCompetitorInpu
 }
 
 /**
+ * Adiciona uma entidade (concorrente/conta-chave) SÓ com o nome — SEM fonte
+ * ainda. É o caminho da IMPLANTAÇÃO/import: o diagnóstico traz os nomes; as
+ * fontes se descobrem depois ("Descobrir fontes"). Idempotente por id (nome
+ * repetido → added:false, não lança). Sourceless = o loop não varre nada dela
+ * até ganhar fonte (honesto: entra na lista, mas inerte).
+ */
+export async function addEntityByName(
+  clientName: string,
+  name: string,
+  pillar: EntityPillar,
+): Promise<{ watchlist: Watchlist; added: boolean }> {
+  const clean = (name ?? "").trim();
+  if (!clean) throw new Error("Dê um nome à entidade.");
+  const id = slugify(clean);
+  if (!id) throw new Error("Esse nome não gera um identificador válido — use letras/números.");
+  const watchlist = await loadWatchlist();
+  const client = findClient(watchlist, clientName);
+  if (client.competitors.some((c) => c.id === id)) return { watchlist, added: false };
+  client.competitors.push({
+    id,
+    name: clean,
+    enabled: true,
+    sources: [],
+    ...(pillar === "conta-chave" ? { pillar: "conta-chave" as const } : {}),
+  });
+  await saveWatchlist(watchlist);
+  return { watchlist, added: true };
+}
+
+/**
  * Adiciona FONTES a um concorrente EXISTENTE (o botão "Achar mais fontes").
  * Dedupe por URL; valida tipo e URL. Devolve a lista + quantas entraram.
  */

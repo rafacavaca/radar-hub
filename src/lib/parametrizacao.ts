@@ -55,6 +55,9 @@ export type Parametrizacao = {
   revisadoEm: string | null;
   /** status por parâmetro; AUSENTE = pendente (honestidade: nunca default silencioso). */
   status: Partial<Record<ParamId, ParamStatus>>;
+  /** as PALAVRAS da agência que geraram cada parâmetro (o "disseram" da Ficha) —
+   *  o Mapa de Tradução vivo: a agência abre e vê a própria fala virando regra. */
+  disseram: Partial<Record<ParamId, string>>;
 };
 
 const DOC_KIND = "parametrizacao";
@@ -68,7 +71,7 @@ export const REGISTRO_KEY = "__agencia__";
 
 /** Ficha vazia (nada implantado ainda — todos os parâmetros pendentes). */
 export function parametrizacaoVazia(clientName: string): Parametrizacao {
-  return { clientName, implantadoEm: null, revisadoEm: null, status: {} };
+  return { clientName, implantadoEm: null, revisadoEm: null, status: {}, disseram: {} };
 }
 
 // ── regras puras (o smoke testa direto) ──────────────────────────────────────
@@ -95,26 +98,46 @@ export function sanitizar(clientName: string, raw: unknown): Parametrizacao {
       if (PARAM_SET.has(k) && (v === "definido" || v === "pendente")) status[k as ParamId] = v;
     }
   }
+  const disseram: Partial<Record<ParamId, string>> = {};
+  if (r.disseram && typeof r.disseram === "object") {
+    for (const [k, v] of Object.entries(r.disseram)) {
+      if (PARAM_SET.has(k) && typeof v === "string" && v.trim()) disseram[k as ParamId] = v.trim().slice(0, 500);
+    }
+  }
   return {
     clientName,
     implantadoEm: typeof r.implantadoEm === "string" ? r.implantadoEm : null,
     revisadoEm: typeof r.revisadoEm === "string" ? r.revisadoEm : null,
     status,
+    disseram,
   };
 }
 
 /**
  * REGISTRA a implantação: marca `implantadoEm` (só na primeira vez) e os
- * parâmetros informados como DEFINIDOS; toca a revisão. Puro (devolve cópia).
+ * parâmetros informados como DEFINIDOS; guarda o "disseram" (as palavras da
+ * agência) dos que vierem; toca a revisão. Puro (devolve cópia).
  */
-export function comImplantado(p: Parametrizacao, ids: ParamId[], nowIso: string): Parametrizacao {
+export function comImplantado(
+  p: Parametrizacao,
+  ids: ParamId[],
+  nowIso: string,
+  disseram?: Partial<Record<ParamId, string>>,
+): Parametrizacao {
   const status = { ...p.status };
   for (const id of ids) if (PARAM_SET.has(id)) status[id] = "definido";
+  const disseramNovo = { ...p.disseram };
+  if (disseram) {
+    for (const [k, v] of Object.entries(disseram)) {
+      if (PARAM_SET.has(k) && typeof v === "string" && v.trim()) disseramNovo[k as ParamId] = v.trim().slice(0, 500);
+    }
+  }
   return {
     ...p,
     implantadoEm: p.implantadoEm ?? nowIso,
     revisadoEm: nowIso,
     status,
+    disseram: disseramNovo,
   };
 }
 
@@ -178,10 +201,15 @@ export async function saveParametrizacao(p: Parametrizacao): Promise<Parametriza
   return sane;
 }
 
-/** Registra a implantação de um cliente (parâmetros informados = definidos). */
-export async function registrarImplantacao(clientName: string, ids: ParamId[], now: Date): Promise<Parametrizacao> {
+/** Registra a implantação de um cliente (parâmetros informados = definidos + disseram). */
+export async function registrarImplantacao(
+  clientName: string,
+  ids: ParamId[],
+  now: Date,
+  disseram?: Partial<Record<ParamId, string>>,
+): Promise<Parametrizacao> {
   const atual = await loadParametrizacao(clientName);
-  return saveParametrizacao(comImplantado(atual, ids, now.toISOString()));
+  return saveParametrizacao(comImplantado(atual, ids, now.toISOString(), disseram));
 }
 
 /**

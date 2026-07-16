@@ -210,6 +210,28 @@ async function runLive(): Promise<void> {
     );
   }
 
+  // 9) IMPORT DA FICHA org-scoped (contrato v1): aplicar uma Ficha na org A
+  //    (corte de prioridade 88/55) grava SÓ na org A — a org B fica no padrão.
+  //    Uma Ficha nunca cruza orgs: applyFicha escreve pelos stores org-scoped.
+  {
+    const { applyFicha } = await import("@/lib/implantacao/ficha");
+    const { loadPrioridade } = await import("@/lib/prioridade");
+    const { runAsOrgCollector } = await import("@/lib/db/collector-org");
+    const ficha = {
+      ficha_version: 1,
+      agencia: "Org A (teste)",
+      criterio_agencia: { prioridade: { status: "definido", valor: { alta_a_partir_de: 88, media_a_partir_de: 55 } } },
+    };
+    await runAsOrgCollector(aId, () => applyFicha(ficha as never, new Date("2026-07-16T00:00:00Z")));
+    const pA = await runAsOrgCollector(aId, () => loadPrioridade());
+    const pB = await runAsOrgCollector(bId, () => loadPrioridade());
+    reg(
+      "Import da Ficha org-scoped: aplicar na org A (corte 88/55) NÃO toca a org B (padrão 70/40)",
+      pA.alta === 88 && pA.media === 55 && pB.alta === 70 && pB.media === 40 ? "ok" : "falhou",
+      `A=${pA.alta}/${pA.media} B=${pB.alta}/${pB.media}`,
+    );
+  }
+
   // limpeza
   await admin.from("orgs").delete().in("slug", [orgA.slug, orgB.slug]);
 }

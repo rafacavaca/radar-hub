@@ -25,6 +25,7 @@ import { loadVocab, rotulo, VOCAB_TERMS } from "@/lib/vocab";
 import { loadWatchlist, pillarOf } from "@/lib/watchlist";
 
 import { BaseLocalEditor } from "@/components/base-local-editor";
+import { FichaImport } from "@/components/ficha-import";
 import { MarcarDefinido } from "@/components/marcar-definido";
 import { PrioridadeEditor } from "@/components/prioridade-editor";
 import { VocabEditor } from "@/components/vocab-editor";
@@ -74,6 +75,11 @@ function Item({ ficha, id, nome, editar, superAdmin, children }: { ficha: Parame
         {editar ? <span className="ml-auto">{editar}</span> : null}
       </div>
       <div className="text-[13px] text-stone-600">{children}</div>
+      {ficha.disseram[id] ? (
+        <p className="mt-2 text-[12px] italic text-stone-400">
+          Definido na implantação porque vocês disseram: “{ficha.disseram[id]}”
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -152,6 +158,12 @@ export default async function ImplantacaoPage() {
           <p className="mt-2 text-[12px] text-stone-400">Para ajustar qualquer definição, fale com a gente.</p>
         ) : null}
       </header>
+
+      {superAdmin ? (
+        <div className="mt-6">
+          <FichaImport />
+        </div>
+      ) : null}
 
       {/* ── NÍVEL 1 — CRITÉRIO DA AGÊNCIA ──────────────────────────────── */}
       <Nivel n="1" titulo="Critério da agência" hint="Como a agência lê e recebe — vale para todas as contas.">
