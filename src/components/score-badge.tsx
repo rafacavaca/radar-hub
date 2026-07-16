@@ -1,23 +1,20 @@
+"use client";
+
 /**
  * Selo de PRIORIDADE (0-100) — número em caixa NEUTRA + o nível em palavra
  * (Alta · Média · Baixa), pra o gestor "sacar" sem ler o número. A cor não
  * codifica prioridade (um papel por cor: vermelho é só da marca); o nível
- * comunica pela PALAVRA. Componente puro (sem estado) — serve em server e client.
+ * comunica pela PALAVRA. O corte que vira score em palavra é a RÉGUA DE
+ * PRIORIDADE da agência (P7) — lida do contexto, igual em toda a interface.
  */
 
 import type { IntelligenceItem } from "@/lib/types";
+import { useNivelPrioridade } from "@/components/prioridade-context";
 
 const SIZE = {
   md: { box: "h-14 w-14", num: "text-xl", cap: "text-[9px]" },
   sm: { box: "h-11 w-11", num: "text-base", cap: "text-[8px]" },
 } as const;
-
-/** Nível de prioridade em palavra (limiares 70 / 40). Reusado onde o score aparece. */
-export function nivelPrioridade(score: number): "Alta" | "Média" | "Baixa" {
-  if (score >= 70) return "Alta";
-  if (score >= 40) return "Média";
-  return "Baixa";
-}
 
 export function ScoreBadge({
   score,
@@ -27,7 +24,7 @@ export function ScoreBadge({
   size?: keyof typeof SIZE;
 }) {
   const s = SIZE[size];
-  const nivel = nivelPrioridade(score);
+  const nivel = useNivelPrioridade()(score);
   return (
     <span
       className={`inline-flex flex-none flex-col items-center justify-center rounded-lg border border-stone-200 bg-stone-100 ${s.box}`}

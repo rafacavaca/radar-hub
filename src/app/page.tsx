@@ -30,7 +30,9 @@ import { CrossActionButton } from "@/components/cross-action-button";
 import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { LensReadingCard, RoadmapNoteRow } from "@/components/lens-reading-card";
 import { RodarAgora } from "@/components/rodar-agora";
-import { FonteLink, nivelPrioridade, ScoreBadge } from "@/components/score-badge";
+import { FonteLink, ScoreBadge } from "@/components/score-badge";
+import { loadPrioridade } from "@/lib/prioridade";
+import { nivelPorCorte, type CortePrioridade } from "@/lib/prioridade-core";
 import { attenuated, RecencyStamp, SourceRef } from "@/components/signal-meta";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +88,8 @@ export default async function BriefingPage({
 
   const watchlistClients = (await loadWatchlist()).clients;
   const clients = watchlistClients.map((c) => c.name);
+  // P7 — a régua de prioridade da agência (org-level); vira score em palavra.
+  const corte = await loadPrioridade();
   const cliente =
     params.cliente && clients.includes(params.cliente) ? params.cliente : (clients[0] ?? "");
   // cliente do modo carteira não tem Briefing de lentes — vai pra a Ficha.
@@ -192,7 +196,7 @@ export default async function BriefingPage({
         ) : stale ? (
           <AnaliseFalhouAviso failures={result.failures} cliente={cliente || undefined} />
         ) : lente === "geral" ? (
-          <GeralView items={geral} now={result.ranAt || new Date().toISOString()} />
+          <GeralView items={geral} now={result.ranAt || new Date().toISOString()} corte={corte} />
         ) : lente === "cruzamento" ? (
           <CrossView insights={crossInsights} />
         ) : !lensConfig?.enabled ? (
@@ -209,19 +213,19 @@ export default async function BriefingPage({
 // Visão GERAL — os itens mais fortes across as lentes (a visão do Rafael)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GeralView({ items, now }: { items: IntelligenceItem[]; now: string }) {
+function GeralView({ items, now, corte }: { items: IntelligenceItem[]; now: string; corte: CortePrioridade }) {
   if (items.length === 0) return <EmptyState />;
   // coluna editorial de leitura (o "ar de jornal" vem da medida, não da serifa).
   return (
     <div className="mx-auto max-w-[680px] space-y-5">
       {items.map((item) => (
-        <BriefingCard key={item.id} item={item} now={now} />
+        <BriefingCard key={item.id} item={item} now={now} corte={corte} />
       ))}
     </div>
   );
 }
 
-function BriefingCard({ item, now }: { item: IntelligenceItem; now: string }) {
+function BriefingCard({ item, now, corte }: { item: IntelligenceItem; now: string; corte: CortePrioridade }) {
   const velho = attenuated(item.publishedAt, item.collectedAt ?? item.createdAt, now);
   return (
     <article
@@ -237,11 +241,11 @@ function BriefingCard({ item, now }: { item: IntelligenceItem; now: string }) {
         </h2>
         <span
           className="inline-flex min-w-[48px] flex-none flex-col items-center justify-center rounded-md border border-stone-200 bg-stone-100 px-2 py-1"
-          title={`Prioridade ${item.score}/100 — ${nivelPrioridade(item.score)}`}
+          title={`Prioridade ${item.score}/100 — ${nivelPorCorte(item.score, corte)}`}
         >
           <span className="text-[15px] font-semibold leading-none tabular-nums text-stone-900">{item.score}</span>
           <span className="mt-0.5 text-[8px] font-medium uppercase leading-none tracking-wide text-stone-400">
-            {nivelPrioridade(item.score)}
+            {nivelPorCorte(item.score, corte)}
           </span>
         </span>
       </div>

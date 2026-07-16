@@ -4,8 +4,10 @@ import { Suspense } from "react";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { VocabProvider } from "@/components/vocab-context";
+import { PrioridadeProvider } from "@/components/prioridade-context";
 import { isSuperAdmin } from "@/lib/db/session";
 import { supabaseEnabled } from "@/lib/db/supabase";
+import { loadPrioridade } from "@/lib/prioridade";
 import { loadVocab } from "@/lib/vocab";
 import { loadWatchlist } from "@/lib/watchlist";
 
@@ -37,15 +39,19 @@ export default async function RootLayout({
   const isAdmin = supabaseEnabled() ? await isSuperAdmin() : true;
   // Vocabulário da agência (P13): rótulos renomeáveis, resolvidos no cliente.
   const vocab = await loadVocab();
+  // Régua de prioridade da agência (P7): o corte score→palavra, resolvido no cliente.
+  const corte = await loadPrioridade();
 
   return (
     <html lang="pt-BR" className={`${archivo.variable} h-full antialiased`}>
       <body className="min-h-full bg-stone-50 text-stone-900">
         <Suspense>
           <VocabProvider vocab={vocab}>
-            <AppShell clients={clients} modes={modes} isAdmin={isAdmin}>
-              {children}
-            </AppShell>
+            <PrioridadeProvider corte={corte}>
+              <AppShell clients={clients} modes={modes} isAdmin={isAdmin}>
+                {children}
+              </AppShell>
+            </PrioridadeProvider>
           </VocabProvider>
         </Suspense>
       </body>

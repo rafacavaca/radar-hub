@@ -62,7 +62,8 @@
     "smoke:automacoes": "tsx scripts/test-radar-automacoes.mts",
     "smoke:param": "tsx scripts/test-radar-parametrizacao.mts",
     "smoke:vocab": "tsx scripts/test-radar-vocab.mts",
-    "smoke:rescope": "tsx scripts/test-radar-rescope.mts"
+    "smoke:rescope": "tsx scripts/test-radar-rescope.mts",
+    "smoke:prioridade": "tsx scripts/test-radar-prioridade.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

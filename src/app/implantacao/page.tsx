@@ -20,11 +20,13 @@ import { sbGetDoc } from "@/lib/db/repo-org-docs";
 import { supabaseEnabled } from "@/lib/db/supabase";
 import { LENS_IDS, LENS_LABEL, loadLenses, loadReguaAgencia } from "@/lib/lenses";
 import { completude, loadParametrizacao, REGISTRO_KEY, statusDe, type ParamId, type Parametrizacao } from "@/lib/parametrizacao";
+import { loadPrioridade } from "@/lib/prioridade";
 import { loadVocab, rotulo, VOCAB_TERMS } from "@/lib/vocab";
 import { loadWatchlist, pillarOf } from "@/lib/watchlist";
 
 import { BaseLocalEditor } from "@/components/base-local-editor";
 import { MarcarDefinido } from "@/components/marcar-definido";
+import { PrioridadeEditor } from "@/components/prioridade-editor";
 import { VocabEditor } from "@/components/vocab-editor";
 
 export const dynamic = "force-dynamic";
@@ -88,13 +90,14 @@ export default async function ImplantacaoPage() {
   const orgId = await currentOrgId();
   const superAdmin = supabaseEnabled() ? await isSuperAdmin() : true;
 
-  const [watchlist, lensesFile, automacoes, ficha, vocab, regua] = await Promise.all([
+  const [watchlist, lensesFile, automacoes, ficha, vocab, regua, corte] = await Promise.all([
     loadWatchlist(),
     loadLenses(),
     loadAutomacoes(),
     loadParametrizacao(REGISTRO_KEY),
     loadVocab(),
     loadReguaAgencia(),
+    loadPrioridade(),
   ]);
   const now = new Date();
 
@@ -170,9 +173,15 @@ export default async function ImplantacaoPage() {
           <p className="mt-2 text-[12px] text-stone-400">Régua ÚNICA da agência — vale para todas as contas. Afine na aba Áreas (a edição por qualquer conta vale para todas).</p>
         </Item>
 
-        <Item ficha={ficha} id="regua_prioridade" nome="Régua de prioridade · corte de ruído" superAdmin={superAdmin}>
-          Prioridade <span className="font-medium text-stone-800">Alta</span> a partir de 70, <span className="font-medium text-stone-800">Média</span> a partir de 40. Sem piso de severidade — a régua de cada área é que filtra o ruído.
-          <p className="mt-1 text-[12px] text-stone-400">Padrão do sistema; edição por-agência chega na Fase 1.5.</p>
+        <Item ficha={ficha} id="regua_prioridade" nome="Régua de prioridade" superAdmin={superAdmin}>
+          {superAdmin ? (
+            <PrioridadeEditor initial={corte} />
+          ) : (
+            <>
+              Prioridade <span className="font-medium text-stone-800">Alta</span> a partir de {corte.alta}, <span className="font-medium text-stone-800">Média</span> a partir de {corte.media}. Abaixo disso, Baixa.
+            </>
+          )}
+          <p className="mt-2 text-[12px] text-stone-400">Vale para todas as contas — vira o score em palavra em toda a interface. Sem piso de severidade: a régua de cada área é que filtra o ruído.</p>
         </Item>
 
         <Item
@@ -298,7 +307,7 @@ export default async function ImplantacaoPage() {
       </Nivel>
 
       <p className="mt-10 border-t border-stone-200 pt-4 text-[12px] text-stone-400">
-        Registro da implantação. Próximos lotes: régua e alertas como critério único da agência, a base de conhecimento local, e os temas de mercado editáveis.
+        Registro da implantação. Próximo lote: os temas de mercado editáveis por conta.
       </p>
     </section>
   );
