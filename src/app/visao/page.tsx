@@ -18,6 +18,7 @@ import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem } from "@/lib/types";
 
 import { AnaliseFalhouAviso } from "@/components/analise-falhou";
+import { Rotulo } from "@/components/rotulo";
 import { RodarAgora } from "@/components/rodar-agora";
 import { ScoreBadge } from "@/components/score-badge";
 
@@ -83,7 +84,7 @@ export default async function VisaoPage({
           <span className="ml-2 text-sm text-stone-500">nos últimos 7 dias</span>
         </StatCard>
 
-        <StatCard label="Concorrentes monitorados">
+        <StatCard label={<><Rotulo termo="concorrentes" /> monitorados</>}>
           <span className="text-3xl font-bold text-stone-900">{enabled}</span>
           <span className="ml-2 text-sm text-stone-500">
             {comMudanca > 0
@@ -145,7 +146,7 @@ export default async function VisaoPage({
   );
 }
 
-function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
+function StatCard({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
       <p className="text-[13px] font-semibold text-stone-900">{label}</p>

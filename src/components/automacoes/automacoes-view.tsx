@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { Automacao, AutomacaoKind, AutomacoesConfig, Cadencia } from "@/lib/automacoes";
+import { useRotulo } from "@/components/vocab-context";
 
 const WEEKDAYS = [
   { v: 1, l: "segunda" }, { v: 2, l: "terça" }, { v: 3, l: "quarta" }, { v: 4, l: "quinta" },
@@ -148,6 +149,7 @@ export function AutomacoesView({
   proximas: { digest: string; diagnostico: string };
 }) {
   const router = useRouter();
+  const r = useRotulo();
   const [cfg, setCfg] = useState(config);
 
   const onSaved = (c: AutomacoesConfig) => {
@@ -178,7 +180,7 @@ export function AutomacoesView({
         />
         <Cartao
           kind="diagnostico"
-          titulo="Varredura de concorrentes"
+          titulo={`Varredura de ${r("concorrentes").toLocaleLowerCase("pt-BR")}`}
           descricao="Reexamina os concorrentes que têm ficha de diagnóstico e gera alertas quando algo muda (tagline, preço, produto…)."
           quando="de manhã, no dia escolhido"
           automacao={cfg.diagnostico}
