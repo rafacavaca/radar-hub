@@ -1,0 +1,12 @@
+[Unit]
+Description=radar-door — porta estreita Radar<->Brain (leitura ON, escrita gated)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/env node --env-file=/root/radar-door/.env /root/radar-door/door.mjs
+WorkingDirectory=/root/radar-door
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

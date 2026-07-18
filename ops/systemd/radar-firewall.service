@@ -1,0 +1,12 @@
+[Unit]
+Description=Radar - fecha portas docker expostas na internet (Redis 6379, code-server 8080)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'for p in 6379 8080; do iptables -C DOCKER-USER -i eth0 -p tcp --dport $p -j DROP 2>/dev/null || iptables -I DOCKER-USER -i eth0 -p tcp --dport $p -j DROP; done'
+
+[Install]
+WantedBy=multi-user.target

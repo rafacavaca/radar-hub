@@ -1,0 +1,9 @@
+[Unit]
+Description=Dispara o radar-schedules de hora em hora
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

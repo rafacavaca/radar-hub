@@ -1,0 +1,8 @@
+[Unit]
+Description=radar-schedules — gera os relatórios agendados vencidos (F10)
+After=network.target radar-hub.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/radar-hub
+ExecStart=/usr/bin/env npx tsx scripts/run-schedules.mts

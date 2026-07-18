@@ -1,0 +1,13 @@
+[Unit]
+Description=radar-hub — app do Radar (Next.js) em localhost:3200
+After=network.target radar-door.service
+
+[Service]
+ExecStart=/usr/bin/env npx next start -p 3200
+WorkingDirectory=/root/radar-hub
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

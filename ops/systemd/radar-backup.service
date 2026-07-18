@@ -1,0 +1,11 @@
+[Unit]
+Description=radar-backup — backup diário do banco do Radar (lógico + pg_dump, retenção 14d, /root/radar-backups)
+After=network.target radar-hub.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/radar-hub
+# 1) dump lógico (JSON via service_role — restaura por upsert)
+ExecStart=/usr/bin/env npx tsx scripts/backup-db.mts
+# 2) pg_dump completo (schema + dado + RLS + funções — padrão-ouro, restaura por psql)
+ExecStart=/root/radar-hub/scripts/backup-pgdump.sh

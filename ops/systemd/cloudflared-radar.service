@@ -1,0 +1,13 @@
+[Unit]
+Description=Cloudflare Tunnel do Radar (radar.formare.tech -> localhost:3200)
+After=network.target
+
+[Service]
+# ⚠️ SEGREDO REDIGIDO: a unit real na VPS tem o token do túnel aqui.
+# Reponha o token real (do painel Cloudflare Zero Trust) só na VPS, nunca no repo.
+ExecStart=/usr/local/bin/cloudflared tunnel run --token <TUNNEL_TOKEN>
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

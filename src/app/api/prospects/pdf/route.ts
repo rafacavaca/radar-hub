@@ -1,6 +1,8 @@
 /**
  * /api/prospects/pdf — baixa o PDF do dossiê (F2). Reusa o dossiê já gerado
- * (não re-gasta crédito) + a curadoria de concorrentes. Server-safe (pdf-lib).
+ * (não re-gasta crédito) + a curadoria de concorrentes. O PDF é renderizado por
+ * HTML → Chrome headless (puppeteer, via `dossieToPdf`) — fiel à tela, 1 Chrome
+ * por vez na VPS. (NÃO é pdf-lib; esse é o caminho do export de relatórios.)
  * GET ?cliente=&id=
  */
 
