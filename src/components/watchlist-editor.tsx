@@ -759,7 +759,7 @@ function CompetitorRow({
   return (
     <li
       data-testid="watchlist-competitor"
-      className="flex items-start justify-between gap-3 px-4 py-3.5 sm:px-5"
+      className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-5"
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -820,7 +820,7 @@ function CompetitorRow({
         <FindMoreSources clientName={clientName} competitor={competitor} />
       </div>
 
-      <div className="flex flex-none items-center gap-1">
+      <div className="flex flex-none flex-wrap items-center gap-1">
         <RunCompetitor clientName={clientName} competitor={competitor} disabled={busy !== null} />
         <button
           type="button"

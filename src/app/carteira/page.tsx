@@ -59,7 +59,7 @@ export default async function CarteiraPage({
             Fichas dos hospitais
           </h1>
           <p className="mt-1.5 text-sm text-stone-500">
-            {gatilhos.length} {gatilhos.length === 1 ? "gatilho ativo" : "gatilhos ativos"} em{" "}
+            {gatilhos.length} {gatilhos.length === 1 ? "oportunidade ativa" : "oportunidades ativas"} em{" "}
             {subjects.length} {subjects.length === 1 ? "hospital" : "hospitais"}
             {result.ranAt ? <> · atualizado em {formatDateTimePtBR(result.ranAt)}</> : null}
           </p>
