@@ -60,14 +60,22 @@
 6. **`docs/MULTITENANT.md` e `CLAUDE.md` estão parcialmente datados** (falam de fases
    F1-F4 e "banco a criar"; o multi-tenant já está vivo). O **modelo/guardrails**
    seguem válidos; a **fase** mudou. Este `docs/` novo é a foto atual.
+7. **Controle morto no `/diagnostico` — a "Varredura semanal automática" por cliente.**
+   O componente `VarreduraSchedule` (`src/components/varredura-schedule.tsx` — toggle +
+   dia da semana; store `diag-schedule`) é **código morto em duas camadas**: (a) **não é
+   renderizado em lugar nenhum** (zero imports — verificado); e (b) mesmo se fosse, o
+   cron o **ignora** — `scripts/run-schedules.mts:48` chama
+   `runDueDiagnosticos(now, { ignorarAgenda: true })`, que **pula** a checagem por-cliente
+   `dueNow(cfg)` (`schedule.ts:177`). Quem decide a cadência de fato é o painel
+   **`/automacoes`** (cadência global por org). O próprio código diz que o toggle
+   por-cliente "**foi aposentado**" (`schedule.ts:157-159`). É **candidato a remoção**
+   (o componente + o store `diag-schedule` + o ramo `dueNow`), **não um bug** — não tente
+   "religar" o controle achando que quebrou.
 
 ---
 
-## ⚠️ Flags do Rafael — não verificados nesta passada (confirme antes de agir)
+## ⚠️ Flags do Rafael — próximas fases (confirme antes de agir)
 
-- **"Controle morto no /diagnostico"** — o Rafael sinalizou um controle de UI que
-  não faz nada na tela de diagnóstico. **Não localizei/confirmei** qual é nesta
-  passada de documentação; um dev deve mapear antes de mexer.
 - **Mobile** — sinalizado como a **próxima fase** (o app foi endurecido para
   desktop; mobile decente ainda é trabalho aberto).
 - **Fase 1.5 / temas de mercado (P9)** — a régua de prioridade e o re-scope org-level
