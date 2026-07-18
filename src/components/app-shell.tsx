@@ -158,6 +158,16 @@ function TodayIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   );
 }
 
+function BookIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 6.5v14" />
+      <path d="M4 5A2 2 0 0 1 6 3h6v14H6a2 2 0 0 0-2 2z" />
+      <path d="M20 5a2 2 0 0 0-2-2h-6v14h6a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 /** A marca do Radar — o ícone com a onda pulsando atrás (a "vida" do produto,
     na linguagem do pulso do ponto vermelho original). */
 function RadarMark({ className = "h-5 w-5" }: { className?: string }) {
@@ -275,6 +285,7 @@ function SidebarNav({
         <NewClientButton clients={clients} collapsed={collapsed} />
         <NavItem href="/automacoes" label="Automações" icon={GearIcon} active={pathname === "/automacoes"} collapsed={collapsed} />
         <NavItem href="/implantacao" label="Implantação" icon={FileTextIcon} active={pathname === "/implantacao"} collapsed={collapsed} />
+        <NavItem href="/treinamento" label="Treinamento" icon={BookIcon} active={pathname === "/treinamento"} collapsed={collapsed} />
         {isAdmin ? (
           collapsed ? (
             <>
@@ -354,7 +365,8 @@ export function AppShell({
     pathname === "/entrar" ||
     pathname.startsWith("/apresentar") ||
     pathname === "/custo" ||
-    pathname === "/admin"
+    pathname === "/admin" ||
+    pathname === "/treinamento"
   ) {
     return <>{children}</>;
   }
