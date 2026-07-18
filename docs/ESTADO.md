@@ -49,6 +49,15 @@
    plural de "oportunidade"). Deliberado — store de rótulo único. **Leia
    [`DECISOES.md` (D13)](DECISOES.md) antes de "consertar".** Se você vir "4 rivais
    monitorados" com um rename de gênero oposto e achar que é bug: **não é.**
+   *Reavaliado em 18/jul/2026 e mantido:* os padrões saem gramaticalmente certos e
+   a Formare usa os padrões, então a limitação é invisível em produção hoje;
+   construir a flexão completa é uma feature de ~meio-dia (store + editor + ~15
+   telas) que só rende quando uma agência renomear um termo pra palavra de
+   gênero/plural diferente — revisitar aí. **No mesmo pacote ficam de fora, de
+   propósito, alguns rótulos de baixa visibilidade** (o `concorrente(s)/conta(s)`
+   da tela Custo, presets de Relatórios, placeholders/aria/tooltips): sem a infra
+   de plural/gênero eles sairiam *errados* num rename (`rival(s)` em vez de
+   `rivais`) — resolvê-los certo depende do mesmo trabalho, não antes dele.
 2. **Rate-limit in-memory single-process** — freio de abuso, não cota distribuída.
    Ao escalar para N instâncias, precisa de backend compartilhado.
 3. **Cache do loop não re-roda sozinho** ao falhar — telas do dia podem ficar vazias

@@ -345,6 +345,18 @@ arquivos que consomem os rótulos) **e**, para renames custom, ainda depender da
 agência digitar cada forma. É um **projeto**, não um fix — e uma decisão de produto
 do Rafael, não do dev. Confirme que o ganho justifica antes de tocar.
 
+**Reavaliado (18/jul/2026) — mantido.** A pergunta voltou à mesa ("vamos zerar
+tudo") e a decisão foi **manter documentado**, não construir. Razão: os padrões
+saem gramaticalmente certos e a única agência real (Formare) usa os padrões, então
+a limitação é **invisível em produção hoje**; a flexão completa é a mesma feature
+de ~meio-dia descrita acima, que só rende quando uma agência renomear um termo pra
+palavra de gênero/plural diferente. No mesmo movimento, um punhado de **rótulos de
+baixa visibilidade** (o `concorrente(s)/conta(s)` da tela Custo, os presets de
+Relatórios, placeholders/aria/tooltips) ficou **deliberadamente sem resolver**:
+são casos que dependem justamente do plural/gênero — resolvê-los sem esta infra
+produziria saída *errada* (`rival(s)`). Ou seja: o gatilho pra reabrir é uma
+agência real renomear um termo — aí resolve-se a flexão **e** esses rótulos juntos.
+
 **Fonte.** `src/lib/vocab-terms.ts` (rótulo único + `rotulo`/`rotuloSingular`),
 `src/components/rotulo.tsx` (`<Rotulo singular lower>`), `src/components/vocab-context.tsx`,
 store `org_docs` kind `vocab` (`src/lib/vocab.ts`). Aplicado em ~22 arquivos
