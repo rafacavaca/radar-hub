@@ -1,15 +1,13 @@
 /**
- * Smoke 0a — VARREDURA AGENDADA do diagnóstico. Testa a LÓGICA de agendamento
- * (config, vencimento, seleção de alvos, idempotência) com runner INJETADO —
- * zero rede/LLM. Data dir isolado.
+ * Smoke 0a — VARREDURA do diagnóstico. Testa a LÓGICA de execução com runner
+ * INJETADO — zero rede/LLM. Data dir isolado. (O QUANDO é do painel de
+ * Automações; aqui prova o QUE roda e como.)
  *
  * Prova:
- *  1. Default: ligado, segunda-feira (sem config salva).
- *  2. isDiagDue só no dia certo, ligado, e não-rodado-hoje.
- *  3. runDueDiagnosticos re-varre SÓ concorrentes com ficha (nunca cria) e marca
- *     rodado (idempotente: 2ª chamada no mesmo dia não re-roda).
- *  4. Cliente DESLIGADO é pulado.
- *  5. Movimento detectado pelo runner é contado (o que alimenta a timeline/alerta).
+ *  1. Alvos = SÓ concorrentes JÁ diagnosticados (com site + pilar concorrente) —
+ *     NUNCA cria diagnóstico novo sozinho.
+ *  2. runDueDiagnosticos re-roda cada alvo pelo runner, conta varridos + movimento.
+ *  3. Erro isolado num concorrente não derruba os outros (vira linha em `erros`).
  *
  * Uso: npm run smoke:diag-schedule
  */
@@ -20,9 +18,7 @@ import { join } from "node:path";
 
 process.env.RADAR_DATA_DIR = mkdtempSync(join(tmpdir(), "radar-diagsched-"));
 
-const { getDiagSchedule, setDiagSchedule, isDiagDue, runDueDiagnosticos, alvosDaVarredura, DIAG_SCHEDULE_DEFAULT } =
-  await import("@/lib/diagnostico/schedule");
-const { localWeekday } = await import("@/lib/schedules");
+const { runDueDiagnosticos, alvosDaVarredura } = await import("@/lib/diagnostico/schedule");
 const { saveDiagnostico } = await import("@/lib/diagnostico/store");
 const { readWatchlist } = await import("@/lib/watchlist");
 const { campoFato, campoNaoEncontrado, canalNaoLocalizado } = await import("@/lib/diagnostico/schema");
@@ -33,12 +29,7 @@ type Criterio = { nome: string; feito: boolean; detalhe?: string };
 const criterios: Criterio[] = [];
 const add = (n: string, f: boolean, d?: string) => criterios.push({ nome: n, feito: f, detalhe: d });
 
-console.log("\n=== Smoke 0a — Varredura agendada ===\n");
-
-// ── 1. Default ────────────────────────────────────────────────────────────────
-const def = getDiagSchedule("Qualquer Cliente");
-add("Default: ligado + segunda-feira (weekday 1)", def.enabled === true && def.weekday === 1, `enabled=${def.enabled} weekday=${def.weekday}`);
-void DIAG_SCHEDULE_DEFAULT;
+console.log("\n=== Smoke 0a — Varredura do diagnóstico ===\n");
 
 // ── escolhe um cliente REAL da watchlist com concorrentes ────────────────────
 const wl = readWatchlist();
@@ -49,7 +40,6 @@ if (!cliente) {
 }
 const comp = wl.clients.find((c) => c.name === cliente)!.competitors.find((k) => k.siteUrl)!;
 
-// dá ficha a UM concorrente (pré-condição pra entrar na varredura)
 const fichaMinima = (data: string): DiagnosticoConcorrente => ({
   clientName: cliente,
   concorrente_id: comp.id,
@@ -70,43 +60,35 @@ const fichaMinima = (data: string): DiagnosticoConcorrente => ({
     linkedin: canalNaoLocalizado(), youtube: canalNaoLocalizado(), instagram: canalNaoLocalizado(), facebook: canalNaoLocalizado(), blog: canalNaoLocalizado(),
   },
 });
-saveDiagnostico(fichaMinima("2026-07-01T10:00:00.000Z"));
 
+const hoje = new Date("2026-07-08T13:00:00.000Z");
+
+// ── 1. Antes de qualquer ficha: NADA a varrer (nunca cria sozinho) ───────────
+add("Sem ficha ⇒ zero alvos (nunca cria diagnóstico sozinho)", alvosDaVarredura(cliente).length === 0);
+
+// dá ficha a UM concorrente (pré-condição pra entrar na varredura)
+saveDiagnostico(fichaMinima("2026-07-01T10:00:00.000Z"));
 const alvos = alvosDaVarredura(cliente);
 add("Alvos = só concorrentes JÁ diagnosticados (com site + pilar)", alvos.length === 1 && alvos[0].competitorId === comp.id, `alvos=${alvos.map((a) => a.competitorId).join(",")}`);
 
-// ── 2. Vencimento: alinha o weekday da config ao dia de HOJE ──────────────────
-const hoje = new Date("2026-07-08T13:00:00.000Z"); // qualquer instante
-const hojeWeekday = localWeekday(hoje);
-setDiagSchedule(cliente, { enabled: true, weekday: hojeWeekday });
-add("isDiagDue = true quando ligado + dia certo + não rodou hoje", isDiagDue(cliente, hoje), `weekday hoje=${hojeWeekday}`);
-setDiagSchedule(cliente, { enabled: true, weekday: (hojeWeekday + 1) % 7 });
-add("isDiagDue = false em outro dia da semana", !isDiagDue(cliente, hoje), "weekday deslocado");
-
-// ── 3. runDueDiagnosticos com runner injetado (conta chamadas + movimento) ────
-setDiagSchedule(cliente, { enabled: true, weekday: hojeWeekday });
+// ── 2. runDueDiagnosticos com runner injetado (conta chamadas + movimento) ────
 const chamadas: string[] = [];
 const runnerFake = async (input: { clientName: string; competitorId: string; name: string; siteUrl: string }) => {
   chamadas.push(input.competitorId);
   const d = fichaMinima("2026-07-08T13:00:00.000Z");
-  // simula 1 movimento detectado nesta varredura
   d.movimentos = [{ campo: "posicionamento.tagline", campo_label: "Tagline", de: "tag", para: "novo", tipo: "mudança", data_deteccao: d.atualizado_em, severidade: "alta" }];
   saveDiagnostico(d);
   return d;
 };
 
 const r1 = await runDueDiagnosticos(hoje, { runner: runnerFake, clients: [cliente] });
-console.log(`  1ª execução: clientes=${r1.clientesRodados} concorrentes=${r1.concorrentesVarridos} com-movimento=${r1.comMovimento} (chamadas: ${chamadas.join(",")})`);
+console.log(`  execução: clientes=${r1.clientesRodados} concorrentes=${r1.concorrentesVarridos} com-movimento=${r1.comMovimento} (chamadas: ${chamadas.join(",")})`);
 add("Re-varre o concorrente com ficha e conta o movimento", r1.concorrentesVarridos === 1 && r1.comMovimento === 1 && chamadas.length === 1, `varridos=${r1.concorrentesVarridos} mov=${r1.comMovimento}`);
 
-const r2 = await runDueDiagnosticos(hoje, { runner: runnerFake, clients: [cliente] });
-add("Idempotente: 2ª execução no mesmo dia NÃO re-roda", r2.concorrentesVarridos === 0 && chamadas.length === 1, `2ª varridos=${r2.concorrentesVarridos} · chamadas totais=${chamadas.length}`);
-
-// ── 4. Cliente desligado é pulado ────────────────────────────────────────────
-const outroDia = new Date("2026-07-15T13:00:00.000Z"); // 1 semana depois, mesmo weekday
-setDiagSchedule(cliente, { enabled: false, weekday: hojeWeekday });
-const r3 = await runDueDiagnosticos(outroDia, { runner: runnerFake, clients: [cliente] });
-add("Cliente DESLIGADO é pulado (nada re-roda)", r3.concorrentesVarridos === 0, `varridos=${r3.concorrentesVarridos}`);
+// ── 3. Erro isolado: um concorrente que falha não derruba a varredura ─────────
+const runnerQuebra = async () => { throw new Error("gateway fora do ar"); };
+const rErro = await runDueDiagnosticos(hoje, { runner: runnerQuebra, clients: [cliente] });
+add("Erro num concorrente vira linha em `erros` (não derruba)", rErro.erros.length === 1 && rErro.concorrentesVarridos === 0, `erros=${rErro.erros.length}`);
 
 // ── Resultado ────────────────────────────────────────────────────────────────
 console.log("\n── Resultado ──");
@@ -115,5 +97,5 @@ for (const c of criterios) {
   console.log(`${c.feito ? "✅" : "❌"} ${c.nome}${c.detalhe ? `  — ${c.detalhe}` : ""}`);
   if (!c.feito) ok = false;
 }
-console.log(ok ? "\n0a VERDE ✅ — varredura semanal agendada (só quem tem ficha, idempotente, honesta).\n" : "\n0a VERMELHO ❌ — ver acima.\n");
+console.log(ok ? "\n0a VERDE ✅ — varredura só de quem tem ficha, executa e conta, erro isolado.\n" : "\n0a VERMELHO ❌ — ver acima.\n");
 process.exit(ok ? 0 : 1);

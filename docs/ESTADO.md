@@ -60,17 +60,12 @@
 6. **`docs/MULTITENANT.md` e `CLAUDE.md` estão parcialmente datados** (falam de fases
    F1-F4 e "banco a criar"; o multi-tenant já está vivo). O **modelo/guardrails**
    seguem válidos; a **fase** mudou. Este `docs/` novo é a foto atual.
-7. **Controle morto no `/diagnostico` — a "Varredura semanal automática" por cliente.**
-   O componente `VarreduraSchedule` (`src/components/varredura-schedule.tsx` — toggle +
-   dia da semana; store `diag-schedule`) é **código morto em duas camadas**: (a) **não é
-   renderizado em lugar nenhum** (zero imports — verificado); e (b) mesmo se fosse, o
-   cron o **ignora** — `scripts/run-schedules.mts:48` chama
-   `runDueDiagnosticos(now, { ignorarAgenda: true })`, que **pula** a checagem por-cliente
-   `dueNow(cfg)` (`schedule.ts:177`). Quem decide a cadência de fato é o painel
-   **`/automacoes`** (cadência global por org). O próprio código diz que o toggle
-   por-cliente "**foi aposentado**" (`schedule.ts:157-159`). É **candidato a remoção**
-   (o componente + o store `diag-schedule` + o ramo `dueNow`), **não um bug** — não tente
-   "religar" o controle achando que quebrou.
+7. ~~Controle morto no `/diagnostico` — a "Varredura semanal automática" por cliente.~~
+   **✅ REMOVIDO.** O componente `VarreduraSchedule`, sua rota `/api/diagnostico/schedule`
+   e a config por-cliente do `schedule.ts` (toggle/weekday/`dueNow`/`isDiagDue`/o store
+   `diag-schedule`) foram apagados — eram código morto (o cron gateia via `/automacoes`).
+   Sobrou só o essencial vivo: `runDueDiagnosticos` (re-roda quem tem ficha) +
+   `alvosDaVarredura`. `smoke:diag-schedule` reescrito p/ o comportamento vivo.
 
 ---
 

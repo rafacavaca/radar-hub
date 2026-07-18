@@ -118,10 +118,6 @@ async function main(): Promise<void> {
   }
   for (const [key, data] of dispPorCliente) docs.push({ kind: "diag-alertas-disparos", key, data });
 
-  // varredura agendada do diagnóstico: config por cliente
-  const diagSched = readJson<{ clients: Record<string, unknown> }>("diagnostico-schedule.json", { clients: {} });
-  for (const [key, data] of Object.entries(diagSched.clients)) docs.push({ kind: "diag-schedule", key, data });
-
   // cobertura: uma por cliente
   const cob = readJson<{ coberturas: Array<{ clientName?: string }> }>("cobertura.json", { coberturas: [] });
   for (const c of cob.coberturas) if (c.clientName) docs.push({ kind: "cobertura", key: String(c.clientName), data: c });

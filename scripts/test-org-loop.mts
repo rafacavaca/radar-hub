@@ -89,7 +89,6 @@ const { runRadarLoop } = await import("@/lib/loop");
 const { persistSourceRun, loadSourceStatus } = await import("@/lib/source-status");
 const { persistSignals } = await import("@/lib/db/repo-signals");
 const { loadSchedules, persistSchedule, runDueSchedules } = await import("@/lib/schedules");
-const { loadDiagSchedule, persistDiagSchedule } = await import("@/lib/diagnostico/schedule");
 
 // ── 2. watchlist por org ──
 const wlA = await runAsOrgCollector(aId, () => loadWatchlist());
@@ -155,15 +154,6 @@ add(
   "persistSchedule/loadSchedules isolados por org; runDueSchedules sob B = no-op",
   schedA.length === 1 && schedB.length === 0 && dueB.ran === 0 && dueB.errors.length === 0,
   `A=${schedA.length} · B=${schedB.length} · B.ran=${dueB.ran}`,
-);
-
-await runAsOrgCollector(aId, () => persistDiagSchedule(clienteA.name, { enabled: false, weekday: 3 }));
-const diagA = await runAsOrgCollector(aId, () => loadDiagSchedule(clienteA.name));
-const diagB = await runAsOrgCollector(bId, () => loadDiagSchedule(clienteA.name));
-add(
-  "persistDiagSchedule sob A não muda o default visto por B",
-  diagA.enabled === false && diagA.weekday === 3 && diagB.enabled === true,
-  `A={enabled:${diagA.enabled},weekday:${diagA.weekday}} · B={enabled:${diagB.enabled}}`,
 );
 
 // ── limpeza (cascade apaga clients/org_docs/signals das orgs de teste) ──

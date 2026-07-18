@@ -45,7 +45,7 @@ async function passada(now: Date, label: string): Promise<void> {
 
   // 2. Varredura de concorrentes (diagnóstico) — SÓ se ligada no painel e devida.
   if (automacaoDevida(auto.diagnostico, now)) {
-    const diag = await runDueDiagnosticos(now, { ignorarAgenda: true });
+    const diag = await runDueDiagnosticos(now);
     await marcarRodou("diagnostico", now);
     console.log(`[run-schedules ${now.toISOString()}] (${label}) varredura: clientes=${diag.clientesRodados} concorrentes=${diag.concorrentesVarridos} com-movimento=${diag.comMovimento} erros=${diag.erros.length}`);
   } else {
