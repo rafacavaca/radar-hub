@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type Member = { user_id: string; email: string; role: string };
-type Org = { id: string; slug: string; name: string; members: Member[]; digestEmail?: string };
+type Provider = "deepseek" | "claude";
+type Org = { id: string; slug: string; name: string; members: Member[]; digestEmail?: string; provider?: Provider };
 
 async function post(body: Record<string, unknown>): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const res = await fetch("/api/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -78,6 +79,44 @@ function DigestEmail({ orgId, atual }: { orgId: string; atual: string }) {
   );
 }
 
+function MotorLLM({ orgId, atual, deepseekReady }: { orgId: string; atual: Provider; deepseekReady: boolean }) {
+  const router = useRouter();
+  const [provider, setProvider] = useState<Provider>(atual);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
+  async function submit() {
+    setBusy(true); setMsg(null);
+    const r = await post({ action: "set-provider", orgId, provider });
+    setBusy(false);
+    if (!r.ok) { setMsg({ tipo: "erro", texto: r.error ?? "falha" }); return; }
+    setMsg({ tipo: "ok", texto: `Motor: ${provider === "claude" ? "Claude" : "DeepSeek"}.` });
+    router.refresh();
+  }
+  return (
+    <div className="mt-3 border-t border-stone-100 pt-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Motor de IA (provider)</p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <select
+          value={provider} onChange={(e) => setProvider(e.target.value as Provider)} aria-label="Provider de IA"
+          className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm"
+        >
+          <option value="deepseek">DeepSeek (padrão)</option>
+          <option value="claude">Claude</option>
+        </select>
+        <button onClick={submit} disabled={busy || provider === atual} className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50">
+          {busy ? "…" : "Salvar"}
+        </button>
+      </div>
+      {provider === "deepseek" && !deepseekReady ? (
+        <p className="mt-2 text-xs text-amber-700">Sem <code>DEEPSEEK_API_KEY</code> na VPS — o Radar usa o Claude até a chave ser configurada.</p>
+      ) : (
+        <p className="mt-2 text-xs text-stone-400">Se o provider falhar, cai no outro automaticamente (o Claude nunca é removido).</p>
+      )}
+      {msg ? <p className={`mt-1 text-xs ${msg.tipo === "ok" ? "text-emerald-700" : "text-red-600"}`}>{msg.texto}</p> : null}
+    </div>
+  );
+}
+
 function AddMembro({ orgId }: { orgId: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -114,7 +153,7 @@ function AddMembro({ orgId }: { orgId: string }) {
   );
 }
 
-export function AdminView({ orgs }: { orgs: Org[] }) {
+export function AdminView({ orgs, deepseekReady = false }: { orgs: Org[]; deepseekReady?: boolean }) {
   return (
     <div className="mx-auto max-w-3xl px-5 py-8 md:px-8">
       <div className="flex items-center gap-2.5">
@@ -146,6 +185,7 @@ export function AdminView({ orgs }: { orgs: Org[] }) {
               ))}
             </ul>
             <AddMembro orgId={org.id} />
+            <MotorLLM orgId={org.id} atual={org.provider ?? "deepseek"} deepseekReady={deepseekReady} />
             <DigestEmail orgId={org.id} atual={org.digestEmail ?? ""} />
           </div>
         ))}

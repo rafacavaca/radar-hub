@@ -119,3 +119,36 @@ export async function listOrgDigestEmails(): Promise<Record<string, string>> {
   }
   return out;
 }
+
+// ── provider do motor LLM por org (DeepSeek × Claude) ───────────────────────
+// Mesma doc-família (org_docs kind "org-config"), key "provider". O motor lê
+// DENTRO do contexto da org (lib/llm/provider.ts); aqui é escrita de admin.
+
+const PROVIDER_KEY = "provider";
+
+/** Define o provider LLM de uma org ("deepseek" | "claude"). */
+export async function setOrgProvider(orgId: string, provider: string): Promise<{ provider: "deepseek" | "claude" }> {
+  const p: "deepseek" | "claude" = provider === "claude" ? "claude" : "deepseek";
+  const sb = adminClient();
+  const { data } = await sb
+    .from("org_docs").select("data").eq("org_id", orgId).eq("kind", CFG_KIND).eq("key", PROVIDER_KEY).maybeSingle();
+  const atual = ((data as { data?: Record<string, unknown> } | null)?.data ?? {}) as Record<string, unknown>;
+  const nova = { ...atual, provider: p };
+  const { error } = await sb.from("org_docs").upsert(
+    { org_id: orgId, kind: CFG_KIND, key: PROVIDER_KEY, data: nova, updated_at: new Date().toISOString() },
+    { onConflict: "org_id,kind,key" },
+  );
+  if (error) throw new Error(`Falha ao gravar o provider: ${error.message}`);
+  return { provider: p };
+}
+
+/** Provider escolhido por org (pro painel de admin exibir; ausência = default). */
+export async function listOrgProviders(): Promise<Record<string, "deepseek" | "claude">> {
+  const sb = adminClient();
+  const { data } = await sb.from("org_docs").select("org_id, data").eq("kind", CFG_KIND).eq("key", PROVIDER_KEY);
+  const out: Record<string, "deepseek" | "claude"> = {};
+  for (const row of (data ?? []) as Array<{ org_id: string; data?: { provider?: string } }>) {
+    if (row.data?.provider === "claude" || row.data?.provider === "deepseek") out[row.org_id] = row.data.provider;
+  }
+  return out;
+}

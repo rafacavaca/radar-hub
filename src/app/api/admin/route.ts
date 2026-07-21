@@ -11,7 +11,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { supabaseConfigured, supabaseEnabled } from "@/lib/db/supabase";
 import { runAsAdmin } from "@/lib/db/admin-client";
 import { isSuperAdmin } from "@/lib/db/session";
-import { addMember, createOrg, setOrgDigestEmail } from "@/lib/db/admin-ops";
+import { addMember, createOrg, setOrgDigestEmail, setOrgProvider } from "@/lib/db/admin-ops";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,10 @@ export async function POST(req: NextRequest) {
     }
     if (body.action === "set-digest-email") {
       const res = await runAsAdmin(() => setOrgDigestEmail(String(body.orgId ?? ""), String(body.email ?? "")));
+      return NextResponse.json({ data: res });
+    }
+    if (body.action === "set-provider") {
+      const res = await runAsAdmin(() => setOrgProvider(String(body.orgId ?? ""), String(body.provider ?? "")));
       return NextResponse.json({ data: res });
     }
     return NextResponse.json({ error: "ação desconhecida" }, { status: 400 });

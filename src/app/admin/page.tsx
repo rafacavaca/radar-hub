@@ -9,7 +9,8 @@ import { redirect } from "next/navigation";
 import { supabaseConfigured, supabaseEnabled } from "@/lib/db/supabase";
 import { runAsAdmin } from "@/lib/db/admin-client";
 import { isSuperAdmin } from "@/lib/db/session";
-import { listMembers, listOrgDigestEmails, listOrgs } from "@/lib/db/admin-ops";
+import { listMembers, listOrgDigestEmails, listOrgProviders, listOrgs } from "@/lib/db/admin-ops";
+import { deepseekConfigured } from "@/lib/llm/deepseek";
 import { AdminView } from "@/components/admin-view";
 
 export const dynamic = "force-dynamic";
@@ -22,19 +23,20 @@ export default async function AdminPage() {
   if (supabaseEnabled() && !(await isSuperAdmin())) redirect("/");
 
   const orgs = await runAsAdmin(async () => {
-    const [base, digestEmails] = await Promise.all([listOrgs(), listOrgDigestEmails()]);
+    const [base, digestEmails, providers] = await Promise.all([listOrgs(), listOrgDigestEmails(), listOrgProviders()]);
     return Promise.all(
       base.map(async (o) => ({
         ...o,
         members: await listMembers(o.id),
         digestEmail: digestEmails[o.id] ?? "",
+        provider: providers[o.id] ?? "deepseek",
       })),
     );
   });
 
   return (
     <div className="min-h-[100dvh] bg-stone-50">
-      <AdminView orgs={orgs} />
+      <AdminView orgs={orgs} deepseekReady={deepseekConfigured()} />
     </div>
   );
 }
