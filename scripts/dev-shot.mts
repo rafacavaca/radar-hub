@@ -62,6 +62,12 @@ try {
     await new Promise((r) => setTimeout(r, 1800)); // deixa o POST + refresh assentarem
     console.log(`clicou ${process.env.SHOT_CLICK}`);
   }
+  if (process.env.SHOT_TYPE) {
+    const [sel, texto] = process.env.SHOT_TYPE.split("|||");
+    await page.type(sel, texto);
+    await new Promise((r) => setTimeout(r, 800));
+    console.log(`digitou "${texto}" em ${sel}`);
+  }
   await page.screenshot({ path: SAIDA, fullPage: true });
   console.log(`✅ print salvo em ${SAIDA}`);
 } finally {
