@@ -235,8 +235,9 @@ function SidebarNav({
   return (
     <>
       <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Clientes">
-        {/* HOJE — o ritual da manhã é da AGÊNCIA (cruza os clientes), acima da lista */}
-        <div className="mb-2">
+        {/* INÍCIO (Home) + HOJE — telas da AGÊNCIA (cruzam os clientes), acima da lista */}
+        <div className="mb-2 space-y-0.5">
+          <NavItem href="/inicio" label="Início" icon={HouseIcon} active={pathname === "/inicio"} collapsed={collapsed} />
           <NavItem href="/hoje" label="Hoje" icon={TodayIcon} active={pathname === "/hoje"} collapsed={collapsed} badge={<HojeBadge />} />
         </div>
         {!collapsed ? (
@@ -379,7 +380,8 @@ export function AppShell({
   const sections = mode === "carteira" ? CARTEIRA_SECTIONS : CONCORRENTES_SECTIONS;
   const activeSection = sections.find((s) => s.match(pathname));
   // telas da AGÊNCIA (não de um cliente) — sem o cabeçalho/abas de cliente.
-  const orgLevel = pathname === "/hoje" || pathname === "/automacoes" || pathname === "/implantacao";
+  const orgLevel =
+    pathname === "/inicio" || pathname === "/hoje" || pathname === "/automacoes" || pathname === "/implantacao";
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-stone-50">

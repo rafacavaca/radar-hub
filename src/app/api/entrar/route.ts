@@ -41,13 +41,13 @@ export async function POST(req: NextRequest) {
   if (supabaseEnabled()) {
     const supabase = await supabaseRouteClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    return seeOther(error ? "/entrar?erro=1" : "/");
+    return seeOther(error ? "/entrar?erro=1" : "/inicio");
   }
 
   // Fechadura clássica (single-tenant): e-mail+senha por env → cookie sha256.
   if (getAuthUsers().length === 0) {
     // fechadura desligada (dev) — só volta pra home.
-    return seeOther("/");
+    return seeOther("/inicio");
   }
 
   const user = findAuthUser(email, senha);
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     return seeOther("/entrar?erro=1");
   }
 
-  const res = seeOther("/");
+  const res = seeOther("/inicio");
   res.cookies.set(
     "radar_auth",
     createHash("sha256").update(`${user.email}:${user.password}`).digest("hex"),
