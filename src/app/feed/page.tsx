@@ -7,7 +7,8 @@
  */
 
 import { formatDateTimePtBR } from "@/lib/format";
-import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
+import { loadRadarForRender, type RadarLoopResult } from "@/lib/loop";
+import { AutoRefreshStale } from "@/components/auto-refresh-stale";
 import { loadWatchlist } from "@/lib/watchlist";
 
 import { FeedList } from "@/components/feed-list";
@@ -28,7 +29,7 @@ export default async function FeedPage({
   let result: RadarLoopResult = { items: [], ranAt: "" };
   let error: string | null = null;
   try {
-    result = await runRadarLoop();
+    result = await loadRadarForRender();
   } catch (err) {
     error = err instanceof Error ? err.message : "Não foi possível rodar o Radar.";
   }
@@ -38,6 +39,7 @@ export default async function FeedPage({
 
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
+      <AutoRefreshStale needsRefresh={result.needsRefresh} />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">

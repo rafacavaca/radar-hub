@@ -10,7 +10,8 @@
 import { redirect } from "next/navigation";
 
 import { formatDateTimePtBR } from "@/lib/format";
-import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
+import { loadRadarForRender, type RadarLoopResult } from "@/lib/loop";
+import { AutoRefreshStale } from "@/components/auto-refresh-stale";
 import { loadWatchlist } from "@/lib/watchlist";
 
 import { FichaHospital } from "@/components/ficha-hospital";
@@ -40,7 +41,7 @@ export default async function CarteiraPage({
   let result: RadarLoopResult = { items: [], ranAt: "" };
   let error = false;
   try {
-    result = await runRadarLoop();
+    result = await loadRadarForRender();
   } catch {
     error = true;
   }
@@ -50,6 +51,7 @@ export default async function CarteiraPage({
 
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
+      <AutoRefreshStale needsRefresh={result.needsRefresh} />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">

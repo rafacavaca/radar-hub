@@ -18,7 +18,7 @@ import { redirect } from "next/navigation";
 import { buildBriefing } from "@/lib/briefing";
 import { formatDateTimePtBR } from "@/lib/format";
 import { loadLensesFor, LENS_LABEL, type LensId } from "@/lib/lenses";
-import { analiseFalhou, runRadarLoop, type RadarLoopResult } from "@/lib/loop";
+import { analiseFalhou, loadRadarForRender, type RadarLoopResult } from "@/lib/loop";
 import { loadNotes, type RoadmapNote } from "@/lib/notes";
 import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem, LensReading } from "@/lib/types";
@@ -26,6 +26,7 @@ import type { IntelligenceItem, LensReading } from "@/lib/types";
 import type { CrossInsight, CrossVerdict } from "@/lib/cross-reference";
 
 import { AnaliseFalhouAviso } from "@/components/analise-falhou";
+import { AutoRefreshStale } from "@/components/auto-refresh-stale";
 import { CrossActionButton } from "@/components/cross-action-button";
 import { GerarNoFormareButton } from "@/components/gerar-no-formare-button";
 import { LensReadingCard, RoadmapNoteRow } from "@/components/lens-reading-card";
@@ -102,7 +103,7 @@ export default async function BriefingPage({
   let result: RadarLoopResult = { items: [], ranAt: "" };
   let error: string | null = null;
   try {
-    result = await runRadarLoop();
+    result = await loadRadarForRender();
   } catch (err) {
     error = err instanceof Error ? err.message : "Não foi possível rodar o Radar.";
   }
@@ -133,6 +134,7 @@ export default async function BriefingPage({
 
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
+      <AutoRefreshStale needsRefresh={result.needsRefresh} />
       {/* Cabeçalho editorial — régua 2px de jornal, rótulo no vermelho da marca. */}
       <header className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-stone-900 pb-4">
         <div>

@@ -13,7 +13,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { formatDateTimePtBR } from "@/lib/format";
-import { runRadarLoop, type RadarLoopResult } from "@/lib/loop";
+import { loadRadarForRender, type RadarLoopResult } from "@/lib/loop";
+import { AutoRefreshStale } from "@/components/auto-refresh-stale";
 import { pillarOf, loadWatchlist } from "@/lib/watchlist";
 
 import { FichaConta } from "@/components/ficha-conta";
@@ -55,7 +56,7 @@ export default async function ContasPage({
   let result: RadarLoopResult = { items: [], ranAt: "" };
   let error = false;
   try {
-    result = await runRadarLoop();
+    result = await loadRadarForRender();
   } catch {
     error = true;
   }
@@ -78,6 +79,7 @@ export default async function ContasPage({
 
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
+      <AutoRefreshStale needsRefresh={result.needsRefresh} />
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
         <Rotulo termo="contas_chave" /> · {cliente}
       </p>

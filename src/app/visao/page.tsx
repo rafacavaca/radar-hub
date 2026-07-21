@@ -12,7 +12,8 @@ import Link from "next/link";
 
 import { buildBriefing } from "@/lib/briefing";
 import { ageInDays, formatDateShort, formatDateTimePtBR } from "@/lib/format";
-import { analiseFalhou, runRadarLoop, type RadarLoopResult } from "@/lib/loop";
+import { analiseFalhou, loadRadarForRender, type RadarLoopResult } from "@/lib/loop";
+import { AutoRefreshStale } from "@/components/auto-refresh-stale";
 import { listVisualReports } from "@/lib/visual";
 import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem } from "@/lib/types";
@@ -46,7 +47,7 @@ export default async function VisaoPage({
   let result: RadarLoopResult = { items: [], ranAt: "" };
   let error = false;
   try {
-    result = await runRadarLoop();
+    result = await loadRadarForRender();
   } catch {
     error = true;
   }
@@ -73,6 +74,7 @@ export default async function VisaoPage({
 
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
+      <AutoRefreshStale needsRefresh={result.needsRefresh} />
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
         Visão do cliente
       </p>

@@ -24,6 +24,7 @@ import { prepararReunioes } from "@/lib/prospects/preparo";
 import { sendDossiePdfEmail } from "@/lib/prospects/email";
 import { loadWatchlist } from "@/lib/watchlist";
 import { runDueSchedules } from "@/lib/schedules";
+import { peekLoopResult, runRadarLoop } from "@/lib/loop";
 import { runDueDiagnosticos } from "@/lib/diagnostico/schedule";
 
 config({ path: ".env.local" });
@@ -36,6 +37,22 @@ config({ path: ".env.local" });
  */
 async function passada(now: Date, label: string): Promise<void> {
   const auto = await loadAutomacoes();
+
+  // 0. PRÉ-AQUECE o cache do loop (1×/dia por org): tira a coleta a frio do
+  //    PRIMEIRO ACESSO do usuário e a põe no cron. Idempotente — só roda se o
+  //    dia ainda não tem cache (runRadarLoop sem force reusa; peek nunca coleta).
+  //    Custo Firecrawl ≈ o de hoje (é 1 rodada/dia de qualquer jeito), fora do
+  //    caminho do usuário. Se falhar, o acesso ainda serve o cache morno.
+  try {
+    if (!(await peekLoopResult())) {
+      const loop = await runRadarLoop({ force: true });
+      console.log(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop: itens=${loop.items.length} falhas=${loop.failures?.length ?? 0}`);
+    } else {
+      console.log(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop: cache de hoje já existe`);
+    }
+  } catch (err) {
+    console.warn(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop falhou: ${(err as Error).message}`);
+  }
 
   // 1. Relatórios agendados (F10) — opt-in por item (só roda o que foi criado).
   const result = await runDueSchedules(now);

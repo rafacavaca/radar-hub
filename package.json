@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "smoke:render": "tsx scripts/test-render-nonblocking.mts",
     "smoke:llm": "tsx scripts/test-llm-provider.mts",
     "smoke": "tsx scripts/test-radar-f1.mts",
     "smoke:f2": "tsx scripts/test-radar-f2.mts",

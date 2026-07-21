@@ -20,7 +20,7 @@
  *   coletor tem cache diário próprio por URL).
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { analyzeLens } from "@/lib/analyst-lens";
@@ -31,7 +31,7 @@ import { collectBlog } from "@/lib/collectors/blog";
 import { collectByDiff } from "@/lib/collectors/content-diff";
 import { collectMarket } from "@/lib/collectors/market";
 import { crossReference, type CrossInsight } from "@/lib/cross-reference";
-import { sbGetDoc, sbSetDoc } from "@/lib/db/repo-org-docs";
+import { sbGetDoc, sbListDocs, sbSetDoc } from "@/lib/db/repo-org-docs";
 import { persistSignals } from "@/lib/db/repo-signals";
 import { currentOrgId } from "@/lib/db/session";
 import { supabaseEnabled } from "@/lib/db/supabase";
@@ -88,6 +88,12 @@ export type RadarLoopResult = {
   brainSources?: BrainSourceNote[];
   /** falhas parciais da rodada (coleta/lente), pra UI ser honesta. */
   failures?: string[];
+  /**
+   * Servido pelo caminho de RENDER a partir de um cache VELHO (o de hoje ainda
+   * não existe): a tela pede um aquecimento em background (não bloqueia). O
+   * cabeçalho já mostra o `ranAt` (data de ontem) — a idade é honesta na tela.
+   */
+  needsRefresh?: boolean;
 };
 
 export type RunRadarLoopOptions = {
@@ -188,6 +194,57 @@ async function persistLoopCache(result: RadarLoopResult): Promise<void> {
  */
 export async function peekLoopResult(): Promise<RadarLoopResult | null> {
   return loadLoopCache();
+}
+
+const cacheValido = (r: RadarLoopResult | null | undefined): r is RadarLoopResult =>
+  !!r && Array.isArray(r.items) && typeof r.ranAt === "string";
+
+/**
+ * O cache MAIS RECENTE que existir (qualquer dia) + se é o de HOJE. Só LEITURA,
+ * nunca dispara coleta. Serve pra tela mostrar algo "morno" na hora enquanto o
+ * de hoje não chegou.
+ */
+async function loadMostRecentCache(): Promise<{ result: RadarLoopResult; fresh: boolean } | null> {
+  const hoje = todayStamp();
+  if (!supabaseEnabled()) {
+    const today = readLoopCache();
+    if (cacheValido(today)) return { result: today, fresh: true };
+    try {
+      const dias = readdirSync(CACHE_DIR)
+        .map((f) => /^loop-(\d{4}-\d{2}-\d{2})\.json$/.exec(f)?.[1])
+        .filter((d): d is string => Boolean(d))
+        .sort()
+        .reverse();
+      for (const dia of dias) {
+        const parsed = JSON.parse(readFileSync(join(CACHE_DIR, `loop-${dia}.json`), "utf8")) as RadarLoopResult;
+        if (cacheValido(parsed)) return { result: parsed, fresh: dia === hoje };
+      }
+    } catch {
+      /* sem diretório de cache ainda */
+    }
+    return null;
+  }
+  const docs = await sbListDocs<RadarLoopResult>(CACHE_KIND);
+  const validos = docs.filter((d) => cacheValido(d.data)).sort((a, b) => (a.key < b.key ? 1 : -1));
+  if (validos.length === 0) return null;
+  return { result: validos[0].data, fresh: validos[0].key === hoje };
+}
+
+/**
+ * CAMINHO DE RENDER das telas — NUNCA coleta (não pendura a página, que era a
+ * causa da lentidão "depois de um tempo sem acessar"). Devolve:
+ *  - o cache de HOJE, se existe (fresco);
+ *  - senão o cache mais recente (morno) + `needsRefresh` pra o cliente aquecer
+ *    em background (/api/run?force=1);
+ *  - sem cache nenhum, vazio + `needsRefresh`.
+ * A coleta cara acontece fora do caminho do usuário (cron pré-aquece; o cliente
+ * dispara o aquecimento quando morno).
+ */
+export async function loadRadarForRender(): Promise<RadarLoopResult> {
+  const recent = await loadMostRecentCache();
+  if (!recent) return { items: [], ranAt: "", needsRefresh: true };
+  const base: RadarLoopResult = { ...recent.result, items: byScoreDesc(recent.result.items) };
+  return recent.fresh ? base : { ...base, needsRefresh: true };
 }
 
 /**
