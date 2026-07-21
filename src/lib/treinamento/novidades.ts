@@ -25,6 +25,12 @@ export type Novidade = {
 /** Mais recente no topo. */
 export const NOVIDADES: Novidade[] = [
   {
+    data: "2026-07-21",
+    titulo: "Central de Treinamento completa",
+    descricao:
+      "Todas as telas agora têm o seu guia — Início, Hoje, Briefing, Feed, Contas, Prospects, Concorrentes, Conhecimento e Relatórios —, somadas ao modelo mental e a como confiar no que o Radar diz.",
+  },
+  {
     data: "2026-07-14",
     titulo: "A sua língua",
     descricao:
