@@ -60,6 +60,30 @@ export async function loadSignals(clientName: string, opts: { limite?: number } 
 }
 
 /**
+ * Quantos sinais deste cliente foram COLETADOS depois de `sinceIso` — alimenta
+ * o "N novidades desde sua última visita". Org-scoped, count-only (barato, usa
+ * o índice por ts). Nunca lança.
+ */
+export async function countSignalsSince(clientName: string, sinceIso: string): Promise<number> {
+  if (!clientName || !sinceIso) return 0;
+  try {
+    const orgId = await currentOrgId();
+    if (!orgId) return 0;
+    const sb = await supabaseRouteClient();
+    const { count, error } = await sb
+      .from("signals")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("client_id", clientName)
+      .gt("ts", sinceIso);
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Grava os eventos da rodada na org do contexto. Devolve mensagem de falha
  * (pra `failures[]`) em vez de lançar — sinal durável é registro, não gate.
  */

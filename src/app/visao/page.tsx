@@ -14,6 +14,10 @@ import { buildBriefing } from "@/lib/briefing";
 import { ageInDays, formatDateShort, formatDateTimePtBR } from "@/lib/format";
 import { analiseFalhou, loadRadarForRender, type RadarLoopResult } from "@/lib/loop";
 import { AutoRefreshStale } from "@/components/auto-refresh-stale";
+import { MarcarVisita } from "@/components/marcar-visita";
+import { currentUser } from "@/lib/db/session";
+import { countSignalsSince } from "@/lib/db/repo-signals";
+import { getLastVisit } from "@/lib/last-visit";
 import { listVisualReports } from "@/lib/visual";
 import { loadWatchlist } from "@/lib/watchlist";
 import type { IntelligenceItem } from "@/lib/types";
@@ -72,12 +76,40 @@ export default async function VisaoPage({
 
   const gatilhos = buildBriefing(result.items.filter((it) => it.clientName === cliente), 4);
 
+  // "Desde sua última visita" — por usuário, da história durável (tabela signals).
+  const user = await currentUser();
+  const ultimaVisita = user ? await getLastVisit(cliente, user.id) : null;
+  const novidades = ultimaVisita ? await countSignalsSince(cliente, ultimaVisita) : 0;
+
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
       <AutoRefreshStale needsRefresh={result.needsRefresh} />
+      <MarcarVisita cliente={cliente} />
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
         Visão do cliente
       </p>
+
+      {ultimaVisita ? (
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm shadow-sm">
+          <span aria-hidden>👋</span>
+          {novidades > 0 ? (
+            <>
+              <span className="font-semibold text-stone-900">
+                {novidades} novidade{novidades === 1 ? "" : "s"}
+              </span>
+              <span className="text-stone-500">desde sua última visita ({formatDateShort(ultimaVisita)})</span>
+              <Link
+                href={`/feed?cliente=${encodeURIComponent(cliente)}`}
+                className="ml-auto shrink-0 font-semibold text-red-700 hover:text-red-800"
+              >
+                ver no histórico →
+              </Link>
+            </>
+          ) : (
+            <span className="text-stone-500">Nada novo desde sua última visita ({formatDateShort(ultimaVisita)}).</span>
+          )}
+        </div>
+      ) : null}
 
       {/* três cartões de estado */}
       <div className="mt-4 grid gap-4 md:grid-cols-3">
