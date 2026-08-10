@@ -143,7 +143,19 @@ export function BaseView({
   return (
     <div>
       {/* cabeçalho */}
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Base de conhecimento</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Base de conhecimento</p>
+        {stats.confirmados > 0 ? (
+          <a
+            href={`/apresentar/base?cliente=${encodeURIComponent(cliente)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 text-[13px] font-medium text-red-600 hover:underline"
+          >
+            Apresentar ↗
+          </a>
+        ) : null}
+      </div>
       <h1 className="mt-1 text-[22px] font-bold tracking-tight text-stone-900">{cliente}</h1>
       <p className="mt-1 max-w-[70ch] text-sm text-stone-500">
         O que sabemos deste cliente, com fonte. A IA <b className="font-semibold text-stone-700">infere</b> do site; você{" "}
@@ -344,7 +356,7 @@ function ItemRow({
             {it.fonte_url ? (
               <SourceRef url={it.fonte_url} titulo={it.fonte_titulo} />
             ) : it.fonte_titulo ? (
-              <span title={it.fonte_titulo}>📄 {it.fonte_titulo}</span>
+              <span title="material enviado">{it.fonte_titulo}</span>
             ) : it.origem === "manual" ? (
               <span>você</span>
             ) : (
