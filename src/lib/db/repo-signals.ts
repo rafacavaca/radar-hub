@@ -31,6 +31,35 @@ function toRow(orgId: string, event: ClientEvent) {
 }
 
 /**
+ * Lê o HISTÓRICO DURÁVEL de sinais de um cliente (tabela `signals`), ORG-SCOPED.
+ * É daqui que o Feed lê — nada some: a tabela guarda tudo (upsert, nunca poda);
+ * o Briefing continua lendo o cache curado. O evento inteiro vive em `data` (o
+ * mesmo `ClientEvent` do loop) → volta pronto pra tela. Ordenado por ts desc
+ * (usa o índice `signals(org_id, client_id, ts desc)`). Teto ALTO só por
+ * segurança de UI (o histórico cresce; a retenção real é ilimitada no banco).
+ * Nunca lança — leitura honesta e vazia sem org.
+ */
+export async function loadSignals(clientName: string, opts: { limite?: number } = {}): Promise<ClientEvent[]> {
+  if (!clientName) return [];
+  try {
+    const orgId = await currentOrgId();
+    if (!orgId) return [];
+    const sb = await supabaseRouteClient();
+    const { data, error } = await sb
+      .from("signals")
+      .select("data")
+      .eq("org_id", orgId) // defesa dupla com a RLS: isolamento por agência
+      .eq("client_id", clientName)
+      .order("ts", { ascending: false })
+      .limit(opts.limite ?? 2000);
+    if (error || !data) return [];
+    return (data as Array<{ data: ClientEvent | null }>).map((r) => r.data).filter((e): e is ClientEvent => Boolean(e));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Grava os eventos da rodada na org do contexto. Devolve mensagem de falha
  * (pra `failures[]`) em vez de lançar — sinal durável é registro, não gate.
  */

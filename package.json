@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "smoke:signals": "tsx scripts/test-signals-history.mts",
     "smoke:inicio": "tsx scripts/test-inicio-cockpit.mts",
     "smoke:render": "tsx scripts/test-render-nonblocking.mts",
     "smoke:llm": "tsx scripts/test-llm-provider.mts",

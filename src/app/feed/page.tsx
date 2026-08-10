@@ -1,13 +1,16 @@
 /**
- * FEED — os SINAIS CRUS coletados, sem lente (F6).
+ * FEED — o HISTÓRICO DURÁVEL de sinais crus de um cliente (F6 + histórico).
  *
- * Transversal por definição (a spec das lentes): aqui é o que o Radar VIU,
- * antes de qualquer leitura — concorrente, tipo, título (link) e um trecho.
- * As leituras por time moram no Briefing; ações também.
+ * Lê a tabela `signals` (durável, org-scoped) — NÃO o cache do dia: aqui NADA
+ * some. É o que o Radar VIU ao longo do tempo, antes de qualquer leitura —
+ * concorrente, tipo, título (link), trecho e as datas. A leitura por área e a
+ * curadoria (top do dia) moram no Briefing; este é o arquivo completo.
  */
 
-import { formatDateTimePtBR } from "@/lib/format";
-import { loadRadarForRender, type RadarLoopResult } from "@/lib/loop";
+import { formatDateShort, formatDateTimePtBR } from "@/lib/format";
+import { loadSignals } from "@/lib/db/repo-signals";
+import { loadRadarForRender } from "@/lib/loop";
+import type { ClientEvent } from "@/lib/loop";
 import { AutoRefreshStale } from "@/components/auto-refresh-stale";
 import { loadWatchlist } from "@/lib/watchlist";
 
@@ -26,31 +29,40 @@ export default async function FeedPage({
   const cliente =
     params.cliente && clientNames.includes(params.cliente) ? params.cliente : (clientNames[0] ?? "");
 
-  let result: RadarLoopResult = { items: [], ranAt: "" };
+  // Histórico durável (tabela signals) + o cache só pra o warm/última varredura.
+  let events: ClientEvent[] = [];
   let error: string | null = null;
+  const render = await loadRadarForRender().catch(() => ({ items: [], ranAt: "", needsRefresh: false }));
   try {
-    result = await loadRadarForRender();
+    events = cliente ? await loadSignals(cliente) : [];
   } catch (err) {
-    error = err instanceof Error ? err.message : "Não foi possível rodar o Radar.";
+    error = err instanceof Error ? err.message : "Não foi possível carregar o histórico.";
   }
 
-  // escopado ao cliente selecionado (CRM: tudo dentro da conta).
-  const events = (result.events ?? []).filter((e) => !cliente || e.clientName === cliente);
+  // desde quando há história (o mais antigo — a lista vem ts desc).
+  const desde = events.length ? (events[events.length - 1].collectedAt ?? events[events.length - 1].publishedAt) : null;
+  const agora = new Date().toISOString();
 
   return (
     <section className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
-      <AutoRefreshStale needsRefresh={result.needsRefresh} />
+      <AutoRefreshStale needsRefresh={render.needsRefresh} />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">
-            Feed
+            Feed · histórico
           </p>
           <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">
-            Sinais crus coletados
+            Todos os sinais coletados
           </h1>
           <p className="mt-1.5 text-sm text-stone-500">
-            {result.ranAt ? <>atualizado em {formatDateTimePtBR(result.ranAt)} · </> : null}
-            a leitura por área está no Briefing
+            {events.length > 0 ? (
+              <>
+                {events.length} {events.length === 1 ? "sinal" : "sinais"}
+                {desde ? <> desde {formatDateShort(desde)}</> : null} — nada some daqui.{" "}
+              </>
+            ) : null}
+            {render.ranAt ? <>Última varredura {formatDateTimePtBR(render.ranAt)}. </> : null}
+            A leitura por área está no Briefing.
           </p>
         </div>
         <RodarAgora testId="rodar-agora" cliente={cliente || undefined} />
@@ -60,25 +72,21 @@ export default async function FeedPage({
         {error ? (
           <ErrorState message={error} />
         ) : events.length === 0 ? (
-          <EmptyState hasItems={result.items.length > 0} />
+          <EmptyState />
         ) : (
-          <FeedList events={events} now={result.ranAt || new Date().toISOString()} />
+          <FeedList events={events} now={agora} />
         )}
       </div>
     </section>
   );
 }
 
-function EmptyState({ hasItems }: { hasItems: boolean }) {
+function EmptyState() {
   return (
     <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
-      <p className="text-base font-medium text-stone-700">
-        {hasItems ? "Os sinais crus desta rodada não foram guardados." : "Nenhum sinal coletado ainda."}
-      </p>
+      <p className="text-base font-medium text-stone-700">Nenhum sinal coletado ainda para este cliente.</p>
       <p className="mt-1 text-sm text-stone-500">
-        {hasItems
-          ? "Rode o Radar de novo para ver os sinais crus (a rodada atual é de uma versão anterior)."
-          : "Rode o Radar para buscar os últimos movimentos dos concorrentes."}
+        Rode o Radar para buscar os primeiros movimentos — a partir daí, tudo fica guardado aqui.
       </p>
       <div className="mt-5 flex justify-center">
         <RodarAgora />

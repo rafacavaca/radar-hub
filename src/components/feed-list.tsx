@@ -39,6 +39,7 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
   const [range, setRange] = useState<Range>("all");
   const [recentes, setRecentes] = useState(true);
   const [competitor, setCompetitor] = useState<string>("all");
+  const [tipo, setTipo] = useState<string>("all");
 
   // NÃO-LIDO (F1.4): sinais novos desde a última visita ganham ponto vermelho.
   const idSig = useMemo(() => events.map((e) => e.id).join(","), [events]);
@@ -65,11 +66,13 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
   const competitors = Array.from(new Set(events.map((e) => e.competitorName)))
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const tipos = Array.from(new Set(events.map((e) => e.kind))).filter(Boolean).sort();
 
   const ageOf = (e: ClientEvent) => ageInDays(e.publishedAt ?? e.collectedAt, now);
 
   let list = events.filter((e) => {
     if (competitor !== "all" && e.competitorName !== competitor) return false;
+    if (tipo !== "all" && e.kind !== tipo) return false;
     if (range === "all") return true;
     const age = ageOf(e);
     return age !== null && age <= Number(range);
@@ -109,6 +112,20 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
           </label>
         ) : null}
 
+        {tipos.length > 1 ? (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">Tipo</span>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={SELECT_CLASS}>
+              <option value="all">Todos</option>
+              {tipos.map((t) => (
+                <option key={t} value={t}>
+                  {KIND_LABEL[t] ?? t}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <label className="flex items-center gap-2 pb-2">
           <input
             type="checkbox"
@@ -133,6 +150,7 @@ export function FeedList({ events, now }: { events: ClientEvent[]; now: string }
               onClick={() => {
                 setRange("all");
                 setCompetitor("all");
+                setTipo("all");
               }}
               className="mt-3 text-sm font-medium text-red-600 hover:underline"
             >
