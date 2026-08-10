@@ -362,4 +362,64 @@ agência real renomear um termo — aí resolve-se a flexão **e** esses rótulo
 store `org_docs` kind `vocab` (`src/lib/vocab.ts`). Aplicado em ~22 arquivos
 (commit `efdff89`). Provado: `npm run smoke:vocab`.
 
+---
+
+## D14 — Brain NATIVO para as agências-clientes (o que a D3 deixou em aberto)
+
+**Contexto.** A D3 decidiu que o Radar **não reimplementa** a descoberta de
+conhecimento do Formare — ele **lê** a base pronta pela porta (D2) e, pras
+agências do piloto, oferece uma **base local enxuta** digitada. Mas as
+agências-clientes (que compram o Radar e **não têm o OS Formare**) não têm de
+onde ler: pra elas, "só a porta" significa **sem Brain** — e a correlação, o
+encaixe do prospect e o "como nós encaixamos" ficam cegos/pobres.
+
+**Decisão.** O Radar passa a construir um **Brain NATIVO na própria org** dessas
+agências, no molde do Brain do OS (5 tipos, verdade/referência, confirmado/
+inferido, com fonte + data), **compondo** primitivos que já existem — **NÃO**
+reimplementando o pipeline do OS:
+- **Descoberta** = a **Lente 1** do diagnóstico (lê o site → posicionamento/
+  oferta/provas, cada campo com fonte). Cada extração entra como **inferido**.
+- **Curadoria** = a aba **Revisar** (`/base`): o humano confirma (verdade/
+  referência) ou descarta. **Só o confirmado** alimenta o resto.
+- **Armazenamento** = `org_docs` (kind `brain`), org-scoped (RLS).
+- **Consumo** = a MESMA costura do `brain.ts`: um novo `mode: "nativo"` que **só
+  a org NÃO-DONA** recebe e que **supera** a base local enxuta. Os 8 consumidores
+  (correlação, encaixe, ask, battlecard, swot, reports) acendem **sem mudança**.
+
+**Dois modos (isto NÃO viola a D3 — resolve o que ela não cobria):**
+- **Porta (Formare):** a org DONA continua lendo o Brain do OS pela porta (D2).
+  Fonte única. Intacto.
+- **Nativo (agências-clientes):** a org constrói o Brain na própria org. Como
+  essas agências **não têm OS**, **não há segunda fonte** → a divergência que a
+  D3 temia (duas memórias do mesmo cliente discordando) **não acontece aqui**.
+
+**Por quê.** Sem Brain, o Radar dessas agências vende-se como "cérebro" e entrega
+correlação cega. Com o Brain nativo — **honesto por construção** (a IA marca
+`inferido`; só o humano promove a `confirmado`) — a correlação/o encaixe/o "como
+nós encaixamos" ficam genuinamente bons, e o rótulo deixa de dizer "base local
+enxuta" quando há confirmado (vira "base de conhecimento (implantação)").
+
+**Consequência de desfazer.** Voltar a "só porta" deixa as agências-clientes sem
+Brain (correlação conservadora/pobre). A guarda é o **owner gate**: o modo nativo
+**só existe pra org não-dona** — a org dona (Formare) nunca mistura o nativo com o
+Brain do OS, então a D2/D3 seguem intactas pra o Formare.
+
+**PRONTO PRA MERCADO (F1, entregue):** modelo + descoberta do site → Revisar →
+dossiê dos confirmados. **F2** = upload de materiais + entrada guiada (Brandbook/
+Tom/Regras) + Pergunte ao Brain nativo. **F3** = Apresentar.
+
+> **Verificado nesta sessão.** `npm run smoke:brain` (dedupe/confirmar/descartar/
+> stats/org-scoped + mapping Lente 1→itens) e `npm run test:isolation` (item
+> "Brain nativo org-scoped: A e B com cliente de NOME IGUAL leem SÓ o próprio
+> confirmado — 'nativo' não 'enxuta'"; owner path = `live`, regressão intacta).
+> **Demo ao vivo** numa org não-dona efêmera: descoberta REAL de `rdstation.com`
+> → 20 itens inferidos com fonte, agrupados nos tipos; confirmar 4 →
+> `fetchClientBrain` = `nativo` (4 fatos confirmados). Print da Revisar em `/base`.
+
+**Fonte.** `src/lib/brain-nativo/{schema,store,context,descobrir}.ts`; o `mode:
+"nativo"` + costura não-dona em `src/lib/brain.ts`; a tela `src/app/base/page.tsx`
++ `src/components/base/base-view.tsx`; a rota `src/app/api/base/route.ts`. Rótulos
+(mode→texto): `battlecard-card.tsx`, `swot-card.tsx`, `page.tsx` (`brainNote`),
+`dossie.ts` (`montarEncaixe`), `pdf-template.ts`.
+
 

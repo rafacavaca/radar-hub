@@ -283,7 +283,7 @@ async function montarEncaixe(
   const nat = (t: string): Ponto => {
     const s = t.trim();
     if (/^\[interno\]/i.test(s)) return pontoInterno(s.replace(/^\[interno\]\s*/i, ""), "contexto privado");
-    return pontoInferencia(s, undefined, brain.mode === "live" ? "cruzamento com a base de conhecimento" : brain.mode === "local" ? "cruzamento (base local da implantação)" : "cruzamento (base de rascunho)");
+    return pontoInferencia(s, undefined, brain.mode === "live" ? "cruzamento com a base de conhecimento" : brain.mode === "nativo" ? "cruzamento com a base de conhecimento (implantação)" : brain.mode === "local" ? "cruzamento (base local da implantação)" : "cruzamento (base de rascunho)");
   };
   return {
     encaixe: {

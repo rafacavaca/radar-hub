@@ -60,9 +60,9 @@ const DEFAULT_LIMIT = 5;
 /** De onde veio o contexto que ancorou os analistas (transparência na UI). */
 export type BrainSourceNote = {
   clientName: string;
-  /** live = Brain real; fixture = resumo local Formare; local = base da implantação; none = sem contexto. */
-  mode: "live" | "fixture" | "local" | "none";
-  /** nº de fatos confirmados usados (só em mode=live). */
+  /** live = Brain real Formare; nativo = Brain confirmado da própria org (implantação); fixture = resumo local; local = base enxuta; none = sem contexto. */
+  mode: "live" | "nativo" | "fixture" | "local" | "none";
+  /** nº de fatos confirmados usados (em mode=live ou nativo). */
   nodeCount?: number;
 };
 
@@ -533,7 +533,7 @@ export async function runRadarPartial(scope: RunScope, opts: { limit?: number } 
   const brainSource: BrainSourceNote = {
     clientName: scope.clientName,
     mode: brain.mode,
-    nodeCount: brain.mode === "live" ? brain.nodeCount : undefined,
+    nodeCount: brain.mode === "live" || brain.mode === "nativo" ? brain.nodeCount : undefined,
   };
 
   const mode = client.mode ?? "concorrentes";
@@ -718,7 +718,7 @@ export async function runRadarLoop(
     brainSources.push({
       clientName,
       mode: brain.mode,
-      nodeCount: brain.mode === "live" ? brain.nodeCount : undefined,
+      nodeCount: brain.mode === "live" || brain.mode === "nativo" ? brain.nodeCount : undefined,
     });
 
     const client = watchlist.clients.find((c) => c.name === clientName);

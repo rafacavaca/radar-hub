@@ -77,6 +77,7 @@ function brainNote(result: RadarLoopResult, clientName: string): string | null {
   const source = result.brainSources?.find((s) => s.clientName === clientName);
   if (!source) return null;
   if (source.mode === "live") return `Base de conhecimento ao vivo (${source.nodeCount} fatos confirmados)`;
+  if (source.mode === "nativo") return `Base de conhecimento (implantação) — ${source.nodeCount ?? 0} fatos confirmados`;
   if (source.mode === "fixture") return "Base de conhecimento indisponível — usando resumo local";
   return "sem base de conhecimento do cliente";
 }

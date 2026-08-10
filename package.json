@@ -8,6 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "smoke:visita": "tsx scripts/test-last-visit.mts",
+    "smoke:brain": "tsx scripts/test-brain-nativo.mts",
     "smoke:signals": "tsx scripts/test-signals-history.mts",
     "smoke:inicio": "tsx scripts/test-inicio-cockpit.mts",
     "smoke:render": "tsx scripts/test-render-nonblocking.mts",

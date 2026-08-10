@@ -93,6 +93,8 @@ async function runLive(): Promise<void> {
     // CONTEXTO PRIVADO (confidencial): texto extraído + bytes do arquivo, em org_docs.
     await admin.from("org_docs").insert({ org_id: orgId, kind: "prospect-contexto", key: `px-${tag}`, data: [{ id: `ci-${tag}`, tipo: "arquivo", nome: `proposta-${tag}.pdf`, texto: `SEGREDO-${tag}: proposta confidencial`, legivel: true, temArquivo: true, criadoEm: "2026-07-13T00:00:00Z" }] });
     await admin.from("org_docs").insert({ org_id: orgId, kind: "prospect-arquivo", key: `ci-${tag}`, data: { mime: "application/pdf", nome: `proposta-${tag}.pdf`, b64: Buffer.from(`bytes-confidenciais-${tag}`).toString("base64") } });
+    // BRAIN NATIVO (D14): o conhecimento confirmado da agência — nunca cruza orgs.
+    await admin.from("org_docs").insert({ org_id: orgId, kind: "brain", key: `Cliente ${tag}`, data: { items: [{ id: `bi-${tag}`, texto: `SEGREDO-BRAIN-${tag}: verdade institucional da agência`, tipo: "posicionamento", autoridade: "verdade", status: "confirmado", origem: "site", data: "2026-08-10T00:00:00Z" }] } });
   };
   await seed(aId, "A");
   await seed(bId, "B");
@@ -138,6 +140,16 @@ async function runLive(): Promise<void> {
     "Contexto privado: A não vê arquivo/texto de B (nem por deep-link) — sem URL pública",
     !ctxVazou && (bArqDireto ?? []).length === 0 ? "ok" : "falhou",
     ctxVazou || (bArqDireto ?? []).length > 0 ? "PERIGO: vazou contexto confidencial" : "confidencial isolado por org",
+  );
+
+  // 5c) BRAIN NATIVO (D14): A não vê o conhecimento confirmado de B (raw + deep-link por key).
+  const { data: bBrain } = await asA.from("org_docs").select("*").eq("kind", "brain");
+  const brainVazou = (bBrain ?? []).some((r) => (r as { org_id: string }).org_id === bId);
+  const { data: bBrainDireto } = await asA.from("org_docs").select("*").eq("kind", "brain").eq("key", "Cliente B");
+  reg(
+    "Brain nativo: A não vê o conhecimento de B (nem por deep-link por key)",
+    !brainVazou && (bBrainDireto ?? []).length === 0 ? "ok" : "falhou",
+    brainVazou || (bBrainDireto ?? []).length > 0 ? "PERIGO: vazou Brain nativo" : "Brain nativo isolado por org",
   );
 
   // 6) coletor grava no org certo (função controlada, org explícito) e não vaza
@@ -205,6 +217,49 @@ async function runLive(): Promise<void> {
     const bSoDela = bB.mode === "local" && bB.context.includes("SEGREDO-BASE-B") && !bB.context.includes("SEGREDO-BASE-A");
     reg(
       "Base local org-scoped: A e B (cliente de NOME IGUAL) leem SÓ a própria base — nenhuma vaza (GAP-1)",
+      aSoDela && bSoDela ? "ok" : "falhou",
+      `A=${bA.mode}${aSoDela ? " própria" : " VAZOU?"} · B=${bB.mode}${bSoDela ? " própria" : " VAZOU?"}`,
+    );
+  }
+
+  // 8b) BRAIN NATIVO homônimo (D14): duas orgs NÃO-DONAS, cliente de NOME IGUAL,
+  //     cada uma com o SEU conhecimento CONFIRMADO. fetchClientBrain devolve
+  //     `nativo` (SUPERA a base local enxuta) com SÓ o próprio segredo — nunca o
+  //     da outra agência. É a prova de que o Brain nativo não vaza E de que o
+  //     rótulo deixa de dizer "enxuta" (mode nativo, não local).
+  {
+    process.env.RADAR_BRAIN_ORG_ID = "00000000-0000-0000-0000-000000000000"; // dona = ninguém → A e B são NÃO-DONAS
+    const { fetchClientBrain } = await import("@/lib/brain");
+    const { addBrainItems, confirmBrainItem, brainItemId } = await import("@/lib/brain-nativo/store");
+    const { runAsOrgCollector } = await import("@/lib/db/collector-org");
+    const nome = "Homonimo Brain"; // MESMO nome nas duas orgs (homônimo)
+
+    const mkItem = (tag: string) => {
+      const texto = `SEGREDO-BRAIN-${tag} — oferta exclusiva da agência ${tag}`;
+      return {
+        id: brainItemId("posicionamento", texto),
+        texto,
+        tipo: "posicionamento" as const,
+        autoridade: "verdade" as const,
+        status: "inferido" as const,
+        origem: "site" as const,
+        data: "2026-08-10T00:00:00Z",
+      };
+    };
+    for (const [orgId, tag] of [[aId, "A"], [bId, "B"]] as const) {
+      await runAsOrgCollector(orgId, async () => {
+        const it = mkItem(tag);
+        await addBrainItems(nome, [it]);
+        await confirmBrainItem(nome, it.id, "verdade"); // só o CONFIRMADO alimenta o contexto
+      });
+    }
+
+    const bA = await runAsOrgCollector(aId, () => fetchClientBrain(nome, { noCache: true }));
+    const bB = await runAsOrgCollector(bId, () => fetchClientBrain(nome, { noCache: true }));
+    const aSoDela = bA.mode === "nativo" && bA.context.includes("SEGREDO-BRAIN-A") && !bA.context.includes("SEGREDO-BRAIN-B");
+    const bSoDela = bB.mode === "nativo" && bB.context.includes("SEGREDO-BRAIN-B") && !bB.context.includes("SEGREDO-BRAIN-A");
+    reg(
+      "Brain nativo org-scoped: A e B (cliente de NOME IGUAL) leem SÓ o próprio confirmado — 'nativo' (não 'enxuta'), nenhuma vaza (D14)",
       aSoDela && bSoDela ? "ok" : "falhou",
       `A=${bA.mode}${aSoDela ? " própria" : " VAZOU?"} · B=${bB.mode}${bSoDela ? " própria" : " VAZOU?"}`,
     );

@@ -50,6 +50,7 @@ const CONCORRENTES_SECTIONS: Section[] = [
   { label: "Feed", href: "/feed", icon: RadarIcon, purpose: "Tudo que o Radar coletou sobre este cliente — os sinais crus, sem análise.", match: (p) => p.startsWith("/feed") },
   { label: "Contas", href: "/contas", icon: Building2Icon, purpose: "As {contas_chave} deste cliente — o que se move nelas e o que você pode oferecer.", match: (p) => p.startsWith("/contas") },
   { label: "Prospects", href: "/prospects", icon: TargetIcon, purpose: "Prepare-se pra uma reunião: um dossiê completo da empresa que você vai visitar.", match: (p) => p.startsWith("/prospects") },
+  { label: "Base", href: "/base", icon: BookIcon, purpose: "A base de conhecimento deste cliente: descubra do site, revise o que a IA infere e confirme o que é verdade.", match: (p) => p.startsWith("/base") },
   { label: "Conhecimento", href: "/perguntar", icon: SearchIcon, purpose: "Pergunte qualquer coisa sobre este cliente — a resposta vem com fonte e data.", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Concorrentes",
@@ -68,6 +69,7 @@ const CARTEIRA_SECTIONS: Section[] = [
   { label: "Carteira", href: "/carteira", icon: WalletIcon, purpose: "Sua carteira: cada conta, o que se move nela e a aderência com o que você vende.", match: (p) => p.startsWith("/carteira") },
   { label: "Feed", href: "/feed", icon: RadarIcon, purpose: "Tudo que o Radar coletou sobre esta carteira — os sinais crus, sem análise.", match: (p) => p.startsWith("/feed") },
   { label: "Prospects", href: "/prospects", icon: TargetIcon, purpose: "Prepare-se pra uma reunião: um dossiê completo da empresa que você vai visitar.", match: (p) => p.startsWith("/prospects") },
+  { label: "Base", href: "/base", icon: BookIcon, purpose: "A base de conhecimento desta carteira: descubra do site, revise o que a IA infere e confirme o que é verdade.", match: (p) => p.startsWith("/base") },
   { label: "Conhecimento", href: "/perguntar", icon: SearchIcon, purpose: "Pergunte qualquer coisa sobre esta carteira — a resposta vem com fonte e data.", match: (p) => p.startsWith("/perguntar") },
   {
     label: "Hospitais",

@@ -10,9 +10,12 @@
  *   o SERVIDOR (ver door/door.mjs); aqui a gente só consome.
  *
  * HONESTIDADE (nunca fingir contexto):
- * - `mode: "live"`    -> contexto veio do Brain real (com contagem de fatos).
+ * - `mode: "live"`    -> contexto veio do Brain real do Formare (contagem de fatos).
+ * - `mode: "nativo"`  -> Brain NATIVO da própria org (D14): conhecimento CONFIRMADO
+ *                        na implantação por uma agência-cliente que não tem o OS.
  * - `mode: "fixture"` -> porta indisponível; usamos o resumo local da Moovefy
  *                        (o substituto do F1) e DIZEMOS isso.
+ * - `mode: "local"`   -> base local enxuta digitada na implantação (não é o Brain).
  * - `mode: "none"`    -> cliente sem Brain e sem fixture; o analista é
  *                        instruído a ser conservador, não a inventar.
  *
@@ -25,6 +28,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { loadBaseLocal } from "@/lib/base-local";
+import { nativeBrain } from "@/lib/brain-nativo/context";
 import { GEMMINI } from "@/lib/clients/gemmini";
 import { MOOVEFY } from "@/lib/clients/moovefy";
 import { TAGAT } from "@/lib/clients/tagat";
@@ -51,6 +55,7 @@ export type BrainNode = {
 
 export type BrainContext =
   | { mode: "live"; context: string; nodeCount: number }
+  | { mode: "nativo"; context: string; nodeCount: number }
   | { mode: "fixture"; context: string }
   | { mode: "local"; context: string }
   | { mode: "none"; context: string };
@@ -285,7 +290,11 @@ export async function fetchClientBrain(
     return real;
   }
 
-  // não-dona: só a própria base local, senão "none". NUNCA Brain/fixtures do Formare.
+  // não-dona (agência-cliente, D14): o Brain NATIVO confirmado da org VENCE; se
+  // ainda não há confirmado, a base local enxuta; senão "none". NUNCA o
+  // Brain/fixtures do Formare (org-scoped: não vaza de outra agência).
+  const nativo = await nativeBrain(clientName);
+  if (nativo) return nativo;
   const local = await localBrain(clientName);
   if (local) return local;
   return noneFor(clientName);
