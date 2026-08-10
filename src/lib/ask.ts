@@ -22,6 +22,7 @@ import { join } from "node:path";
 
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
+import { loadRadarForRender } from "@/lib/loop";
 import { runWithUsage } from "@/lib/usage/context";
 import { loadWatchlist, type Watchlist } from "@/lib/watchlist";
 import type { IntelligenceItem } from "@/lib/types";
@@ -81,6 +82,23 @@ export function collectRecentItems(maxDays = MAX_DAYS, maxItems = MAX_ITEMS): Ar
     }
   }
   return items;
+}
+
+/**
+ * Itens de inteligência RECENTES DA ORG — lidos do cache do loop (org_docs,
+ * org-scoped), NÃO do cache de arquivo (que ficava vazio no modo org). É o
+ * material que o chat e os relatórios citam. `anchor` filtra por um cliente.
+ * Cache-only: `loadRadarForRender` nunca dispara coleta (não pendura a resposta).
+ */
+export async function collectOrgItems(
+  anchor?: string,
+  max = MAX_ITEMS,
+): Promise<Array<IntelligenceItem & { dia: string }>> {
+  const radar = await loadRadarForRender();
+  const dia = (radar.ranAt || "").slice(0, 10);
+  let items = (radar.items ?? []).map((it) => ({ ...it, dia })); // já vem por score desc
+  if (anchor) items = items.filter((i) => i.clientName === anchor);
+  return items.slice(0, max);
 }
 
 /** "2026-07-02" -> "02/07" (curto, pro material). */
@@ -188,9 +206,8 @@ export async function askRadar(
   const allNames = watchlist.clients.map((c) => c.name);
   const anchor = clientName && allNames.includes(clientName) ? clientName : undefined;
 
-  // material: itens recentes; ancorado → só os do cliente escolhido.
-  let items = collectRecentItems();
-  if (anchor) items = items.filter((i) => i.clientName === anchor);
+  // material: itens recentes DA ORG (cache do loop, org-scoped); ancorado → só do cliente.
+  const items = await collectOrgItems(anchor);
 
   // Brain: ancorado → só o do cliente; senão TODOS (multi-cliente, rotulado).
   const names = anchor ? [anchor] : allNames;

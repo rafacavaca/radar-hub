@@ -20,7 +20,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { buildMaterialBlock, collectRecentItems, type AskSource } from "@/lib/ask";
+import { buildMaterialBlock, collectOrgItems, type AskSource } from "@/lib/ask";
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
 import { runWithUsage } from "@/lib/usage/context";
@@ -349,7 +349,7 @@ export async function composeReport(
   clientName: string,
   request: string,
 ): Promise<{ titulo: string; corpo: string; fontes: AskSource[] }> {
-  const items = collectRecentItems(14, REPORT_MAX_ITEMS);
+  const items = await collectOrgItems(clientName, REPORT_MAX_ITEMS);
   const brain = await fetchClientBrain(clientName);
 
   const prompt = `CLIENTE DO RELATÓRIO: ${clientName}
