@@ -33,6 +33,7 @@ import {
   TargetIcon,
   WalletIcon,
 } from "@/components/icons";
+import { BrainChat } from "@/components/brain-chat";
 import { LogoutButton } from "@/components/logout-button";
 import { NewClientButton } from "@/components/new-client-dialog";
 import { useRotulo } from "@/components/vocab-context";
@@ -557,6 +558,9 @@ export function AppShell({
           <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
         ) : null}
       </div>
+
+      {/* Pergunte ao Brain — bolha flutuante sempre visível (com seletor de cliente). */}
+      <BrainChat clients={clients} cliente={cliente} />
     </div>
   );
 }

@@ -20,9 +20,11 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as {
     question?: unknown;
     history?: unknown;
+    clientName?: unknown;
   } | null;
 
   const question = typeof body?.question === "string" ? body.question.trim() : "";
+  const clientName = typeof body?.clientName === "string" && body.clientName.trim() ? body.clientName.trim() : undefined;
   if (!question) {
     return NextResponse.json({ error: "Escreva uma pergunta." }, { status: 400 });
   }
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const answer = await askRadar(question, history.slice(-6));
+    const answer = await askRadar(question, history.slice(-6), clientName);
     return NextResponse.json({ data: answer });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Não foi possível responder agora.";

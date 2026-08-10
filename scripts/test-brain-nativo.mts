@@ -35,6 +35,7 @@ const { runAsOrgCollector } = await import("@/lib/db/collector-org");
 const { addBrainItems, confirmBrainItem, discardBrainItem, brainStats, loadBrainItems, brainItemId } =
   await import("@/lib/brain-nativo/store");
 const { itensDoPosicionamento } = await import("@/lib/brain-nativo/descobrir");
+const { itensDoMaterial } = await import("@/lib/brain-nativo/upload");
 const { campoFato, campoNaoEncontrado } = await import("@/lib/diagnostico/schema");
 
 const stamp = process.env.RADAR_ISO_STAMP || "brn";
@@ -90,6 +91,12 @@ add("discardBrainItem remove o item", st2.itens === 2, `itens=${st2.itens}`);
 // ── 5. stats ──
 add("brainStats conta tipos e fontes", st2.tipos === 2 && st2.fontes >= 1, `tipos=${st2.tipos} fontes=${st2.fontes}`);
 
+// item de MATERIAL (fonte = nome do arquivo, sem URL) TAMBÉM conta como fonte.
+const matItem = { id: brainItemId("institucional", "vindo de um material"), texto: "vindo de um material", tipo: "institucional" as const, autoridade: "referencia" as const, status: "inferido" as const, origem: "upload" as const, fonte_titulo: "briefing.pdf", data: "2026-08-10T00:00:00.000Z" };
+await runAsOrgCollector(aId, () => addBrainItems(cli, [matItem]));
+const st3 = await runAsOrgCollector(aId, () => brainStats(cli));
+add("stats: material (fonte = arquivo, sem URL) conta como fonte", st3.fontes >= 2, `fontes=${st3.fontes}`);
+
 // ── 6. org-scoped ──
 const bItems = await runAsOrgCollector(bId, () => loadBrainItems(cli));
 add("ORG-SCOPED: a org B NÃO vê o Brain da org A", bItems.length === 0, `B=${bItems.length}`);
@@ -115,6 +122,22 @@ const mapTipos = new Set(mapItens.map((i) => i.tipo));
 add("mapping: extrai só os campos ACHADOS, ignora nao_encontrado (6 de 8)", mapItens.length === 6, `n=${mapItens.length}`);
 add("mapping: todo item entra INFERIDO e com fonte", mapItens.every((i) => i.status === "inferido" && !!i.fonte_url), "");
 add("mapping: cobre posicionamento + oferta_produto + institucional", mapTipos.has("posicionamento") && mapTipos.has("oferta_produto") && mapTipos.has("institucional"), [...mapTipos].join(","));
+
+// ── 8. mapping de MATERIAL (upload) → itens inferidos (puro, sem rede) ──
+const matItens = itensDoMaterial(
+  [
+    { texto: "Missão: democratizar o marketing", tipo: "institucional" },
+    { texto: "Tom de voz direto e sem jargão", tipo: "posicionamento" },
+    { texto: "", tipo: "posicionamento" }, // vazio → ignora
+    { texto: "Produto X faz Y pro cliente", tipo: "oferta_produto" },
+    { texto: "Categoria inexistente", tipo: "xyz" }, // tipo inválido → institucional
+  ],
+  "briefing.txt",
+  dt,
+);
+add("upload: mapeia fatos → itens, ignora vazios (4 de 5)", matItens.length === 4, `n=${matItens.length}`);
+add("upload: inferido + origem upload + fonte = nome do arquivo", matItens.every((i) => i.status === "inferido" && i.origem === "upload" && i.fonte_titulo === "briefing.txt"), "");
+add("upload: tipo inválido cai em institucional", matItens.find((i) => i.texto === "Categoria inexistente")?.tipo === "institucional", "");
 
 await admin.from("orgs").delete().in("slug", [a.slug, b.slug]);
 

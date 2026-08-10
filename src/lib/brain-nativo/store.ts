@@ -128,7 +128,8 @@ export async function brainStats(cliente: string): Promise<BrainStats> {
       else bucket.inferido++;
     }
     if (i.status === "confirmado") confirmados++;
-    if (i.fonte_url) fontes.add(i.fonte_url);
+    const fonte = i.fonte_url || i.fonte_titulo; // material = o nome do arquivo é a fonte
+    if (fonte) fontes.add(fonte);
   }
   const tipos = BRAIN_TIPOS.filter((t) => porTipo[t].total > 0).length;
   return {

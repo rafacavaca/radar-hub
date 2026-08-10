@@ -11,7 +11,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { SourceRef } from "@/components/signal-meta";
 import { formatDateShort } from "@/lib/format";
@@ -21,6 +21,7 @@ import {
   type BrainAutoridade,
   type BrainItem,
   type BrainStats,
+  type BrainTipo,
 } from "@/lib/brain-nativo/schema";
 
 type Filtro = "aguardando" | "tudo";
@@ -52,6 +53,14 @@ export function BaseView({
   const [descobrindo, setDescobrindo] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
   const [filtro, setFiltro] = useState<Filtro>(stats.aguardando > 0 ? "aguardando" : "tudo");
+
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [novoTexto, setNovoTexto] = useState("");
+  const [novoTipo, setNovoTipo] = useState<BrainTipo>("posicionamento");
+  const [novaAut, setNovaAut] = useState<BrainAutoridade>("verdade");
+  const [salvando, setSalvando] = useState(false);
 
   async function acaoItem(a: "confirmar" | "descartar", id: string, autoridade?: BrainAutoridade) {
     setBusy(a + id);
@@ -85,6 +94,43 @@ export function BaseView({
       router.refresh();
     } finally {
       setDescobrindo(false);
+    }
+  }
+
+  async function enviarMaterial(file: File) {
+    setEnviando(true);
+    setAviso(null);
+    try {
+      const form = new FormData();
+      form.append("cliente", cliente);
+      form.append("file", file);
+      const res = await fetch("/api/base/upload", { method: "POST", body: form });
+      const r = (await res.json().catch(() => ({ error: "resposta inválida" }))) as Resposta;
+      if (r.error) {
+        setAviso({ tipo: "erro", texto: r.error });
+      } else if (r.data?.ok && (r.data.added ?? 0) > 0) {
+        setAviso({ tipo: "ok", texto: `${r.data.added} item(ns) novo(s) do material — revise abaixo e confirme.` });
+        setFiltro("aguardando");
+      } else {
+        setAviso({ tipo: "erro", texto: r.data?.erro || "O material não trouxe fatos novos." });
+      }
+      router.refresh();
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function adicionarManual() {
+    const t = novoTexto.trim();
+    if (!t) return;
+    setSalvando(true);
+    try {
+      await postBase({ acao: "adicionar", cliente, texto: t, tipo: novoTipo, autoridade: novaAut });
+      setNovoTexto("");
+      setAddOpen(false);
+      router.refresh();
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -138,9 +184,85 @@ export function BaseView({
             {descobrindo ? "Lendo o site…" : "Descobrir"}
           </button>
         </div>
+        <div className="mt-3 flex items-center gap-2 border-t border-stone-100 pt-3 text-[12px] text-stone-400">
+          <span>ou</span>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,.docx,.txt,.md,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void enviarMaterial(f);
+              e.currentTarget.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={enviando}
+            className="font-medium text-stone-600 underline-offset-2 hover:text-stone-900 hover:underline disabled:opacity-50"
+          >
+            {enviando ? "Lendo o material…" : "envie um material (PDF/DOCX/TXT) — brandbook, briefing, proposta"}
+          </button>
+        </div>
         {aviso ? (
           <p className={"mt-2 text-[12px] " + (aviso.tipo === "ok" ? "text-emerald-700" : "text-amber-700")}>{aviso.texto}</p>
         ) : null}
+      </div>
+
+      {/* Entrada guiada — o que só a agência sabe (voz, regras, ICP) → confirmado. */}
+      <div className="mt-3">
+        {addOpen ? (
+          <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+            <p className="text-[13px] font-semibold text-stone-900">Adicionar o que só você sabe</p>
+            <p className="mt-0.5 text-[12px] text-stone-500">
+              Voz da marca, regras, ICP, posicionamento — o que a agência conhece e o site não diz. Entra <b>confirmado</b> (fonte: você).
+            </p>
+            <textarea
+              value={novoTexto}
+              onChange={(e) => setNovoTexto(e.target.value)}
+              rows={2}
+              placeholder="Ex.: Tom de voz direto e sem jargão; nunca prometer resultado garantido."
+              className="mt-2.5 w-full resize-none rounded-md border border-stone-300 px-2.5 py-2 text-sm outline-none focus:border-stone-500"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <select
+                value={novoTipo}
+                onChange={(e) => setNovoTipo(e.target.value as BrainTipo)}
+                className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700"
+              >
+                {BRAIN_TIPOS.map((t) => (
+                  <option key={t} value={t}>
+                    {BRAIN_TIPO_LABEL[t]}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={novaAut}
+                onChange={(e) => setNovaAut(e.target.value as BrainAutoridade)}
+                className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700"
+              >
+                <option value="verdade">Verdade</option>
+                <option value="referencia">Referência</option>
+              </select>
+              <button
+                onClick={adicionarManual}
+                disabled={salvando || !novoTexto.trim()}
+                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-50"
+              >
+                {salvando ? "Salvando…" : "Adicionar"}
+              </button>
+              <button onClick={() => setAddOpen(false)} className="rounded-md px-2 py-1.5 text-sm text-stone-400 hover:text-stone-700">
+                cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setAddOpen(true)} className="text-[13px] font-medium text-stone-500 hover:text-stone-900">
+            + Adicionar o que só você sabe (voz, regras, ICP)
+          </button>
+        )}
       </div>
 
       {/* filtro */}
@@ -219,7 +341,15 @@ function ItemRow({
             ) : (
               <span className="rounded-full bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-800">aguardando você</span>
             )}
-            {it.fonte_url ? <SourceRef url={it.fonte_url} titulo={it.fonte_titulo} /> : <span>sem fonte</span>}
+            {it.fonte_url ? (
+              <SourceRef url={it.fonte_url} titulo={it.fonte_titulo} />
+            ) : it.fonte_titulo ? (
+              <span title={it.fonte_titulo}>📄 {it.fonte_titulo}</span>
+            ) : it.origem === "manual" ? (
+              <span>você</span>
+            ) : (
+              <span>sem fonte</span>
+            )}
             {it.data ? <span>{formatDateShort(it.data)}</span> : null}
           </div>
         </div>

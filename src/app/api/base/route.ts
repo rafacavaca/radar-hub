@@ -12,7 +12,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { descobrirDoSite } from "@/lib/brain-nativo/descobrir";
-import { confirmBrainItem, discardBrainItem, loadBrainSite, saveBrainSite } from "@/lib/brain-nativo/store";
+import {
+  addBrainItems,
+  brainItemId,
+  confirmBrainItem,
+  discardBrainItem,
+  loadBrainSite,
+  saveBrainSite,
+} from "@/lib/brain-nativo/store";
+import { BRAIN_TIPOS, type BrainTipo } from "@/lib/brain-nativo/schema";
 import { currentOrgId } from "@/lib/db/session";
 import { supabaseEnabled } from "@/lib/db/supabase";
 import { LIMITES, rateLimit, respostaRateLimit } from "@/lib/rate-limit";
@@ -32,6 +40,8 @@ export async function POST(req: NextRequest) {
     siteUrl?: string;
     id?: string;
     autoridade?: string;
+    texto?: string;
+    tipo?: string;
   } | null;
 
   const acao = body?.acao;
@@ -70,6 +80,24 @@ export async function POST(req: NextRequest) {
       const id = (body?.id ?? "").trim();
       if (!id) return NextResponse.json({ error: "id ausente." }, { status: 400 });
       await discardBrainItem(cliente, id);
+      return NextResponse.json({ data: { ok: true } });
+    }
+
+    if (acao === "adicionar") {
+      // entrada GUIADA/manual: o que só a agência sabe (voz, regras, ICP). Vem da
+      // fonte humana → entra CONFIRMADO. Se já existia (inferido), é promovido.
+      const texto = (body?.texto ?? "").replace(/\s+/g, " ").trim();
+      if (!texto) return NextResponse.json({ error: "Escreva o conhecimento." }, { status: 400 });
+      const tipo: BrainTipo =
+        typeof body?.tipo === "string" && (BRAIN_TIPOS as string[]).includes(body.tipo)
+          ? (body.tipo as BrainTipo)
+          : "posicionamento";
+      const autoridade = body?.autoridade === "referencia" ? "referencia" : "verdade";
+      const id = brainItemId(tipo, texto);
+      const { added } = await addBrainItems(cliente, [
+        { id, texto, tipo, autoridade, status: "confirmado", origem: "manual", data: new Date().toISOString() },
+      ]);
+      if (added === 0) await confirmBrainItem(cliente, id, autoridade); // já existia → promove
       return NextResponse.json({ data: { ok: true } });
     }
 

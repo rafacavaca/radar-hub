@@ -23,7 +23,7 @@ import { join } from "node:path";
 import { fetchClientBrain } from "@/lib/brain";
 import { completeViaGateway } from "@/lib/gateway";
 import { runWithUsage } from "@/lib/usage/context";
-import { readWatchlist } from "@/lib/watchlist";
+import { loadWatchlist, type Watchlist } from "@/lib/watchlist";
 import type { IntelligenceItem } from "@/lib/types";
 
 const CACHE_DIR = join(process.cwd(), ".cache");
@@ -105,8 +105,7 @@ export function buildMaterialBlock(items: Array<IntelligenceItem & { dia: string
 }
 
 /** Resumo da watchlist (pro Radar saber dizer o que ainda NÃO vigia). */
-function buildWatchlistBlock(): string {
-  const watchlist = readWatchlist();
+function buildWatchlistBlock(watchlist: Watchlist): string {
   const parts: string[] = [];
   for (const client of watchlist.clients) {
     const comps = client.competitors
@@ -132,6 +131,7 @@ function buildPrompt(
   materialBlock: string,
   brainContext: string,
   watchlistBlock: string,
+  anchor?: string,
 ): string {
   const historyBlock =
     history.length > 0
@@ -141,7 +141,11 @@ function buildPrompt(
           .join("\n")
       : "(primeira pergunta da conversa)";
 
-  return `QUEM O RADAR VIGIA HOJE:
+  const focoBlock = anchor
+    ? `FOCO DESTA CONVERSA: o cliente ${anchor}. Responda sobre ELE (o material e a base de conhecimento abaixo são só dele).\n\n`
+    : "";
+
+  return `${focoBlock}QUEM O RADAR VIGIA HOJE:
 ${watchlistBlock}
 
 O QUE A BASE DE CONHECIMENTO SABE DOS CLIENTES (cada um rotulado):
@@ -168,15 +172,30 @@ function extractJson(content: string): { resposta?: unknown; fontesUsadas?: unkn
   }
 }
 
-/** Pergunta ao Radar. Nunca lança por resposta malformada do LLM. */
-export async function askRadar(question: string, history: AskTurn[] = []): Promise<AskAnswer> {
-  const items = collectRecentItems();
+/**
+ * Pergunta ao Radar. Nunca lança por resposta malformada do LLM.
+ *
+ * `clientName` (opcional): ANCORA a conversa num cliente — o material e o Brain
+ * ficam só dele (é o "Pergunte ao Brain" com seletor). Sem ele, é multi-cliente
+ * (o Brain de todos entra como contexto — comportamento legado).
+ */
+export async function askRadar(
+  question: string,
+  history: AskTurn[] = [],
+  clientName?: string,
+): Promise<AskAnswer> {
+  const watchlist = await loadWatchlist();
+  const allNames = watchlist.clients.map((c) => c.name);
+  const anchor = clientName && allNames.includes(clientName) ? clientName : undefined;
 
-  // MULTI-CLIENTE (F7): o Brain de TODOS os clientes do Radar entra como
-  // contexto, cada um rotulado (a leitura tem cache diário — barato).
-  const clientNames = readWatchlist().clients.map((c) => c.name);
+  // material: itens recentes; ancorado → só os do cliente escolhido.
+  let items = collectRecentItems();
+  if (anchor) items = items.filter((i) => i.clientName === anchor);
+
+  // Brain: ancorado → só o do cliente; senão TODOS (multi-cliente, rotulado).
+  const names = anchor ? [anchor] : allNames;
   const brains: string[] = [];
-  for (const name of clientNames) {
+  for (const name of names) {
     const brain = await fetchClientBrain(name);
     brains.push(`— ${name}:\n${brain.context}`);
   }
@@ -186,11 +205,15 @@ export async function askRadar(question: string, history: AskTurn[] = []): Promi
     history,
     buildMaterialBlock(items),
     brains.join("\n\n"),
-    buildWatchlistBlock(),
+    buildWatchlistBlock(watchlist),
+    anchor,
   );
 
-  // medição (item 1): a pergunta é multi-cliente — sem clientName; feature "pergunta".
-  const content = await runWithUsage({ feature: "pergunta" }, () => completeViaGateway({ system: SYSTEM, prompt }));
+  // medição: ancorado atribui o custo ao cliente; senão multi-cliente.
+  const content = await runWithUsage(
+    anchor ? { clientName: anchor, feature: "pergunta" } : { feature: "pergunta" },
+    () => completeViaGateway({ system: SYSTEM, prompt }),
+  );
   const parsed = extractJson(content);
 
   // Resposta crua como fallback (sem fontes) — melhor que erro.
