@@ -17,7 +17,7 @@ import { config } from "dotenv";
 import { markAdminProcess } from "@/lib/db/admin-client";
 import { listOrgsAsCollector, runAsOrgCollector } from "@/lib/db/collector-org";
 import { supabaseEnabled } from "@/lib/db/supabase";
-import { automacaoDevida, loadAutomacoes, marcarRodou } from "@/lib/automacoes";
+import { automacaoDevida, devePreAquecer, loadAutomacoes, marcarRodou } from "@/lib/automacoes";
 import { ensureDigestMatinal } from "@/lib/digest";
 import { maybeSendDigestEmail } from "@/lib/digest-email";
 import { prepararReunioes } from "@/lib/prospects/preparo";
@@ -38,20 +38,25 @@ config({ path: ".env.local" });
 async function passada(now: Date, label: string): Promise<void> {
   const auto = await loadAutomacoes();
 
-  // 0. PRÉ-AQUECE o cache do loop (1×/dia por org): tira a coleta a frio do
-  //    PRIMEIRO ACESSO do usuário e a põe no cron. Idempotente — só roda se o
-  //    dia ainda não tem cache (runRadarLoop sem force reusa; peek nunca coleta).
-  //    Custo Firecrawl ≈ o de hoje (é 1 rodada/dia de qualquer jeito), fora do
-  //    caminho do usuário. Se falhar, o acesso ainda serve o cache morno.
-  try {
-    if (!(await peekLoopResult())) {
-      const loop = await runRadarLoop({ force: true });
-      console.log(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop: itens=${loop.items.length} falhas=${loop.failures?.length ?? 0}`);
-    } else {
-      console.log(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop: cache de hoje já existe`);
+  // 0. PRÉ-AQUECE o cache do loop (1×/dia por org) — SÓ SE ALGUMA AUTOMAÇÃO ESTÁ
+  //    LIGADA. O painel manda: com tudo desligado, NADA varre sozinho — a coleta
+  //    acontece só quando o Rafael ABRE o Radar (beacon /api/run) ou clica Rodar
+  //    agora (não pendura a tela: serve o cache morno + aquece em background).
+  //    Com automação ligada, o prewarm tira a coleta a frio do 1º acesso e a põe
+  //    no cron (idempotente — só roda se o dia ainda não tem cache).
+  if (devePreAquecer(auto)) {
+    try {
+      if (!(await peekLoopResult())) {
+        const loop = await runRadarLoop({ force: true });
+        console.log(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop: itens=${loop.items.length} falhas=${loop.failures?.length ?? 0}`);
+      } else {
+        console.log(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop: cache de hoje já existe`);
+      }
+    } catch (err) {
+      console.warn(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop falhou: ${(err as Error).message}`);
     }
-  } catch (err) {
-    console.warn(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop falhou: ${(err as Error).message}`);
+  } else {
+    console.log(`[run-schedules ${now.toISOString()}] (${label}) prewarm loop: automações desligadas — sem coleta automática`);
   }
 
   // 1. Relatórios agendados (F10) — opt-in por item (só roda o que foi criado).

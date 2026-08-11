@@ -13,7 +13,7 @@ import { join } from "node:path";
 process.env.RADAR_DATA_DIR = mkdtempSync(join(tmpdir(), "radar-auto-"));
 delete process.env.RADAR_DB;
 
-const { loadAutomacoes, saveAutomacoes, automacaoDevida, automacoesOff, marcarRodou, sanitizarCadencia } = await import("@/lib/automacoes");
+const { loadAutomacoes, saveAutomacoes, automacaoDevida, automacoesOff, marcarRodou, sanitizarCadencia, devePreAquecer } = await import("@/lib/automacoes");
 const { localDayKey, localWeekday } = await import("@/lib/schedules");
 
 type Criterio = { nome: string; feito: boolean; detalhe?: string };
@@ -29,6 +29,11 @@ add("Default: varredura DESLIGADA", off.diagnostico.enabled === false);
 
 const seg = new Date("2026-07-13T12:00:00.000Z"); // segunda 09h BRT
 add("Desligada NUNCA é devida (nada roda sozinho)", automacaoDevida(off.digest, seg) === false && automacaoDevida(off.diagnostico, seg) === false);
+
+// ── 1b. PREWARM do loop (a coleta diária) SÓ com automação ligada ──
+add("Tudo desligado → NÃO pré-aquece (sem coleta automática diária)", devePreAquecer(off) === false);
+add("Digest ligado → pré-aquece", devePreAquecer({ ...off, digest: { ...off.digest, enabled: true } }) === true);
+add("Varredura ligada → pré-aquece", devePreAquecer({ ...off, diagnostico: { ...off.diagnostico, enabled: true } }) === true);
 
 // ── 2. LIGAR diária → devida hoje; após rodar → não de novo hoje ──
 const diaria = { enabled: true, cadencia: { tipo: "diaria" as const } };

@@ -137,6 +137,16 @@ export function automacaoDevida(a: Automacao, now: Date): boolean {
   return localWeekday(now) === a.cadencia.weekday;
 }
 
+/**
+ * DEVE PRÉ-AQUECER o cache do loop no cron? SÓ se alguma automação está ligada —
+ * o painel manda ("nada varre sozinho até ser ligado"). Com tudo desligado, a
+ * coleta só acontece quando o Rafael ABRE o Radar (beacon) ou clica Rodar agora.
+ * PURO — o smoke testa direto.
+ */
+export function devePreAquecer(cfg: AutomacoesConfig): boolean {
+  return cfg.digest.enabled || cfg.diagnostico.enabled;
+}
+
 /** Rótulo humano da cadência (ex.: "todo dia", "toda segunda"). */
 const WEEKDAY_LABEL = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 export function cadenciaLabel(c: Cadencia): string {
