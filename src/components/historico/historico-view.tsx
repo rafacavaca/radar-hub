@@ -12,7 +12,7 @@ import { useState } from "react";
 
 import { SourceRef } from "@/components/signal-meta";
 import { formatDateTimePtBR } from "@/lib/format";
-import type { Balanco } from "@/lib/balanco";
+import { calibrar, type Balanco } from "@/lib/balanco";
 import type { BriefingEstado, EstadoRegistro } from "@/lib/briefing-estado";
 
 type Filtro = "todos" | BriefingEstado;
@@ -100,6 +100,7 @@ function BalancoCockpit({ balancos }: { balancos: Record<Janela, Balanco> }) {
   const [dias, setDias] = useState<Janela>(30);
   const b = balancos[dias];
   const pct = Math.round(b.taxaAcao * 100);
+  const insights = calibrar(b);
 
   return (
     <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
@@ -145,6 +146,27 @@ function BalancoCockpit({ balancos }: { balancos: Record<Janela, Balanco> }) {
                     <span className="text-stone-400">
                       {l.contagem.atuado} atuado(s) · {l.contagem.total} no total
                     </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {insights.length > 0 ? (
+            <div className="mt-3 border-t border-stone-100 pt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-stone-400">Calibração</p>
+              <p className="mt-0.5 text-[12px] text-stone-400">Padrões do seu uso — você decide o ajuste (nada muda sozinho).</p>
+              <ul className="mt-2 space-y-2">
+                {insights.map((ins, i) => (
+                  <li key={i} className="flex gap-2 text-[13px] leading-snug text-stone-600">
+                    <span
+                      aria-hidden
+                      className={
+                        "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full " +
+                        (ins.padrao === "ignora" ? "bg-amber-500" : "bg-emerald-500")
+                      }
+                    />
+                    <span>{ins.sugestao}</span>
                   </li>
                 ))}
               </ul>

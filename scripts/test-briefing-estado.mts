@@ -45,7 +45,7 @@ console.log("\n=== Smoke ESTADOS DO BRIEFING — histórico durável ===\n");
 
 // ── A2. balanço (colher o histórico) — agregação pura ────────────────────────
 {
-  const { calcularBalanco } = await import("@/lib/balanco");
+  const { calcularBalanco, calibrar } = await import("@/lib/balanco");
   const reg = (estado: string, cliente: string, kind: string, em: string) =>
     ({ estado, em, chave: "k" + em, item: { id: "x", kind, clientName: cliente, titulo: "t", detalhe: "", origem: "o", score: 1 } }) as unknown as import("@/lib/briefing-estado").EstadoRegistro;
   const now = new Date("2026-08-11T12:00:00.000Z");
@@ -61,6 +61,19 @@ console.log("\n=== Smoke ESTADOS DO BRIEFING — histórico durável ===\n");
   add("balanço: por cliente (A = 2 atuados)", b30.porCliente.find((l) => l.label === "A")?.contagem.atuado === 2, `A=${b30.porCliente.find((l) => l.label === "A")?.contagem.atuado}`);
   const b90 = calcularBalanco(regs, 90, now);
   add("balanço: janela de 90d inclui o antigo (4 de 4)", b90.total.total === 4, `total=${b90.total.total}`);
+
+  // calibração: ignora sistemático (cliente C = 4/5 = 80%) dispara; volume baixo não.
+  const regsCal = [
+    reg("ignorado", "C", "leitura", "2026-08-10T01:00:00.000Z"),
+    reg("ignorado", "C", "leitura", "2026-08-10T02:00:00.000Z"),
+    reg("ignorado", "C", "leitura", "2026-08-10T03:00:00.000Z"),
+    reg("ignorado", "C", "leitura", "2026-08-10T04:00:00.000Z"),
+    reg("atuado", "C", "leitura", "2026-08-10T05:00:00.000Z"),
+  ];
+  const ins = calibrar(calcularBalanco(regsCal, 30, now));
+  add("calibração: detecta ignora sistemático (cliente C, 80%)", ins.some((i) => i.dimensao === "cliente" && i.label === "C" && i.padrao === "ignora" && i.pct === 80), `insights=${ins.map((i) => i.label + ":" + i.padrao).join(",")}`);
+  const insBaixo = calibrar(calcularBalanco([reg("ignorado", "D", "leitura", "2026-08-10T00:00:00.000Z")], 30, now));
+  add("calibração: volume baixo (<4) NÃO vira padrão (evita ruído)", insBaixo.length === 0, `n=${insBaixo.length}`);
 }
 
 // ── B. store durável + org-scoped (Supabase real) ────────────────────────────

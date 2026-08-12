@@ -67,3 +67,56 @@ export function calcularBalanco(regs: EstadoRegistro[], dias: number, now: Date)
     porTipo: linhas(tipo as Map<string, BalancoContagem>, (k) => KIND_LABEL[k as DigestItemKind] ?? k),
   };
 }
+
+/**
+ * CALIBRAÇÃO (colher o histórico) — a régua NOTA o que você ignora/atua de forma
+ * sistemática e sugere um ajuste. É o princípio 30/60/90: a leitura vira sinal, o
+ * HUMANO decide (nada re-rankeia sozinho). Só dispara com volume mínimo (senão é
+ * ruído) e taxa alta num sentido. Puro — deriva do Balanço.
+ */
+export type CalibracaoInsight = {
+  dimensao: "cliente" | "tipo";
+  label: string;
+  padrao: "ignora" | "atua";
+  n: number;
+  total: number;
+  pct: number;
+  sugestao: string;
+};
+
+const MIN_VOLUME = 4; // abaixo disso é ruído, não padrão
+const LIMIAR = 0.7; // 70%+ num sentido = padrão claro
+
+export function calibrar(b: Balanco): CalibracaoInsight[] {
+  const out: CalibracaoInsight[] = [];
+  const scan = (linhas: BalancoLinha[], dim: "cliente" | "tipo") => {
+    for (const l of linhas) {
+      const c = l.contagem;
+      if (c.total < MIN_VOLUME) continue;
+      const ign = c.ignorado / c.total;
+      const act = c.atuado / c.total;
+      if (ign >= LIMIAR) {
+        const pct = Math.round(ign * 100);
+        out.push({
+          dimensao: dim, label: l.label, padrao: "ignora", n: c.ignorado, total: c.total, pct,
+          sugestao:
+            dim === "cliente"
+              ? `Você ignorou ${c.ignorado} de ${c.total} (${pct}%) sinais de ${l.label}. Se não é foco, reveja o que vigia em Concorrentes — ou pause a coleta em Automações.`
+              : `Você ignorou ${c.ignorado} de ${c.total} (${pct}%) de "${l.label}". Talvez o peso dessa área esteja alto pro seu foco — ajuste em Áreas.`,
+        });
+      } else if (act >= LIMIAR) {
+        const pct = Math.round(act * 100);
+        out.push({
+          dimensao: dim, label: l.label, padrao: "atua", n: c.atuado, total: c.total, pct,
+          sugestao:
+            dim === "cliente"
+              ? `Você atuou em ${c.atuado} de ${c.total} (${pct}%) sinais de ${l.label} — o Radar está no alvo aqui.`
+              : `Você atuou em ${c.atuado} de ${c.total} (${pct}%) de "${l.label}" — essa área tem rendido.`,
+        });
+      }
+    }
+  };
+  scan(b.porCliente, "cliente");
+  scan(b.porTipo, "tipo");
+  return out.sort((a, z) => z.total - a.total);
+}
