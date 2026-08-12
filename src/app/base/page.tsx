@@ -7,9 +7,12 @@
  * o site salvo, e entrega pra a view (curadoria interativa via /api/base).
  */
 
+import { brainOwnerOrgId, fetchBrainNodes } from "@/lib/brain";
 import { brainStats, loadBrainItems, loadBrainSite } from "@/lib/brain-nativo/store";
+import { currentOrgId } from "@/lib/db/session";
 import { loadWatchlist } from "@/lib/watchlist";
 
+import { BasePortaView } from "@/components/base/base-porta-view";
 import { BaseView } from "@/components/base/base-view";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +37,21 @@ export default async function BasePage({
             Cadastre uma conta na barra lateral pra começar a construir a base de conhecimento.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // Dois modos (D14): a org DONA (Formare) LÊ o Brain do OS pela porta (leitura,
+  // sem construtor); as agências-clientes CONSTROEM o Brain nativo (o construtor).
+  const owner = brainOwnerOrgId();
+  const org = await currentOrgId();
+  const modoPorta = !!owner && org === owner;
+
+  if (modoPorta) {
+    const nodes = await fetchBrainNodes(cliente);
+    return (
+      <div className="mx-auto max-w-[1080px] px-5 py-8 sm:px-6">
+        <BasePortaView cliente={cliente} nodes={nodes} />
       </div>
     );
   }

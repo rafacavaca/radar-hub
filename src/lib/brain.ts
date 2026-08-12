@@ -299,3 +299,30 @@ export async function fetchClientBrain(
   if (local) return local;
   return noneFor(clientName);
 }
+
+/**
+ * Os NÓS confirmados do Brain do Formare OS (leitura pela porta) — para a org
+ * DONA EXIBIR a base em modo LEITURA (o modo "porta" da tela /base). Org não-dona
+ * ou porta indisponível → [] (nunca lê o Brain do Formare de outra agência).
+ * Nunca lança. NÃO cacheia (a tela pede on-demand; o loop já tem o cache de dia).
+ */
+export async function fetchBrainNodes(clientName: string): Promise<BrainNode[]> {
+  const org = (await currentOrgId()) ?? "";
+  const owner = brainOwnerOrgId();
+  const isOwner = !owner || org === owner;
+  if (!isOwner || !isBrainDoorConfigured()) return [];
+  try {
+    const url = new URL(process.env.RADAR_BRAIN_URL as string);
+    url.searchParams.set("workspace", clientName);
+    url.searchParams.set("limit", String(NODE_LIMIT));
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${process.env.RADAR_BRAIN_SECRET as string}` },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return [];
+    const payload = (await res.json()) as { data?: { nodes?: BrainNode[] } };
+    return payload.data?.nodes ?? [];
+  } catch {
+    return [];
+  }
+}

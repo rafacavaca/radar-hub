@@ -29,6 +29,13 @@ export function BrainChat({ clients, cliente }: { clients: string[]; cliente: st
     }
   }, []);
 
+  // segue o CLIENTE ATUAL: a conversa é sempre sobre quem você está vendo. Ao
+  // trocar de cliente (navegação), reancora — o `key` no AskThread reinicia a
+  // conversa, fresca sobre o novo cliente. O seletor ainda permite trocar/"Todos".
+  useEffect(() => {
+    setSelected(cliente || clients[0] || "");
+  }, [cliente, clients]);
+
   function toggle() {
     setOpen((prev) => {
       const next = !prev;
@@ -74,6 +81,7 @@ export function BrainChat({ clients, cliente }: { clients: string[]; cliente: st
         </header>
 
         <AskThread
+          key={selected}
           clients={clients}
           clientName={selected || undefined}
           onClientChange={setSelected}
