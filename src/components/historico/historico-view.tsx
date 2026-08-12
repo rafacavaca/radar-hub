@@ -12,9 +12,11 @@ import { useState } from "react";
 
 import { SourceRef } from "@/components/signal-meta";
 import { formatDateTimePtBR } from "@/lib/format";
+import type { Balanco } from "@/lib/balanco";
 import type { BriefingEstado, EstadoRegistro } from "@/lib/briefing-estado";
 
 type Filtro = "todos" | BriefingEstado;
+type Janela = 30 | 60 | 90;
 
 const FILTROS: Array<{ id: Filtro; label: string }> = [
   { id: "todos", label: "Todos" },
@@ -36,7 +38,13 @@ function formatDia(d: string): string {
   return day && m ? `${day}/${m}` : d;
 }
 
-export function HistoricoView({ registros }: { registros: EstadoRegistro[] }) {
+export function HistoricoView({
+  registros,
+  balancos,
+}: {
+  registros: EstadoRegistro[];
+  balancos: Record<Janela, Balanco>;
+}) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const conta = (e: BriefingEstado) => registros.filter((r) => r.estado === e).length;
   const visiveis = filtro === "todos" ? registros : registros.filter((r) => r.estado === filtro);
@@ -49,7 +57,9 @@ export function HistoricoView({ registros }: { registros: EstadoRegistro[] }) {
         Tudo que você processou no Hoje — por estado, com data. O inbox segue curado; aqui nada se perde.
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-1.5">
+      <BalancoCockpit balancos={balancos} />
+
+      <div className="mt-6 flex flex-wrap gap-1.5">
         {FILTROS.map((f) => {
           const n = f.id === "todos" ? registros.length : conta(f.id);
           const ativo = filtro === f.id;
@@ -82,6 +92,75 @@ export function HistoricoView({ registros }: { registros: EstadoRegistro[] }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function BalancoCockpit({ balancos }: { balancos: Record<Janela, Balanco> }) {
+  const [dias, setDias] = useState<Janela>(30);
+  const b = balancos[dias];
+  const pct = Math.round(b.taxaAcao * 100);
+
+  return (
+    <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[13px] font-semibold text-stone-900">Balanço</p>
+          <p className="text-[12px] text-stone-500">O que você processou — e de quanto atuou.</p>
+        </div>
+        <div className="flex gap-1">
+          {([30, 60, 90] as const).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDias(d)}
+              className={
+                "rounded-full px-2.5 py-1 text-[12px] font-medium " +
+                (dias === d ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-100")
+              }
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {b.total.total === 0 ? (
+        <p className="mt-3 text-[13px] text-stone-400">Nada processado nos últimos {dias} dias ainda.</p>
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-10">
+            <Num n={b.total.total} label="processados" />
+            <Num n={b.total.atuado} label={`atuados · ${pct}%`} accent />
+            <Num n={b.total.ignorado} label="ignorados" />
+            <Num n={b.total.adiado} label="adiados" />
+            {b.total.arquivado > 0 ? <Num n={b.total.arquivado} label="arquivados" /> : null}
+          </div>
+          {b.porCliente.length > 1 ? (
+            <div className="mt-3 border-t border-stone-100 pt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-stone-400">Por cliente</p>
+              <ul className="mt-1.5 space-y-1">
+                {b.porCliente.slice(0, 6).map((l) => (
+                  <li key={l.label} className="flex items-center justify-between text-[13px]">
+                    <span className="text-stone-700">{l.label}</span>
+                    <span className="text-stone-400">
+                      {l.contagem.atuado} atuado(s) · {l.contagem.total} no total
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+function Num({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
+  return (
+    <div>
+      <span className={"text-2xl font-bold " + (accent ? "text-emerald-600" : "text-stone-900")}>{n}</span>
+      <span className="ml-1.5 text-[13px] text-stone-500">{label}</span>
     </div>
   );
 }

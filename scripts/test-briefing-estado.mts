@@ -43,6 +43,26 @@ console.log("\n=== Smoke ESTADOS DO BRIEFING — histórico durável ===\n");
   add("item de outro sinal (não marcado) entra no inbox", outro.itens.length === 1, `itens=${outro.itens.length}`);
 }
 
+// ── A2. balanço (colher o histórico) — agregação pura ────────────────────────
+{
+  const { calcularBalanco } = await import("@/lib/balanco");
+  const reg = (estado: string, cliente: string, kind: string, em: string) =>
+    ({ estado, em, chave: "k" + em, item: { id: "x", kind, clientName: cliente, titulo: "t", detalhe: "", origem: "o", score: 1 } }) as unknown as import("@/lib/briefing-estado").EstadoRegistro;
+  const now = new Date("2026-08-11T12:00:00.000Z");
+  const regs = [
+    reg("atuado", "A", "leitura", "2026-08-10T00:00:00.000Z"),
+    reg("atuado", "A", "alerta", "2026-08-09T00:00:00.000Z"),
+    reg("ignorado", "B", "leitura", "2026-08-08T00:00:00.000Z"),
+    reg("adiado", "A", "leitura", "2026-06-01T00:00:00.000Z"), // fora da janela de 30d
+  ];
+  const b30 = calcularBalanco(regs, 30, now);
+  add("balanço: janela de 30d exclui o antigo (3 de 4)", b30.total.total === 3, `total=${b30.total.total}`);
+  add("balanço: atuados + taxa de ação (2 de 3 = 67%)", b30.total.atuado === 2 && Math.round(b30.taxaAcao * 100) === 67, `atuado=${b30.total.atuado} taxa=${Math.round(b30.taxaAcao * 100)}%`);
+  add("balanço: por cliente (A = 2 atuados)", b30.porCliente.find((l) => l.label === "A")?.contagem.atuado === 2, `A=${b30.porCliente.find((l) => l.label === "A")?.contagem.atuado}`);
+  const b90 = calcularBalanco(regs, 90, now);
+  add("balanço: janela de 90d inclui o antigo (4 de 4)", b90.total.total === 4, `total=${b90.total.total}`);
+}
+
 // ── B. store durável + org-scoped (Supabase real) ────────────────────────────
 const URL = process.env.RADAR_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
