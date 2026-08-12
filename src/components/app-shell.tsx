@@ -168,6 +168,16 @@ function BookIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+function HistoryIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v5h5" />
+      <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
 /** A marca do Radar — o ícone com a onda pulsando atrás (a "vida" do produto,
     na linguagem do pulso do ponto vermelho original). */
 function RadarMark({ className = "h-5 w-5" }: { className?: string }) {
@@ -239,6 +249,7 @@ function SidebarNav({
         <div className="mb-2 space-y-0.5">
           <NavItem href="/inicio" label="Início" icon={HouseIcon} active={pathname === "/inicio"} collapsed={collapsed} />
           <NavItem href="/hoje" label="Hoje" icon={TodayIcon} active={pathname === "/hoje"} collapsed={collapsed} badge={<HojeBadge />} />
+          <NavItem href="/historico" label="Histórico" icon={HistoryIcon} active={pathname === "/historico"} collapsed={collapsed} />
         </div>
         {!collapsed ? (
           <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-400">Clientes</p>
@@ -381,7 +392,11 @@ export function AppShell({
   const activeSection = sections.find((s) => s.match(pathname));
   // telas da AGÊNCIA (não de um cliente) — sem o cabeçalho/abas de cliente.
   const orgLevel =
-    pathname === "/inicio" || pathname === "/hoje" || pathname === "/automacoes" || pathname === "/implantacao";
+    pathname === "/inicio" ||
+    pathname === "/hoje" ||
+    pathname === "/historico" ||
+    pathname === "/automacoes" ||
+    pathname === "/implantacao";
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-stone-50">

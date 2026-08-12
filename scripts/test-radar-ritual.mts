@@ -128,7 +128,7 @@ add(
 
 // ── 3+4: estados — atuado some; adiado some hoje e volta amanhã ──
 const itemForte = d1.itens.find((i) => i.id === "lr:r-forte")!;
-await setEstado("lr:r-forte", "atuado");
+await setEstado("lr:r-forte", "atuado", { item: itemForte });
 await setEstado("al:d-novo", "adiado", { now: hoje, item: d1.itens.find((i) => i.id === "al:d-novo")! });
 const estados = await loadEstados();
 const d2 = buildDigest(material, estados, hoje);

@@ -9,11 +9,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { setEstado, type BriefingEstado } from "@/lib/briefing-estado";
+import { currentUser } from "@/lib/db/session";
 import type { DigestItem } from "@/lib/digest";
 
 export const dynamic = "force-dynamic";
 
-const ESTADOS: BriefingEstado[] = ["atuado", "ignorado", "adiado"];
+const ESTADOS: BriefingEstado[] = ["atuado", "ignorado", "adiado", "arquivado"];
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -32,7 +33,9 @@ export async function POST(req: NextRequest) {
       : undefined;
 
   try {
-    const registro = await setEstado(itemId, estado, { item });
+    const user = await currentUser();
+    const por = user ? { id: user.id, email: user.email } : undefined;
+    const registro = await setEstado(itemId, estado, { item, por });
     return NextResponse.json({ data: { registro } });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "falha ao marcar" }, { status: 400 });

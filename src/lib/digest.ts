@@ -306,9 +306,18 @@ export function buildDigest(
   }
   adiados.sort((a, b) => b.score - a.score);
 
-  // itens do dia: fora os processados (qualquer estado marcado sai da lista
-  // do dia — o adiado reaparece pela seção própria quando vence).
-  const doDia = candidatos(material, now).filter((c) => !estados[c.id]);
+  // itens do dia: fora os processados (qualquer estado marcado sai da lista do
+  // dia — o adiado reaparece pela seção própria quando vence). O casamento é por
+  // id E por CHAVE estável do sinal: se a reanálise mudar o id (o headline do LLM
+  // varia), o estado ainda pega o item pela chave — o "ignorado" não vaza de volta.
+  const marcadasChaves = new Set(
+    Object.values(estados)
+      .map((r) => r.chave)
+      .filter((k): k is string => Boolean(k)),
+  );
+  const doDia = candidatos(material, now).filter(
+    (c) => !estados[c.id] && !marcadasChaves.has(c.sinalKey ?? ""),
+  );
 
   // cap por cliente com transparência (nunca corte silencioso).
   const porCliente = new Map<string, DigestItem[]>();

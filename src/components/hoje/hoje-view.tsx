@@ -12,6 +12,7 @@
  * nada reflowa depois da hidratação e um item não aparece em dois lugares.
  */
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { useRotulo } from "@/components/vocab-context";
@@ -129,7 +130,12 @@ export function HojeView({
             Digest de {formatDateTimePtBR(geradoEm)} · {clientesCount} cliente(s) na base
           </p>
         </div>
-        <AtualizarDigest />
+        <div className="flex items-center gap-3">
+          <Link href="/historico" className="text-[13px] font-medium text-stone-500 hover:text-stone-900">
+            Ver histórico →
+          </Link>
+          <AtualizarDigest />
+        </div>
       </header>
 
       {/* COCKPIT — bate o olho e sabe se o dia tem fogo */}
