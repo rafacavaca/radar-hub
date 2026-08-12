@@ -126,6 +126,42 @@ function clampScore(value: unknown): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
+/** Teto de eventos por rodada de análise (protege o timeout de 40s do gateway). */
+const MAX_ANALISE = 20;
+
+/**
+ * Seleciona os eventos que vão ao analista — POR CONCORRENTE (round-robin por
+ * recência), com teto TOTAL. Antes era `slice(0, 12)` no geral: com muitos
+ * concorrentes, quem postava mais recente enchia a janela e deixava os outros
+ * NO ESCURO (nunca chegavam ao LLM → 0 leituras → sumiam do Briefing/Visão).
+ * Agora o mais recente de CADA concorrente entra primeiro (garante cobertura),
+ * depois aprofunda, até `total`. Um concorrente barulhento não monopoliza.
+ */
+export function selecionarEventos(events: RawEvent[], total = MAX_ANALISE): RawEvent[] {
+  const ordenados = [...events].sort(byRecencyDesc);
+  if (ordenados.length <= total) return ordenados;
+
+  const grupos = new Map<string, RawEvent[]>();
+  for (const e of ordenados) {
+    const k = e.competitorName || "?";
+    const g = grupos.get(k);
+    if (g) g.push(e);
+    else grupos.set(k, [e]);
+  }
+  const listas = [...grupos.values()];
+  const maxLen = Math.max(...listas.map((g) => g.length));
+  const out: RawEvent[] = [];
+  for (let i = 0; i < maxLen && out.length < total; i++) {
+    for (const g of listas) {
+      if (i < g.length) {
+        out.push(g[i]);
+        if (out.length >= total) break;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Roda UMA lente sobre os movimentos de um cliente.
  * Devolve 0..N leituras — só dos movimentos que passaram na régua da lente.
@@ -138,9 +174,9 @@ export async function analyzeLens(
 ): Promise<LensReading[]> {
   if (events.length === 0) return [];
 
-  // CAP: geração longa estoura o teto de 40s do gateway (e o timeout abre o
-  // disjuntor, derrubando as outras lentes em cascata). Lê os 12 mais recentes.
-  const capped = [...events].sort(byRecencyDesc).slice(0, 12);
+  // Por concorrente (round-robin), teto 20: todo concorrente ativo é analisado —
+  // sem o ponto cego do antigo `slice(0, 12)` no geral.
+  const capped = selecionarEventos(events);
 
   const content = await completeViaGateway({
     system: buildSystem(lens),

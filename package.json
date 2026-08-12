@@ -10,6 +10,7 @@
     "smoke:visita": "tsx scripts/test-last-visit.mts",
     "smoke:brain": "tsx scripts/test-brain-nativo.mts",
     "smoke:estados": "tsx scripts/test-briefing-estado.mts",
+    "smoke:select": "tsx scripts/test-radar-select.mts",
     "smoke:ask-material": "tsx scripts/test-ask-material.mts",
     "smoke:signals": "tsx scripts/test-signals-history.mts",
     "smoke:inicio": "tsx scripts/test-inicio-cockpit.mts",
