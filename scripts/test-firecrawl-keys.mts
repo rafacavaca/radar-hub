@@ -21,7 +21,7 @@ process.env.FIRECRAWL_API_KEY_2 = "fc-teste-dois-000000000000000000000";
 process.env.FIRECRAWL_KEY2_QUOTA = "2";
 process.env.FIRECRAWL_KEY2_RENOVA = "2";
 process.env.FIRECRAWL_API_KEY_3 = "fc-teste-tres-000000000000000000000";
-// slot 3 sem QUOTA no env → deve cair no default (1000); com RENOVA 17.
+// slot 3 sem QUOTA no env → deve cair no default (2000); com RENOVA 17.
 process.env.FIRECRAWL_KEY3_RENOVA = "17";
 
 const { carregarChaves, ordemDeTentativa, registrarUso, marcarEsgotada, statusChaves, inicioCicloAtual } = await import(
@@ -40,7 +40,7 @@ const now = new Date("2026-07-20T12:00:00.000Z"); // dia 20: ciclos → k1=14/ju
 const chaves = carregarChaves();
 add("Lê as 3 chaves do env (slots 1-3)", chaves.length === 3 && chaves.map((c) => c.slot).join(",") === "1,2,3");
 add("Quota do env respeitada (k1=2)", chaves[0].quota === 2);
-add("Quota ausente cai no default 1000 (k3)", chaves[2].quota === 1000);
+add("Quota ausente cai no default 2000 (k3)", chaves[2].quota === 2000);
 add("renovaDia lido por chave (k2=2, k3=17)", chaves[1].renovaDia === 2 && chaves[2].renovaDia === 17);
 add("id é estável e único por chave", chaves[0].id !== chaves[1].id && chaves[0].id === carregarChaves()[0].id);
 
@@ -62,7 +62,7 @@ add("k1 marcada esgotada no status", statusChaves(now).find((s) => s.slot === 1)
 registrarUso(k2.id, now);
 registrarUso(k2.id, now);
 add("k2 esgotada → topo vira slot 3", ordemDeTentativa(now)[0].slot === 3);
-add("k3 (default 1000) intacta e disponível", statusChaves(now).find((s) => s.slot === 3)!.restante === 1000);
+add("k3 (default 2000) intacta e disponível", statusChaves(now).find((s) => s.slot === 3)!.restante === 2000);
 
 // ── 5. marcarEsgotada (recusa da API 402) tira a chave na hora ──
 marcarEsgotada(k3.id, now);

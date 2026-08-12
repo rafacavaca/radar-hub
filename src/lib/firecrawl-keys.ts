@@ -14,7 +14,10 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const QUOTA_PADRAO = 1000;
+// Cota mensal por chave, quando o env não define (FIRECRAWL_KEY{N}_QUOTA). O
+// plano real observado é ~2000/conta (não 1000) — o teto baixo marcava as chaves
+// "esgotadas" na metade do mês. O 402 real do Firecrawl é o juiz final.
+const QUOTA_PADRAO = 2000;
 
 export type ChaveFirecrawl = {
   id: string; // hash estável do valor da chave (contador segue a chave, não o slot)

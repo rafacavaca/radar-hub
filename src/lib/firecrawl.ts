@@ -154,7 +154,11 @@ export async function scrape(url: string, opts: ScrapeOptions = {}): Promise<Scr
     }
 
     if (STATUS_ROTACIONA.has(response.status)) {
-      marcarEsgotada(chave.id);
+      // 429 = RATE LIMIT (transitório: bateu no limite por minuto, mas a chave
+      // ainda TEM cota do mês) → rotaciona nesta requisição, mas NÃO marca a
+      // chave esgotada no ciclo (senão um pico de 429 a mata o mês inteiro).
+      // 402 (sem crédito) / 401 / 403 (chave inválida) = a chave saiu de verdade.
+      if (response.status !== 429) marcarEsgotada(chave.id);
       ultimoDetalhe = `${chave.label}: HTTP ${response.status}`;
       continue;
     }
